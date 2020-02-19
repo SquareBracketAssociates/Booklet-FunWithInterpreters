@@ -1,0 +1,70 @@
+!! AST Visitors
+
+The cornerstone of an AST interpreter are the ASTs, short for abstract syntax tree.
+An abstract syntax tree is a tree data structure that represents a program from the syntax point of view. In other words, each node in the tree will represent an element that is written in a program. To illustrate it, consider the piece of Pharo code below:
+
+[[[language=smalltalk
+variable := 'constant' , self message
+]]]
+
+This piece of code assigns into a variable named ==variable== the result of sending the ==,== message to a =='constant'== string, with ==self message== as argument. An AST will then organize the code above as a tree containing nodes representing variables, assignments, strings, and message sends.
+
+In the first part of this chapter we will study ASTs by looking at the existing AST implementation in Pharo, the RBAST. RBAST is the AST implementation used currently (Pharo 9.0) by many tools in Pharo's tool-chain, such as the compiler, the syntax-highlighter, the auto-completion, the code quality engine and the refactoring engine. As so, it's an interesting piece of engineering, and we will find it provides most of what we will need for our journey to have fun with interpreters.
+
+In the second part of the chapter we will study (or re-study, for those who already know it) the visitor design pattern. To be usable by the many tools named before, RBASTs implement a visitor interface. Tools performing complex operations on ASTs may then visitor classes with their algorithm. As we will see in the chapters after this one, one such tool is an interpreter, thus mastering ASTs and visitors is essential.
+
+!!! Pharo Abstract Syntax Trees
+
+What is an AST.
+How do we get it.
+The parser comes for free.
+
+```
+RBParser parseExpression: '1+1'
+```
+
+!!!! Literal nodes
+
+!!!! Variable node
+
+!!!! Assignment nodes
+
+!!!! Message nodes
+
+!!!! Cascade nodes
+
+!!!! Method and Block nodes
+
+has arguments and sequence.
+Method has selector, block doesnt.
+
+!!!!! The Sequence Node
+
+has temporaries and statements.
+
+
+!!!! Return Node
+
+!!! Basic ASTs Manipulations
+
+!!!! Iterating over an AST
+
+children
+allChildren
+nodesDo:
+methodNode
+parent
+
+!!!! Storing Properties
+
+!!!! Testing Methods
+
+!!! AST Visitors
+
+!!!! The Visitor Pattern
+
+!!!! A visitor XX
+
+!!!! A visitor YY
+
+!!! Conclusion

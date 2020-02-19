@@ -1,0 +1,14 @@
+build/
+pillar
+mustache
+Pharo.*
+pharo
+pharo-ui
+pharo-vm/
+*.mcz
+*.auctex
+.DS_Store
+_result
+*.log
+*.blg
+*.aux
