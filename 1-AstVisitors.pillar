@@ -15,25 +15,226 @@ In the second part of the chapter we will study (or re-study, for those who alre
 
 !!! Pharo Abstract Syntax Trees
 
-What is an AST.
-How do we get it.
-The parser comes for free.
+An abstract syntax tree is a tree data structure that represents a program from the syntax point of view. In the tree, nodes represent the syntactic elements of the program.
+The edges in the tree represent how those nodes are related.
 
-```
-RBParser parseExpression: '1+1'
-```
+The Pharo standard distribution comes with a pretty complete AST implementation that is used by many tools. To get our hands over an AST, we could build it ourselves manually, or as we will do in this chapter, we could ask a parser to parse some text and build an AST for us. Fortunately, Pharo also includes a parser that does exactly this: the ==RBParser==.
+The ==RBParser== class implementas a parser for the Pharo syntax.
+It has two main modes of working: parsing expressions and parsing methods.
 
-!!!! Literal nodes
+!!!! Parsing Expressions
 
-!!!! Variable node
+Expressions are constructs that can be evaluated to a value.
+For example, the program ==17 max: 42== is the message send ==max:== to receiver 17 with argument 42, and can be evaluated to the value 42 (since it is bigger than 17).
+
+[[[language=smalltalk
+expression := RBParser parseExpression: '17 max: 42'.
+
+expression receiver formattedCode
+>>> 17.
+
+expression selector
+>>> #max.
+
+expression arguments first formattedCode
+>>> 42.
+]]]
+
+Expressions can be combined to build more complex expressions. In the following example, the expresion =17 max: 42= is used as the receiver of another message expression, the message ==#asString== with no arguments.
+
+[[[language=smalltalk
+expression := RBParser parseExpression: '(17 max: 42) asString'.
+
+expression receiver formattedCode
+>>> (17 max: 42).
+
+expression selector
+>>> #asString.
+
+expression arguments
+>>> #()
+]]]
+
+Of course, message sends are not the only expressions we have in Pharo.
+Another kind of expression that appeared already in the examples above are literal objects such as numbers.
+
+[[[language=smalltalk
+expression := RBParser parseExpression: '17'.
+
+expression formattedCode
+>>> 17.
+]]]
+
+!!!!! The Literal Node
+
+Literal nodes represent literal objects. A literal object is an object that is not created directly by sending the ==new== message to a class. Instead, the developer writes directly in the source code the value of that object, and the object is created automatically from it. Literal objects in Pharo are strings, numbers, characters, booleans, nil and literal arrays.
+
+Literal nodes in Pharo are instances of the ==RBLiteralValueNode==, and understand the message ==#value== which returns the value of the object. In other words, literal objects in Pharo are resolved at parse time. Notice that the ==#value== message does not return a string representation of the literal object, but the literal object itself.
+
+[[[language=smalltalk
+integerExpression := RBParser parseExpression: '17'.
+integerExpression value
+>>> 17.
+
+trueExpression := RBParser parseExpression: 'true'.
+trueExpression value
+>>> true.
+
+"Remember, strings need to be escaped"
+stringExpression := RBParser parseExpression: '''a string'''.
+stringExpression value
+>>> 'a string'.
+]]]
+
+A special case of literals are literal arrays, which have their own node: ==RBLiteralArrayNode==.
+Literal array nodes understand the message ==#value== as any other literal, returning the literal array instance. However, it allows us to access the sub collection of literals using the message ==#contents==. 
+
+[[[language=smalltalk
+arrayExpression := RBParser parseExpression: '#(1 2 3)'.
+arrayExpression value
+>>> #(1 2 3).
+
+arrayExpression contents first
+>>> RBLiteralValueNode(1).
+]]]
+
+!!!!! The Variable Node
+
+Variable nodes in the AST tree are used when variables are used or assigned to.
+Variables are instances of ==RBVariableNode== and know their ==#name==.
+
+[[[language=smalltalk
+variableExpression := RBParser parseExpression: 'aVariable'.
+variableExpression name
+>>> 'aVariable'.
+]]]
+
+Variable nodes are used to equally denote temporary, argument, instance, class or global variables.
+That is because at parse-time, the parser cannot always differentiate when a variable is of one kind or another.
+This is specially true when we talk about instance, class and global variables, because the context to distinguish them has not been made avaiable.
+Instead of complexifying the parser with this kind of information, the Pharo toolchain does it in a pipelined fashion, leaving those tools using the AST to decide how to do it.
+Then the parser generates a simple AST, and tools can later annotate that AST with semantic information from a context if required.
+An example of this kind of treatment is the compiler, which requires such contextual information to produce the correct final code.
+For the matter of this booklet, we will not consider nor use semantic analysis, and we will stick with normal ==RBVariableNode== objects.
 
 !!!! Assignment nodes
 
+Assignment nodes in the AST represent assignment expressions using the ==:\=== operator.
+Assignments are indeed expressions: their value is the value of the variable after the assignment.
+We will see in the next chapter, when implementing an evaluator, why this is important.
+
+An assignment node is an instance of ==RBAssignmentNode==.
+If we send it the ==variable== message answers the variable it assigns to.
+The message ==value== returns the expression at the right of the assignment.
+
+[[[language=smalltalk
+assignmentExpression := RBParser parseExpression: 'var := #( 1 2 ) size'.
+assignmentExpression variable
+>>> RBVariableNode(var).
+
+assignmentExpression value
+>>> RBMessageNode(#(1 2) size).
+]]]
+
 !!!! Message nodes
+
+Message nodes are the core of Pharo programs, and they are the most common composed expression node we will find in the AST.
+Message are instances of ==RBMessageNode== and they have a receiver, a selector and a collection of arguments, obtained through the ==#receiver==, ==#selector== and ==#arguments== messages.
+We say that message nodes are composed expressions because the ==#receiver== and ==#arguments== of a message are expressions in themselves, which can be as simple as literals or variables, or it can be other composed messages too.
+
+[[[language=smalltalk
+messageExpression := RBParser parseExpression: '17 max: 42'.
+messageExpression receiver
+>>> RBLiteralValueNode(17).
+]]]
+
+Note that the arguments is a normal collection of expressions.
+
+[[[language=smalltalk
+messageExpression arguments
+>>> an OrderedCollection(RBLiteralValueNode(42)).
+]]]
+
+And that the selector is also just a symbol.
+
+[[[language=smalltalk
+messageExpression selector
+>>> #max:.
+]]]
+
+!!!! A note on message nodes and precedence
+
+For those readers that already master the syntax of Pharo, you will remember that there exist three kind of messages: unary, binary and keyword messages. Besides their number of parameters, the Pharo syntax accords an order of precedences between them too. I.e., unary messages get to be evaluated before binary messages, which get to be evaluated before keyword messages. Only parentheses override this precedence.
+Precedence of messages in RBASTs is resolved at parse-time. In other words, the output of ==RBParser== is an AST respecting the precedence rules of Pharo.
+
+Let's consider a couple of examples illustrating this.
+If we feed the ==RBParser== with the expression below, it will create a ==RBMessageNode== as we already know it.
+The root of that message node is they ==keyword:== message, and its first argument is the ==argument + 42 unaryMessage== subexpression.
+That subexpression is in turn another message node with the ==+== binary selector, whose first argument is the ==42 unaryMessage== subexpression.
+
+[[[
+variable keyword: argument + 42 unaryMessage
+]]]
+
+Now, let's change the expression adding extra parenthesis as in:
+
+[[[
+variable keyword: (argument + 42) unaryMessage
+]]]
+
+The resulting AST completely changed! The root is still the ==keyword:== message, but now its first argument is the ==unaryMessage== sent to a (now in parenthesis) ==(argument + 42)== receiver.
+
+Finally, if modify the parenthesis again to wrap the keyword message, the root of the resulting AST has changed too. It is now the ==+== binary message.
+
+[[[
+(variable keyword: argument) + 42 unaryMessage
+]]]
+
+==RBParser== can be a nice tool to try and play with Pharo expressions and master precedence!
 
 !!!! Cascade nodes
 
-!!!! Method and Block nodes
+Cascade nodes represent cascaded message expressions.
+Cascaded messages are messages separated by semi-colons (==;==) such as in the following example.
+
+[[[language=smalltalk
+OrderedCollection new
+    add: 17;
+    add: 42;
+    yourself
+]]]
+
+Which is, in practical terms, equivalent to a sequence of messages to the same receiver:
+
+[[[language=smalltalk
+t := OrderedCollection new.
+t add: 17.
+t add: 42.
+t yourself
+]]]
+
+
+However, in contrast with the sequence above, cascades are expressions: their value is the value of the last message in the cascade.
+
+A cascade node is an instance of ==RBCascadeNode==.
+A cascade node understands the ==receiver== message, returning the receiver of the cascade.
+It also understands the ==messages== message, returning a collection with the messages in the cascade.
+Note that the messages inside the cascade node are normal ==RBMessageNode== and have a receiver too.
+They indeed share the same receiver than the cascade.
+In the following chapters we will have to be careful when manipulating cascade nodes, to avoid to wrongly manipulate twice the same receiver.
+
+[[[language=smalltalk
+cascadeExpression := RBParser parseExpression: 'var msg1; msg2'.
+cascadeExpression receiver
+>>> RBVariableNode(var).
+
+cascadeExpression messages
+>>> an OrderedCollection(RBMessageNode(var msg1) RBMessageNode(var msg2))
+]]]
+
+!!!! Dynamic Array nodes
+
+!!! Method and Block nodes
 
 has arguments and sequence.
 Method has selector, block doesnt.
@@ -63,8 +264,10 @@ parent
 
 !!!! The Visitor Pattern
 
-!!!! A visitor XX
+!!!! Search the AST
 
-!!!! A visitor YY
+!!!! Search the AST
+
+
 
 !!! Conclusion
