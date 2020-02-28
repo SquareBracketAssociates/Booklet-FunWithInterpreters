@@ -24,7 +24,7 @@ script:
 after_success:
   - wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
   - mv _result/pdf/main.pdf fun-with-interpreters-wip.pdf
-  - bash upload.sh fun-with-interpreters.pdf
+  - bash upload.sh fun-with-interpreters-wip.pdf
 
 branches:
   except:
