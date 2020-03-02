@@ -378,6 +378,8 @@ This is because in Pharo, control-flow statements such as conditionals or loops 
 Because of this, we say that Pharo's syntax fits inside a post-card.
 
 In this section we will explore some core-messages of RBAST, that allow common manipulation for all nodes: iterating the nodes, storing meta-data and testing methods.
+Most of these manipulations are rather primitive and simple.
+In the next section we will see how the visitor pattern in conjunction with ASTs empowers us, and gives us the possibility to build more complex applications such as concrete and abstract evaluators as we will see in the next chapters.
 
 !!!! Iterating over an AST
 
