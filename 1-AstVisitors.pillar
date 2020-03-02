@@ -372,17 +372,61 @@ blockNode body statements.
 
 !!! Basic ASTs Manipulations
 
+We have already covered all of Pharo AST nodes, and how to access the information in them.
+Those knowing ASTs for other languages, would have noticed that we have indeed few nodes.
+This is because in Pharo, control-flow statements such as conditionals or loops are expressed as messages, so no special case for them is required in the syntax.
+Because of this, we say that Pharo's syntax fits inside a post-card.
+
+In this section we will explore some core-messages of RBAST, that allow common manipulation for all nodes: iterating the nodes, storing meta-data and testing methods.
+
 !!!! Iterating over an AST
 
-children
-allChildren
-nodesDo:
-methodNode
-parent
+ASTs are indeed trees, and we can traverse them as any other tree.
+RBASTs provide several protocols for accessing and iterating any AST node in a generic way.
+
+- ==aNode children==: returns a collection with the direct children of the node.
+- ==aNode allChildren==: returns a collection with all recursive children found from the node.
+- ==aNode nodesDo: aBlock==: iterates over allChildren applying ==aBlock== on each of them.
+- ==aNode parent==: returns the direct parent of the node.
+- ==aNode methodNode==: returns the method node that is the root of the tree. For consistency, expressions nodes parsed using ==parseExpression:== are contained within a method node too.
 
 !!!! Storing Properties
 
+Some manipulations require storing meta-data associated to AST nodes.
+RBASTs provide a protocols for storing arbitrary properties inside a node.
+Properties stored in a node are indexed by a key, following the API of Pharo dictionaries.
+
+- ==aNode propertyAt: aKey put: anObject==: inserts ==anObject== at ==aKey==, overriding existing values at ==aKey==.
+- ==aNode hasProperty: aKey==: returns a boolean indicting if the node contains a property indexed by ==aKey==.
+- ==aNode propertyAt: aKey==: returns the value associated with ==aKey==. If ==aKey== is not found, fails with an exception.
+- ==aNode propertyAt: aKey ifAbsent: aBlock==: returns the value associated with ==aKey==. If ==aKey== is not found, evaluates the block and returns the its value.
+- ==aNode propertyAt: aKey ifAbsentPut: aBlock==: returns the value associated with ==aKey==. If ==aKey== is not found, evaluates the block, inserts the value of the block at ==aKey== and returns the value.
+- ==aNode propertyAt: aKey ifPresent: aPresentBlock ifAbsent: anAbsentBlock==: Searches for the value associated with ==aKey==. If ==aKey== is found, evaluates ==aPresentBlock== with the its value. If ==aKey== is not found, evaluates the block and returns the its value.
+- ==aNode removeProperty: aKey==: removes the property at ==aKey==. If ==aKey== is not found, fails with an exception.
+- ==aNode removeProperty: aKey ifAbsent: aBlock==: removes the property at ==aKey==. If ==aKey== is not found, evaluates the block and returns the its value.
+
+
 !!!! Testing Methods
+
+RBASTs provide a testing protocol that can be useful for small applications and writing unit tests.
+All RBASTs answer the messages ==isXXX== with a boolean ==true== or ==false==.
+A first set of methods allow us to ask a node if it is of a specified type:
+
+- ==isLiteralNode==
+- ==isLiteralArray==
+- ==isVariable==
+- ==isAssignment==
+- ==isMessage==
+- ==isCascade==
+- ==isDynamicArray==
+- ==isMethod==
+- ==isSequence==
+- ==isReturn==
+
+And we can also ask a node if it is an expression node or not:
+
+- ==isValue==
+
 
 !!! AST Visitors
 
