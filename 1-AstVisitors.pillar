@@ -350,7 +350,25 @@ It is interesting to note that the AST does not force semantics but only syntax:
 
 !!!! Block nodes
 
-!!!! Method and Block argument nodes
+Block nodes represent block closures expressions.
+A block closure is an object syntactically delimited by square brackets ==[]== that contains statements and can be evaluated using the ==value== message and its variants.
+The block node is the syntactic counter-part of a block closure: it is expression that, when evaluated, will create the block object.
+
+Block nodes work by most means like method nodes: they have a list of arguments and a sequence node as body containing temporaries and statements.
+They differentiate from methods in two aspects: first, they do not have a selector, second, they are expressions (and thus can be parsed with ==parseExpression:==).
+
+[[[
+blockNode := RBParser parseExpression: '[ :arg | | temp | 1 + 1. temp ]'.
+
+blockNode arguments.
+>>>an OrderedCollection(RBVariableNode(arg))
+
+blockNode body temporaries.
+>>>an OrderedCollection(RBVariableNode(temp))
+
+blockNode body statements.
+>>>an OrderedCollection(RBMessageNode(1 + 1) RBVariableNode(temp))
+]]]
 
 !!! Basic ASTs Manipulations
 
