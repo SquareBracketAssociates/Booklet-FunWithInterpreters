@@ -65,7 +65,7 @@ expression formattedCode
 >>> 17.
 ]]]
 
-!!!!! The Literal Node
+!!!! The Literal Node
 
 Literal nodes represent literal objects. A literal object is an object that is not created directly by sending the ==new== message to a class. Instead, the developer writes directly in the source code the value of that object, and the object is created automatically from it. Literal objects in Pharo are strings, numbers, characters, booleans, nil and literal arrays.
 
@@ -98,7 +98,7 @@ arrayExpression contents first
 >>> RBLiteralValueNode(1).
 ]]]
 
-!!!!! The Variable Node
+!!!! The Variable Node
 
 Variable nodes in the AST tree are used when variables are used or assigned to.
 Variables are instances of ==RBVariableNode== and know their ==#name==.
@@ -232,19 +232,125 @@ cascadeExpression messages
 >>> an OrderedCollection(RBMessageNode(var msg1) RBMessageNode(var msg2))
 ]]]
 
-!!!! Dynamic Array nodes
+!!!! Dynamic Literal Array nodes
+
+Pharo has dynamic literal arrays. Dynamic literal arrays differ from literal arrays in that its elements are calculated at runtime instead of at parse time. To delay the execution of the elements in the dynamic array, a dynamic array node contains expressions, separated by dots.
+
+[[[language=smalltalk
+{ 1 + 1 . self message . anObject doSomethingWith: anArgument + 3 }
+]]]
+
+Dynamic literal arrays nodes are instances of ==RBArrayNode==.
+To access the expressions inside an dynamic array node, they understand the message ==children==
+
+[[[language=smalltalk
+arrayNode := RBParser parseExpression: '{ 
+  1 + 1 . 
+  self message . 
+  anObject doSomethingWith: anArgument + 3 }'.
+
+arrayNode children.
+>>> an OrderedCollection(
+  RBMessageNode((1 + 1))
+  RBMessageNode(self message)
+  RBMessageNode((anObject doSomethingWith: anArgument + 3)))
+]]]
 
 !!! Method and Block nodes
 
-has arguments and sequence.
-Method has selector, block doesnt.
+Now that we have studied the basic nodes representing expressions, we can build up methods from them.
+Methods in RBAST are represented as instances of ==RBMethodNode== and need to be parsed with a variant of the parser we have used so far, a method parser. The ==RBParser== class fulfills the role of a method parser when we use the message ==parseMethod:== instead of ==parseExpression:==. For example, the following piece of code returns a ==RBMethodNode== instance for a method named ==myMethod==.
 
-!!!!! The Sequence Node
+[[[language=smalltalk
+methodNode := RBParser parseMethod: 'myMethod
+	1+1.
+	self'
+]]]
 
-has temporaries and statements.
+A method node differs from the expression nodes we have seen before in the fact that method nodes can only be roots in the AST tree. Method nodes cannot be children of other nodes.
 
+Method nodes have a name or selector, accessed through the ==selector== message, a list of arguments, accessed through the ==arguments== message, and as we will see in the next section they also contain a ""body"" with the list of statements in the method.
 
-!!!! Return Node
+[[[language=smalltalk
+methodNode selector
+>>> #myMethod
+]]]
+
+!!!! Sequence nodes
+
+Method nodes have a body, represented as a ==RBSequenceNode==.
+A sequence node is a sequence of instructions or statements.
+All expressions are statements, including all nodes we have already seen such as literals, variables, arrays, assignments and message sends.
+We will introduce later two more instructions that can be included as part of a sequence node: block nodes and return nodes.
+Block nodes are expressions that are syntactically and thus structurally similar to methods.
+Return nodes, representing the return instruction ==^==, are instruction nodes but not expression nodes, i.e., they can only be children of sequence nodes.
+
+If we take the example from before, we can access the sequence node body of our method with the ==body== message.
+
+[[[language=smalltalk
+methodNode := RBParser parseMethod: 'myMethod
+	1+1.
+	self'.
+
+methodNode body.
+>>> RBSequenceNode(1 + 1. self)
+]]]
+
+And we can access and iterate the instructions in the sequence by asking it its ==statements==.
+
+[[[language=smalltalk
+methodNode body statements.
+>>> an OrderedCollection(RBMessageNode(1 + 1) RBSelfNode(self))
+]]]
+
+Besides the instructions, sequence nodes also are the ones defining temporary variables.
+Consider for example the following method defining a temporary.
+In RBAST, temporary variables are defined as part of the sequence node and not the method node.
+This is because temporary variables can be defined inside a block node, as we will see later.
+We can access the temporary variables of a sequence node by asking it for its ==temporaries==.
+
+[[[language=smalltalk
+myMethod
+  | temporary |
+	1+1.
+	self'.
+]]]
+
+[[[language=smalltalk
+methodNode := RBParser parseMethod: 'myMethod
+  | temporary |
+  1+1.
+  self'.
+methodNode body temporaries.
+>>> an OrderedCollection(RBVariableNode(temporary))
+]]]
+
+!!!! Return nodes
+
+Return AST nodes represent the instruction using the caret character ==^==.
+Return nodes, instances of ==RBReturnNode== are not expression nodes, i.e., they can only be found as a direct child of sequence nodes.
+Return nodes do represent the fact of returning a value, and that value is an expression, which we can access through the ==value== message.
+
+[[[language=smalltalk
+methodNode := RBParser parseMethod: 'myMethod
+  1+1.
+  ^ self'.
+
+returnNode := methodNode body statements last.
+>>>RBReturnNode(^ self)
+
+returnNode value.
+>>>RBSelfNode(self)
+]]]
+
+Note that as in Pharo return statements are not mandatory in a method, they are not mandatory in the AST either.
+Indeed, we can have method ASTs without return nodes.
+In those cases, the semantics of Pharo specify that ==self== is implicitly returned.
+It is interesting to note that the AST does not force semantics but only syntax: we will add semantics to the AST when we evaluate it in a subsequent chapter.
+
+!!!! Block nodes
+
+!!!! Method and Block argument nodes
 
 !!! Basic ASTs Manipulations
 
