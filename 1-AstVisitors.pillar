@@ -15,14 +15,28 @@ In the second part of the chapter we will study (or re-study, for those who alre
 
 !!! Pharo Abstract Syntax Trees
 
-An abstract syntax tree is a tree data structure that represents a program from the syntax point of view. In the tree, nodes represent the syntactic elements of the program.
+An abstract syntax tree is a tree data structure that represents a program from the syntax point of view.
+In the tree, nodes represent the syntactic elements of the program.
 The edges in the tree represent how those nodes are related.
 
-The Pharo standard distribution comes with a pretty complete AST implementation that is used by many tools. To get our hands over an AST, we could build it ourselves manually, or as we will do in this chapter, we could ask a parser to parse some text and build an AST for us. Fortunately, Pharo also includes a parser that does exactly this: the ==RBParser==.
-The ==RBParser== class implementas a parser for the Pharo syntax.
+The Pharo standard distribution comes with a pretty complete AST implementation that is used by many tools.
+To get our hands over an AST, we could build it ourselves manually, or as we will do in this chapter, we ask a parser to parse some text and build an AST for us. 
+Fortunately, Pharo also includes a parser that does exactly this: the ==RBParser==.
+The ==RBParser== class implements a parser for Pharo.
 It has two main modes of working: parsing expressions and parsing methods.
 
-!!!! Parsing Expressions
+!!!! For the Purists. 
+People tend to make the distinction between abstract syntax and concrete program trees.
+The difference is the following: an abstract syntax tree does not contain information about syntactic elements 
+per se. For example an abstract syntax does not contain information about parentheses since the structure of the tree itself reflects it.
+This is similar for variable definition delimiters or period in Pharo. 
+A concrete tree on the other hand keeps such information because tools may need it. 
+From that perspective, the Pharo AST are more concrete syntax trees, but because of language abuse we refer to them as 
+ASTs. 
+
+
+
+!!! Parsing Expressions
 
 Expressions are constructs that can be evaluated to a value.
 For example, the program ==17 max: 42== is the message send ==max:== to receiver 17 with argument 42, and can be evaluated to the value 42 (since it is bigger than 17).
@@ -40,7 +54,7 @@ expression arguments first formattedCode
 >>> 42.
 ]]]
 
-Expressions can be combined to build more complex expressions. In the following example, the expresion =17 max: 42= is used as the receiver of another message expression, the message ==#asString== with no arguments.
+Expressions can be combined to build more complex expressions. In the following example, the expresion ==17 max: 42== is used as the receiver of another message expression, the message ==#asString== with no arguments.
 
 [[[language=smalltalk
 expression := RBParser parseExpression: '(17 max: 42) asString'.
@@ -65,9 +79,11 @@ expression formattedCode
 >>> 17.
 ]]]
 
-!!!! The Literal Node
 
-Literal nodes represent literal objects. A literal object is an object that is not created directly by sending the ==new== message to a class. Instead, the developer writes directly in the source code the value of that object, and the object is created automatically from it. Literal objects in Pharo are strings, numbers, characters, booleans, nil and literal arrays.
+
+!!!Literal Nodes
+
+Literal nodes represent literal objects. A literal object is an object that is not created directly by sending the ==new== message to a class. Instead, the developer writes directly in the source code the value of that object, and the object is created automatically from it. Literal objects in Pharo are strings, numbers, characters, booleans (==true==, and  ==false==), ==nil== and literal arrays (==\#()==).
 
 Literal nodes in Pharo are instances of the ==RBLiteralValueNode==, and understand the message ==#value== which returns the value of the object. In other words, literal objects in Pharo are resolved at parse time. Notice that the ==#value== message does not return a string representation of the literal object, but the literal object itself.
 
@@ -98,7 +114,7 @@ arrayExpression contents first
 >>> RBLiteralValueNode(1).
 ]]]
 
-!!!! The Variable Node
+!!!Variable Nodes
 
 Variable nodes in the AST tree are used when variables are used or assigned to.
 Variables are instances of ==RBVariableNode== and know their ==#name==.
@@ -117,7 +133,7 @@ Then the parser generates a simple AST, and tools can later annotate that AST wi
 An example of this kind of treatment is the compiler, which requires such contextual information to produce the correct final code.
 For the matter of this booklet, we will not consider nor use semantic analysis, and we will stick with normal ==RBVariableNode== objects.
 
-!!!! Assignment nodes
+!!! Assignment Nodes
 
 Assignment nodes in the AST represent assignment expressions using the ==:\=== operator.
 Assignments are indeed expressions: their value is the value of the variable after the assignment.
@@ -136,7 +152,7 @@ assignmentExpression value
 >>> RBMessageNode(#(1 2) size).
 ]]]
 
-!!!! Message nodes
+!!! Message nodes
 
 Message nodes are the core of Pharo programs, and they are the most common composed expression node we will find in the AST.
 Message are instances of ==RBMessageNode== and they have a receiver, a selector and a collection of arguments, obtained through the ==#receiver==, ==#selector== and ==#arguments== messages.
