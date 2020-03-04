@@ -54,7 +54,7 @@ expression arguments first formattedCode
 >>> 42.
 ]]]
 
-Expressions can be combined to build more complex expressions. In the following example, the expresion ==17 max: 42== is used as the receiver of another message expression, the message ==#asString== with no arguments.
+Expressions can be combined to build more complex expressions. In the following example, the expresion ==17 max: 42== is used as the receiver of another message expression, the message ==asString== with no arguments.
 
 [[[language=smalltalk
 expression := RBParser parseExpression: '(17 max: 42) asString'.
@@ -85,7 +85,7 @@ expression formattedCode
 
 Literal nodes represent literal objects. A literal object is an object that is not created directly by sending the ==new== message to a class. Instead, the developer writes directly in the source code the value of that object, and the object is created automatically from it. Literal objects in Pharo are strings, numbers, characters, booleans (==true==, and  ==false==), ==nil== and literal arrays (==\#()==).
 
-Literal nodes in Pharo are instances of the ==RBLiteralValueNode==, and understand the message ==#value== which returns the value of the object. In other words, literal objects in Pharo are resolved at parse time. Notice that the ==#value== message does not return a string representation of the literal object, but the literal object itself.
+Literal nodes in Pharo are instances of the ==RBLiteralValueNode==, and understand the message ==value== which returns the value of the object. In other words, literal objects in Pharo are resolved at parse time. Notice that the ==value== message does not return a string representation of the literal object, but the literal object itself.
 
 [[[language=smalltalk
 integerExpression := RBParser parseExpression: '17'.
@@ -103,7 +103,7 @@ stringExpression value
 ]]]
 
 A special case of literals are literal arrays, which have their own node: ==RBLiteralArrayNode==.
-Literal array nodes understand the message ==#value== as any other literal, returning the literal array instance. However, it allows us to access the sub collection of literals using the message ==#contents==. 
+Literal array nodes understand the message ==value== as any other literal, returning the literal array instance. However, it allows us to access the sub collection of literals using the message ==contents==. 
 
 [[[language=smalltalk
 arrayExpression := RBParser parseExpression: '#(1 2 3)'.
@@ -117,7 +117,7 @@ arrayExpression contents first
 !!!Variable Nodes
 
 Variable nodes in the AST tree are used when variables are used or assigned to.
-Variables are instances of ==RBVariableNode== and know their ==#name==.
+Variables are instances of ==RBVariableNode== and know their ==name==.
 
 [[[language=smalltalk
 variableExpression := RBParser parseExpression: 'aVariable'.
@@ -152,11 +152,11 @@ assignmentExpression value
 >>> RBMessageNode(#(1 2) size).
 ]]]
 
-!!! Message nodes
+!!! Message Nodes
 
 Message nodes are the core of Pharo programs, and they are the most common composed expression node we will find in the AST.
-Message are instances of ==RBMessageNode== and they have a receiver, a selector and a collection of arguments, obtained through the ==#receiver==, ==#selector== and ==#arguments== messages.
-We say that message nodes are composed expressions because the ==#receiver== and ==#arguments== of a message are expressions in themselves, which can be as simple as literals or variables, or it can be other composed messages too.
+Message are instances of ==RBMessageNode== and they have a receiver, a selector and a collection of arguments, obtained through the ==receiver==, ==selector== and ==arguments== messages.
+We say that message nodes are composed expressions because the ==receiver== and ==arguments== of a message are expressions in themselves, which can be as simple as literals or variables, or it can be other composed messages too.
 
 [[[language=smalltalk
 messageExpression := RBParser parseExpression: '17 max: 42'.
@@ -185,8 +185,8 @@ Precedence of messages in RBASTs is resolved at parse-time. In other words, the 
 
 Let's consider a couple of examples illustrating this.
 If we feed the ==RBParser== with the expression below, it will create a ==RBMessageNode== as we already know it.
-The root of that message node is they ==keyword:== message, and its first argument is the ==argument + 42 unaryMessage== subexpression.
-That subexpression is in turn another message node with the ==+== binary selector, whose first argument is the ==42 unaryMessage== subexpression.
+The root of that message node is the ==keyword:== message, and its first argument is the ==argument + 42 unaryMessage== subexpression.
+That subexpression is in turn another message node with the ==\+== binary selector, whose first argument is the ==42 unaryMessage== subexpression.
 
 [[[
 variable keyword: argument + 42 unaryMessage
@@ -200,13 +200,14 @@ variable keyword: (argument + 42) unaryMessage
 
 The resulting AST completely changed! The root is still the ==keyword:== message, but now its first argument is the ==unaryMessage== sent to a (now in parenthesis) ==(argument + 42)== receiver.
 
-Finally, if modify the parenthesis again to wrap the keyword message, the root of the resulting AST has changed too. It is now the ==+== binary message.
+Finally, if modify the parenthesis again to wrap the keyword message, the root of the resulting AST has changed too. 
+It is now the ==+== binary message.
 
 [[[
 (variable keyword: argument) + 42 unaryMessage
 ]]]
 
-==RBParser== can be a nice tool to try and play with Pharo expressions and master precedence!
+==RBParser== is a nice tool to try and play with Pharo expressions and master precedence!
 
 !!!! Cascade nodes
 
