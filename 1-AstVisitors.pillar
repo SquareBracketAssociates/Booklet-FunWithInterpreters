@@ -98,7 +98,7 @@ arrayExpression contents first
 >>> RBLiteralValueNode(1).
 ]]]
 
-!!!! The Variable Node
+!!!! The Variable Node, self and super nodes
 
 Variable nodes in the AST tree are used when variables are used or assigned to.
 Variables are instances of ==RBVariableNode== and know their ==#name==.
@@ -111,7 +111,7 @@ variableExpression name
 
 Variable nodes are used to equally denote temporary, argument, instance, class or global variables.
 That is because at parse-time, the parser cannot always differentiate when a variable is of one kind or another.
-This is specially true when we talk about instance, class and global variables, because the context to distinguish them has not been made avaiable.
+This is specially true when we talk about instance, class and global variables, because the context to distinguish them has not been made available.
 Instead of complexifying the parser with this kind of information, the Pharo toolchain does it in a pipelined fashion, leaving those tools using the AST to decide how to do it.
 Then the parser generates a simple AST, and tools can later annotate that AST with semantic information from a context if required.
 An example of this kind of treatment is the compiler, which requires such contextual information to produce the correct final code.
@@ -432,11 +432,173 @@ And we can also ask a node if it is an expression node or not:
 
 !!! AST Visitors
 
+In the previous sections we have seen how to create and manipulate AST nodes.
+The ==RBParser== class implements a parser of expressions and methods that return AST nodes for the text given as argument.
+With the AST manipulation methods we have seen before, we can already write queries on an AST.
+For example, counting the number of message sends in an AST is as simple as the following loop.
+
+[[[language=smalltalk
+count := 0.
+aNode nodesDo: [ :n | 
+  n isMessage
+    ifTrue: [ count := count + 1 ] ].
+count
+]]]
+
+However, more complex manipulations do require more than an iteration and a conditional.
+When an different operation is required for each kind of node in the AST, potentially with special cases depending on how nodes are composed, one object-oriented alternative is to implement it using the visitor design pattern.
+In this section we start reviewing the visitor pattern, and we then apply it for a single task: searching a string inside the tree.
+
 !!!! The Visitor Pattern
 
-!!!! Search the AST
+The visitor pattern is one of the original design patterns from Gamma et Al.
+The main purpose of the visitor pattern is to externalize an operation from a data structure.
+For example, let's consider a file system implemented with the composite pattern, where nodes can be files or directories.
+This composite forms a tree, where file nodes are leaf nodes and directory nodes are non-leaf nodes.
 
-!!!! Search the AST
+[[[language=smalltalk
+Object subclass: #FileNode
+  instanceVariableNames: 'size'
+  classVariableNames: ''
+  package: 'VisitorExample'
+  
+Object subclass: #DirectoryNode
+  instanceVariableNames: 'children'
+  classVariableNames: ''
+  package: 'VisitorExample'
+]]]
+
+Using this tree, we can take advantage of the composite pattern and the polymorphism between both nods to calculate the total size of a node implementing a polymorphic ==size== method in each class.
+
+[[[language=smalltalk
+FileNode >> size [
+  ^ size
+]
+
+DirectoryNode >> size [
+  ^ children sum: [ :each | each size ]
+]
+]]]
+
+Now, let's consider the users of the file system library want to extend it with their own operations.
+If the users have access to the classes, they may extend them just by adding methods to them.
+However, chances are users do not have access to the library classes.
+One way to open the library classes is to implement the visitor ""protocol"": each library class will implement a generic ==acceptVisitor: aVisitor==  method that will perform a re-dispatch on the argument giving information about the receiver.
+For example, when a ==FileNode== receives the ==acceptVisitor:== message, it will send the argument the message ==visitFileNode:==, identifying itself as a file node.
+
+[[[language=smalltalk
+FileNode >> acceptVisitor: aVisitor [
+  ^ aVisitor visitFileNode: self
+]
+
+DirectoryNode >> acceptVisitor: aVisitor [
+  ^ aVisitor visitDirectoryNode: self
+]
+]]]
+
+In this way, we can re-implement a ==SizeVisitor== that calculates the total size of a node in the file system as follows.
+When a size visitor visits a file, it asks the file for its size.
+When it visits a directory, it must iterate the children and sum the sizes.
+However, it cannot directly ask the ==size== of the children, because only ==FileNode== instances do understand it but directories do not. Because of this, we need to make a recursive call and re-ask the child node to accept the visitor. Then each node will again dispath on the size visitor.
+
+
+[[[language=smalltalk
+SizeVisitor >> visitFileNode: aFileNode [
+  ^ aFileNode size
+]
+
+SizeVisitor >> visitDirectoryNode: aDirectoryNode [
+  ^ aDirectoryNode children sum: [ :each | each accept: self ]
+]
+]]]
+
+As the file system library forms trees that we can manipulate with a visitor, ASTs do so too.
+RBASTs are already extensible through visitors: its nodes implement ==acceptVisitor:== methods on each of the nodes.
+This means we can introduce operations on the AST that were not foreseen by the original developers.
+In such cases, it is up to us to implement a visitor object with the correct ==visitXXX:== methods.
+
+!!!! Introducing AST visitors: measuring the depth of the tree
+
+To introduce how to implement an AST visitor on RBASTs, let's implement a visitor that returns the max depth of the tree. That is, a tree with a single node has a depth of 1. A node with children node has a depth of 1 + the maximum depth amongst all its children.
+Let's call that visitor ==DepthCalculatorVisitor==.
+
+[[[language=smalltalk
+Object subclass: #DepthCalculatorVisitor
+  instanceVariableNames: ''
+  classVariableNames: ''
+  package: 'VisitorExample'
+]]]
+
+RBAST nodes implement already the visitor pattern.
+They have an ==acceptVisitor:== method that will dispatch to the visitor with corresponding visit methods.
+This means we can already use our visitor, which will break on a visit.
+
+!!!!! Visiting message nodes
+
+Let's start by calculating the depth of the expression ==1+1==.
+This expression is made of a message node, and two literal nodes.
+
+[[[
+expression := RBParser parseExpression: '1+1'.
+expression acceptVisitor: DepthCalculatorVisitor new.
+>>> Exception! DepthCalculatorVisitor does not understand visitMessageNode:
+]]]
+
+If we execute the example above, we get a debugger because ==DepthCalculatorVisitor== does not understand ==visitMessageNode:==. We can then proceed to introduce that method in the debugger using the button ""create"" or by creating it in the browser.
+We can implement the visit method as follows, by iterating the children to calculate the maximum depth amongst the children, and then adding 1 to it.
+
+[[[
+DepthCalculatorVisitor >> visitMessageNode: aRBMessageNode
+  ^ 1 + (aRBMessageNode children
+      inject: 0
+      into: [ :max :node | max max: (node acceptVisitor: self) ])
+]]]
+
+!!!!! Visiting literal nodes
+
+As soon as we restart the example, it will stop again with an exception again, but this time because our visitor does not know how to visit literal nodes.
+We know that literal nodes have no children, so we can implement the visit method as just returning one.
+
+[[[
+DepthCalculatorVisitor >> visitLiteralValueNode: aRBLiteralValueNode
+  ^ 1
+]]]
+
+!!!!! Calculating the depth of a method
+
+A method node contains a set of statements.
+Statements are either expressions or return statements.
+The example that follows parses a method with two statements whose maximum depth is 3.
+The first statement, as we have seen above, has a depth of 2.
+The second statement, however, has depth of three, because the receiver of the ==+== message is a message itself.
+The final depth of the method is then 5: 1 for the method node, 1 for the sequence node, and 3 for the statements.
+
+[[[
+method := RBParser parseMethod: 'method
+  1+1.
+  self factorial + 2'.
+method acceptVisitor: DepthCalculatorVisitor new.
+>>> Exception! DepthCalculatorVisitor does not understand visitMethodNode:
+]]]
+
+To calculate the above, we need to implement three other visiting methods: ==visitMethodNode:==, ==visitSequenceNode:== and ==visitSelfNode:==. Since for both kind of nodes we have to iterate over all children in the same way, let's implement these similarly to our ==visitMessageNode:==.
+
+[[[
+DepthCalculatorVisitor >> visitMethodNode: aRBMethodNode
+  ^ 1 + (aRBMethodNode children
+      inject: 0
+      into: [ :max :node | max max: (node acceptVisitor: self) ])
+      
+DepthCalculatorVisitor >> visitSequenceNode: aRBSequenceNode
+  ^ 1 + (aRBSequenceNode children
+      inject: 0
+      into: [ :max :node | max max: (node acceptVisitor: self) ])
+]]]
+
+
+
+!!!! Searching the AST for a Token
+
 
 
 
