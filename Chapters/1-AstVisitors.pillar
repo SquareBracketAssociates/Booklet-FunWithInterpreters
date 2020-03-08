@@ -126,12 +126,16 @@ variableExpression name
 ]]]
 
 Variable nodes are used to equally denote temporary, argument, instance, class or global variables.
-That is because at parse-time, the parser cannot always differentiate when a variable is of one kind or another.
-This is specially true when we talk about instance, class and global variables, because the context to distinguish them has not been made available.
+That is because at parse-time, the parser cannot differentiate when a variable is of one kind or another.
+This is specially true when we talk about instance, class and global variables, because the context to distinguish them has not been made available. 
 Instead of complexifying the parser with this kind of information, the Pharo toolchain does it in a pipelined fashion, leaving those tools using the AST to decide how to do it.
 Then the parser generates a simple AST, and tools can later annotate that AST with semantic information from a context if required.
 An example of this kind of treatment is the compiler, which requires such contextual information to produce the correct final code.
+
 For the matter of this booklet, we will not consider nor use semantic analysis, and we will stick with normal ==RBVariableNode== objects.
+The only exception to this are ==self==, ==super== and ==thisContext== special variables.
+Special variables are variables are recognised at parse-time, and generating special nodes ==RBSelfNode==, ==RBSuperNode== and ==RBThisContextNode== for them.
+These special nodes inherit from ==RBVariableNode== and work as normal variable nodes for the purposes of this booklet.
 
 !!! Assignment Nodes
 
@@ -568,10 +572,11 @@ If we execute the example above, we get a debugger because ==DepthCalculatorVisi
 We can implement the visit method as follows, by iterating the children to calculate the maximum depth amongst the children, and then adding 1 to it.
 
 [[[
-DepthCalculatorVisitor >> visitMessageNode: aRBMessageNode
+DepthCalculatorVisitor >> visitMessageNode: aRBMessageNode [
   ^ 1 + (aRBMessageNode children
       inject: 0
       into: [ :max :node | max max: (node acceptVisitor: self) ])
+]
 ]]]
 
 !!!!! Visiting literal nodes
@@ -580,8 +585,9 @@ As soon as we restart the example, it will stop again with an exception again, b
 We know that literal nodes have no children, so we can implement the visit method as just returning one.
 
 [[[
-DepthCalculatorVisitor >> visitLiteralValueNode: aRBLiteralValueNode
+DepthCalculatorVisitor >> visitLiteralValueNode: aRBLiteralValueNode [
   ^ 1
+]
 ]]]
 
 !!!!! Calculating the depth of a method
@@ -601,21 +607,170 @@ method acceptVisitor: DepthCalculatorVisitor new.
 >>> Exception! DepthCalculatorVisitor does not understand visitMethodNode:
 ]]]
 
-To calculate the above, we need to implement three other visiting methods: ==visitMethodNode:==, ==visitSequenceNode:== and ==visitSelfNode:==. Since for both kind of nodes we have to iterate over all children in the same way, let's implement these similarly to our ==visitMessageNode:==.
+To calculate the above, we need to implement three other visiting methods: ==visitMethodNode:==, ==visitSequenceNode:== and ==visitSelfNode:==. Since for the first two kind of nodes we have to iterate over all children in the same way, let's implement these similarly to our ==visitMessageNode:==. Self nodes are variables, so they are leafs in our tree, and can be implemented as similarly to literals.
 
 [[[
-DepthCalculatorVisitor >> visitMethodNode: aRBMethodNode
+DepthCalculatorVisitor >> visitMethodNode: aRBMethodNode [
   ^ 1 + (aRBMethodNode children
       inject: 0
       into: [ :max :node | max max: (node acceptVisitor: self) ])
-      
-DepthCalculatorVisitor >> visitSequenceNode: aRBSequenceNode
+]
+
+DepthCalculatorVisitor >> visitSequenceNode: aRBSequenceNode [
   ^ 1 + (aRBSequenceNode children
       inject: 0
       into: [ :max :node | max max: (node acceptVisitor: self) ])
+]
+
+DepthCalculatorVisitor >> visitSelfNode: aSelfNode [
+  ^ 1
+]
 ]]]
 
+!!!!! Refactoring the implementation
 
+This simple AST visitor does not actually require different implementation for each of its nodes.
+We have seen above that we can differentiate the nodes between two kinds: leaf nodes that do not have children, and internal nodes that have children.
+A first refactoring to avoid the repeated code in our solution may extract the repeated methods into a common ones: ==visitNodeWithChildren:== and ==visitLeafNode:==.
+
+[[[
+DepthCalculatorVisitor >> visitNodeWithChildren: aNode [
+  ^ 1 + (aNode children
+      inject: 0
+      into: [ :max :node | max max: (node acceptVisitor: self) ])
+]
+
+DepthCalculatorVisitor >> visitMessageNode: aRBMessageNode [
+  ^ self visitNodeWithChildren: aRBMessageNode
+]
+
+DepthCalculatorVisitor >> visitMethodNode: aRBMethodNode [
+  ^ self visitNodeWithChildren: aRBMethodNode
+]
+
+DepthCalculatorVisitor >> visitSequenceNode: aRBSequenceNode [
+  ^ self visitNodeWithChildren: aRBSequenceNode
+]
+
+DepthCalculatorVisitor >> visitLeafNode: aSelfNode [
+  ^ 1
+]
+
+DepthCalculatorVisitor >> visitSelfNode: aSelfNode [
+  ^ self visitLeafNode: aSelfNode
+]
+
+DepthCalculatorVisitor >> visitLiteralValueNode: aRBLiteralValueNode [
+  ^ self visitLeafNode: aRBLiteralValueNode
+]
+]]]
+
+As a second step, we can refactor further by taking into account a simple intuition: leaf nodes do never have children. This means that ==aNode children== would always yield an empty collection for leaf nodes, and thus the result of the following expression will always be zero:
+
+[[[language=smalltalk
+(aNode children
+  inject: 0
+  into: [ :max :node | max max: (node acceptVisitor: self) ])
+]]]
+
+In other words, we could reuse the implementation of ==visitNodeWithChildren:== for both nodes with and without children, to get rid of the duplicated ==1+==. Let's then rename the method ==visitNodeWithChildren:== into ==visitNode:== and make all visit methods delegate to it.
+This will allow us also to remove the, now unused, ==visitLeafNode:==.
+
+[[[
+DepthCalculatorVisitor >> visitNode: aNode [
+  ^ 1 + (aNode children
+      inject: 0
+      into: [ :max :node | max max: (node acceptVisitor: self) ])
+]
+
+DepthCalculatorVisitor >> visitMessageNode: aRBMessageNode [
+  ^ self visitNode: aRBMessageNode
+]
+
+DepthCalculatorVisitor >> visitMethodNode: aRBMethodNode [
+  ^ self visitNode: aRBMethodNode
+]
+
+DepthCalculatorVisitor >> visitSequenceNode: aRBSequenceNode [
+  ^ self visitNode: aRBSequenceNode
+]
+
+DepthCalculatorVisitor >> visitSelfNode: aSelfNode [
+  ^ self visitNode: aSelfNode
+]
+
+DepthCalculatorVisitor >> visitLiteralValueNode: aRBLiteralValueNode [
+  ^ self visitNode: aRBLiteralValueNode
+]
+]]]
+
+!!!!! A common visitor superclass
+
+If we take a look at our visitor above, we see a common structure has appeared.
+We have a lot of little visit methods per kind of node were we could do specific per-node treatments.
+For those nodes that do not do anything specific, with that node, we treat them as a more generic node with a more generic visit method.
+Our methods generic visit methods could then be moved to a common superclass ==BaseASTVisitor== defining the common structure, but making a single empty hook for the ==visitNode:== method.
+
+[[[language=smalltalk
+Object subclass: #BaseASTVisitor
+  instanceVariableNames: ''
+  classVariableNames: ''
+  package: 'VisitorExample'
+
+BaseASTVisitor >> visitNode: aNode [
+  "Do nothing by default. I'm meant to be overridden by subclasses"
+]
+
+BaseASTVisitor >> visitMessageNode: aRBMessageNode [
+  ^ self visitNode: aRBMessageNode
+]
+
+BaseASTVisitor >> visitMethodNode: aRBMethodNode [
+  ^ self visitNode: aRBMethodNode
+]
+
+BaseASTVisitor >> visitSequenceNode: aRBSequenceNode [
+  ^ self visitNode: aRBSequenceNode
+]
+
+BaseASTVisitor >> visitSelfNode: aSelfNode [
+  ^ self visitNode: aSelfNode
+]
+
+BaseASTVisitor >> visitLiteralValueNode: aRBLiteralValueNode [
+  ^ self visitNode: aRBLiteralValueNode
+]
+]]]
+
+And our ==DepthCalculatorVisitor== is then redefined as a subclass of it:
+
+[[[language=smalltalk
+BaseASTVisitor subclass: #DepthCalculatorVisitor
+  instanceVariableNames: ''
+  classVariableNames: ''
+  package: 'VisitorExample'
+
+DepthCalculatorVisitor >> visitNode: aNode [
+  ^ 1 + (aNode children
+      inject: 0
+      into: [ :max :node | max max: (node acceptVisitor: self) ])
+]
+]]]
+
+A more elaborate visitor could provide many more hooks.
+For example, in our example above we could have differentiated ==RBSelf== nodes from ==RBVariableNodes==, defining the following.
+
+[[[language=smalltalk
+BaseASTVisitor >> visitSelfNode: aRBSelfNode [
+  ^ self visitVariableNode: aRBSelfNode
+]
+
+BaseASTVisitor >> visitVariableNode: aRBVariableNode [
+  ^ self visitNode: aRBVariableNode
+]
+]]]
+
+Fortunately for us, RBASTs already provide ==RBProgramNodeVisitor== a base class for our visitors, with many hooks to override in our specific subclasses.
 
 !!!! Searching the AST for a Token
 
