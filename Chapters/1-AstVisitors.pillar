@@ -774,7 +774,95 @@ Fortunately for us, RBASTs already provide ==RBProgramNodeVisitor== a base class
 
 !!!! Searching the AST for a Token
 
+Calculating the depth of an AST is a pretty naïve example for a visitor because we do not need special treatment per node. It is however a nice example to introduce the concepts, learn some common patterns, and it furthermore forced us to do some refactoring and understanding a complex visitor structure. Moreover, it was a good introduction for the ==RBProgramNodeVisitor== class.
 
+In this section we will implement a visitor that does require different treatment per node: a node search.
+Our node search will look for a node in the RBAST tree that contains a token matching a string.
+For the purposes of this example, we will keep it scoped to a ""begins with"" search, and will return all nodes it finds, in a depth-first in-order traversal.
+We leave as an exercise for the reader implementing variants such as fuzzy string search, traversing the AST in different order, and being able to provide a stream-like API to get only the next matching node on demand.
 
+Let's then start to define a new visitor class ==SearchVisitor==, subclass of ==RBProgramNodeVisitor==.
+This class will have an instance variable to keep the token we are looking for.
+Notice that we need to keep the token as part of the state of the visitor: the visitor API implemented by RBASTs do not support additional arguments to pass around some extra state. This means that this state needs to be kept in the visitor.
+
+[[[language=smalltalk
+RBProgramNodeVisitor subclass: #SearchVisitor
+  instanceVariableNames: 'token'
+  classVariableNames: ''
+  package: 'VisitorExample'
+
+SearchVisitor >> token: aToken [
+  token := aToken
+]
+]]]
+
+The main idea of our visitor is that it will return a collection with all matching nodes.
+If no matching nodes are found, an empty collection is returned.
+
+!!!!! Searching in variables nodes
+
+Let's then start implementing the visit methods for variable nodes.
+==RBProgramNodeVisitor== will already treat special variables as variable nodes, so a single visit method is enough for all four kind of nodes.
+A variable node matches the search if its name begins with the searched token.
+
+[[[language=smalltalk
+SearchVisitor >> visitVariableNode: aNode [
+  ^ (aNode name beginsWith: token)
+      ifTrue: [ { aNode } ]
+      ifFalse: [ #() ]
+]
+]]]
+
+!!!!! Searching in message nodes
+
+Mesage nodes will match a search if their selector begins with the searched token.
+In addition, to follow the specification children of the message need to be iterated in depth first in-order.
+This means the receiver should be iterated first, then the message node itself, finally the arguments.
+
+[[[language=smalltalk
+SearchVisitor >> visitMessageNode: aNode [
+  ^ (aNode receiver acceptVisitor: self),
+    ((selector beginsWith: token)
+      ifTrue: [ { aNode } ]
+      ifFalse: [ #() ]),
+    (aNode arguments gather: [ :each | each acceptVisitor: self ])
+]
+]]]
+
+!!!!! Searching in literal nodes
+
+Literal nodes contain literal objects such as strings, but also booleans or numbers.
+To search in them, we need to transform such values as string and then perform the search within that string.
+
+[[[language=smalltalk
+SearchVisitor >> visitLiteralNode: aNode [
+  ^ (aNode value asString beginsWith: token)
+      ifTrue: [ { aNode } ]
+      ifFalse: [ #() ]
+]
+]]]
+
+!!!!! The rest of the nodes
+
+The rest of the nodes do not contain strings to search in them.
+Instead the contain children we need to search.
+We can then provide a common implementation for them by simply redefining the ==visitNode:== method.
+
+[[[language=smalltalk
+SearchVisitor >> visitNode: aNode [
+  ^ aNode children gather: [ :each | each acceptVisitor: self ]
+]
+]]]
 
 !!! Conclusion
+
+In this chapter we have studied ASTs, short for abstract syntax trees, an object-oriented representation of the syntactic structure of programs. We have also seen an implementation of them: the RB ASTs. RB provides a parser for Pharo methods and expressions that transforms a string into a tree representing the program.
+
+We have seen how we can manipulate those ASTs and we have reviewed the visitor design pattern first on a simple example, then on ASTs.
+The visitor design pattern allows us to extend tree-like structures with operations without modifying the original implementation. The tree-like structure, in our case the AST, needs only to implement an accept-visit protocol. RB ASTs implement such a protocol and some handy base visitor classes.
+
+Finally, we implemented two visitors for ASTs: a depth calculator and a node searcher.
+The depth calculator is a visitor that does not require special manipulation per-node, but sees all nodes through a common view. The search visitor has a common case for most nodes, and then implements special search conditions for messages, literals and variables.
+
+In the following chapters we will use the visitor pattern to implement AST interpreters: a program that will specifies how to evaluate an AST. A normal evaluator interpreter yields the result of executing the AST.
+However, we will see that abstract interpreters will evaluate an AST in an abstract way, useful for code analyses.
