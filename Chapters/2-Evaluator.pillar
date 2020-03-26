@@ -1,1 +1,108 @@
 !! A First Interpreter: An Simple Evaluator
+
+
+!!! Setting the stage
+[[[
+TestCase subclass: #BasicInterpreterTest
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion'
+]]]
+
+[[[
+Object subclass: #Interpretable
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion'
+]]]
+
+[[[
+Interpretable >> returnFive
+
+	^ 5
+]]]
+
+[[[
+BasicInterpreterTest >> testReturnConstant
+
+	| ast result |
+	ast := (Interpretable >> #returnFive) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 5
+]]]
+
+
+[[[
+BasicInterpreterTest >> interpreterClass 
+
+	^ BasicInterpreter
+]]]
+
+[[[
+BasicInterpreterTest >> interpreter
+
+	^ self interpreterClass new
+]]]
+
+
+!!! Building a minimal constant evaluator
+
+[[[
+Object subclass: #BasicInterpreter
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion'
+]]]
+
+[[[
+BasicInterpreter >> execute: anAST
+
+	^ self visitNode: anAST
+]]]
+
+
+[[[
+BasicInterpreter >> visitNode: aNode
+	^ aNode acceptVisitor: self
+]]]
+
+[[[
+BasicInterpreter >> visitMethodNode: aMethodNode
+
+	^ self visitMethodBodyNode: aMethodNode body
+]]]
+
+[[[
+BasicInterpreter >> visitMethodBodyNode: aMethodBodyNode
+	^ self visitNode: aMethodBodyNode 
+]]]
+
+[[[
+BasicInterpreter >> visitSequenceNode: aSequenceNode
+	
+	aSequenceNode statements allButLast do: [ :each | self visitNode: each ].
+	^ self visitNode: aSequenceNode statements last.
+]]]
+
+
+[[[
+BasicInterpreter >> visitReturnNode: aReturnNode
+
+	^ self visitNode: aReturnNode value
+]]]
+
+
+[[[
+BasicInterpreter >> visitLiteralValueNode: aRBLiteralValueNode
+
+	^ aRBLiteralValueNode value
+]]]
+
+
+
+
+
+
