@@ -102,6 +102,90 @@ BasicInterpreter >> visitLiteralValueNode: aRBLiteralValueNode
 ]]]
 
 
+!!! Accessing receiver state
+
+[[[
+Interpretable >> returnX
+
+	^ x 
+]]]
+
+
+[[[
+Interpretable >> x: anInteger
+
+	x := anInteger
+]]]
+
+[[[
+BasicInterpreterTest >> testAccessXInInstance
+
+	| ast result |
+	ast := (Interpretable >> #store100IntoX) ast.
+	result := self interpreter execute: ast with: (Interpretable new x: 100).
+	self assert: result equals: 100. 
+	
+]]]
+
+
+
+[[[
+Object subclass: #BasicInterpreter
+	instanceVariableNames: 'receiver'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion'
+]]]
+
+[[[
+BasicInterpreter >> execute: anAST with: anObject
+
+	receiver := anObject.
+	^ self visitNode: anAST
+]]]
+
+
+[[[
+BasicInterpreter >> visitInstanceVariableNode: aVariableNode
+
+	^ receiver instVarNamed: aVariableNode name
+]]]
+
+
+!!! Instance Variable assignment
+
+[[[
+BasicInterpreterTest >> testStore100IntoX
+
+	| ast result |
+	ast := (Interpretable >> #store100IntoX) ast.
+	result := self interpreter execute: ast with: Interpretable new.
+]]]
+
+
+[[[
+BasicInterpreter >> visitAssignmentNode: anAssignmentNode
+	"| x y |
+	x := y := 10.
+	x
+	>>> 10"
+
+	self visitNode: anAssignmentNode variable.
+	^ self visitNode: anAssignmentNode value
+]]]
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
