@@ -379,6 +379,21 @@ BasicInterpreterTest >> testSendMessageReturnX
 
 !!!!! Implementation
 
+The first behavior is to return the receiver as value for the ==self== node. 
+Right now we only have one receiver and we will change this when we will support messages to any objects.
+[[[
+BasicInterpreter >> visitSelfNode: aRBSelfNode 
+	^ receiver
+]]]
+
+The ==visitMessageNode:== is the core of the Pharo computation. 
+We do a bit more than just managing self send messages.
+First it computes the message receiver (in the future the receiver may be composed of multiple message).
+Then arguments values are computed.
+We look for the method to execute using the message ==lookup:fromClass:==. Note that we dispactch on the receiver node
+
+@@note SD: I have probably a bug because if I have (self +3 ) bar the lookup of bar should not be in the node message + 
+
 [[[
 BasicInterpreter >> visitMessageNode: aMessageNode
 
@@ -418,13 +433,41 @@ BasicInterpreterTest >> testReturnSelf
 	self assert: result equals: object 
 ]]]
 
+!!! Looking in superclass
 
+[[[
+BasicInterpreterTest >> testLookupMessageInSuperclass
+
+	| ast result |
+	ast := (Interpretable >> #sendMessageReturnX) ast.
+	result := self interpreter execute: ast with: (InterpretableSubclass new x: 100).
+	self assert: result equals: 100. 
+]]]
+
+
+[[[
+RBSelfNode >> lookup: aSymbol fromClass: aClass 
+	"return the method ast or nil."
+	
+	^ (aClass includesSelector: aSymbol)
+		ifTrue: [ (aClass compiledMethodAt: aSymbol) ast ]
+		ifFalse: [
+			aClass = ProtoObject 
+				ifTrue: [ nil ]
+				ifFalse: [ self lookup: aSymbol fromClass: aClass superclass ]]
+]]]
+
+
+!!! Handling super
+
+
+
+!!! Handling arguments
 
 
 !!! Different receivers 
 
 
-!!! Lookup
 
 !!! Nested temporaries and shadowing
 
