@@ -110,21 +110,21 @@ Interpretable >> returnX
 	^ x 
 ]]]
 
+[[[
+BasicInterpreterTest >> testAccessXInInstance
+
+	| ast result |
+	ast := (Interpretable >> #returnX) ast.
+	result := self interpreter execute: ast with: (Interpretable new x: 100).
+	self assert: result equals: 100. 
+	
+]]]
+
 
 [[[
 Interpretable >> x: anInteger
 
 	x := anInteger
-]]]
-
-[[[
-BasicInterpreterTest >> testAccessXInInstance
-
-	| ast result |
-	ast := (Interpretable >> #store100IntoX) ast.
-	result := self interpreter execute: ast with: (Interpretable new x: 100).
-	self assert: result equals: 100. 
-	
 ]]]
 
 
@@ -152,30 +152,63 @@ BasicInterpreter >> visitInstanceVariableNode: aVariableNode
 ]]]
 
 
-!!! Instance Variable assignment
+!!! Instance variable assignment
+
+
+[[[
+Interpretable >> store100IntoX
+
+	x := 100.
+]]]
+
+
+
+[[[
+Interpretable >> x
+
+	^ x 
+]]]
+
 
 [[[
 BasicInterpreterTest >> testStore100IntoX
 
-	| ast result |
+	| ast result object  |
 	ast := (Interpretable >> #store100IntoX) ast.
-	result := self interpreter execute: ast with: Interpretable new.
+	object := Interpretable new. 
+	result := self interpreter execute: ast with: object. 
+	self assert: object x equals: 100
 ]]]
+
 
 
 [[[
 BasicInterpreter >> visitAssignmentNode: anAssignmentNode
-	"| x y |
-	x := y := 10.
-	x
-	>>> 10"
-
-	self visitNode: anAssignmentNode variable.
-	^ self visitNode: anAssignmentNode value
+	" x := 100"
+	
+	| value | 
+	value := (self visitNode: anAssignmentNode value).
+	anAssignmentNode variable store: value with: self.
+	^ value
 ]]]
 
 
+[[[
+RBInstanceVariableNode >> store: anObject with: anInterpreter 
+	
+	anInterpreter receiver instVarNamed: name put: anObject
+]]]
 
+
+!!! Different receivers 
+
+!!! Temps
+
+!!! Message
+
+!!! Lookup
+
+!!! 
 
 
 
