@@ -1,28 +1,47 @@
 !! A First Interpreter: An Simple Evaluator
 
+In this chapter we will develop step by step a Pharo program interprerter.
+We will incrementally add support for language characteristics.
+Here is the progression: returning constants, accessing receiver state, instance variable assignment, 
+simple temporaries, self messages, ....
+
+For each of the steps we will start by defining a method illustrating the situation, then we define a test and 
+we implement the features. 
+
+Doing so we will define and refine a visitor. 
+Note that we will write the visitor from scratch but we will reuse the node of the Pharo AST and their  
+functionalities.
 
 !!! Setting the stage
+
+The tests that we will define will be hosted in the class ==BasicInterpreterTest==.
 [[[
 TestCase subclass: #BasicInterpreterTest
 	instanceVariableNames: ''
 	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Champollion'
+	package: 'Champollion'
 ]]]
+
+The class ==Interpretable== is a class hosting methods that we will execute. 
 
 [[[
 Object subclass: #Interpretable
 	instanceVariableNames: ''
 	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Champollion'
+	package: 'Champollion'
 ]]]
+
+Here we define the first method that we would like to execute: the method ==returnFive==
 
 [[[
 Interpretable >> returnFive
 
 	^ 5
 ]]]
+
+Our first test is worth one comment: we access the AST of the method that we want to execute
+then we instantiate our interpreter and ask it to execute the ast. 
+And we check that we get the expected result. 
 
 [[[
 BasicInterpreterTest >> testReturnConstant
@@ -33,6 +52,7 @@ BasicInterpreterTest >> testReturnConstant
 	self assert: result equals: 5
 ]]]
 
+We define two helper methods: ==interpreter== and ==interpreterClass== as follows: 
 
 [[[
 BasicInterpreterTest >> interpreterClass 
@@ -47,15 +67,19 @@ BasicInterpreterTest >> interpreter
 ]]]
 
 
+
 !!! Building a minimal constant evaluator
+
+Now we are ready to define our interpreter:
 
 [[[
 Object subclass: #BasicInterpreter
 	instanceVariableNames: ''
 	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Champollion'
+	package: 'Champollion'
 ]]]
+
+The method ==execute:== simply call the visitor main entry point. 
 
 [[[
 BasicInterpreter >> execute: anAST
@@ -63,22 +87,27 @@ BasicInterpreter >> execute: anAST
 	^ self visitNode: anAST
 ]]]
 
-
 [[[
 BasicInterpreter >> visitNode: aNode
 	^ aNode acceptVisitor: self
 ]]]
 
+The first visitor method of interest is the method ==visitMethodNode:==
+It just dispatches on ==visitMethodBodyNode:==.
 [[[
 BasicInterpreter >> visitMethodNode: aMethodNode
 
 	^ self visitMethodBodyNode: aMethodNode body
 ]]]
 
+For now ==visitMethodBodyNode:== just visit the method body (an ==RBSequenceNode==).
 [[[
 BasicInterpreter >> visitMethodBodyNode: aMethodBodyNode
 	^ self visitNode: aMethodBodyNode 
 ]]]
+
+The first version of ==visitSequenceNode:== ignore possible temporary declarations and 
+handle all the statements paying attention that the last statement value should be returned.
 
 [[[
 BasicInterpreter >> visitSequenceNode: aSequenceNode
@@ -88,12 +117,14 @@ BasicInterpreter >> visitSequenceNode: aSequenceNode
 ]]]
 
 
+Since we want to be able to access return value we define the ==visitReturnNode:== to handle 
 [[[
 BasicInterpreter >> visitReturnNode: aReturnNode
 
 	^ self visitNode: aReturnNode value
 ]]]
 
+For now we only manage literal object such as number, booleans, ...
 
 [[[
 BasicInterpreter >> visitLiteralValueNode: aRBLiteralValueNode
@@ -323,7 +354,69 @@ BasicInterpreterTest >> testSettingAValueToTempEmbedded
 	self assert: result equals: 10 
 ]]]
 
-!!! Nested temporaries and shadowing
+
+!!! self Message
+We will implement now an extremely simple version of message: messages sent to self without arguments. 
+The lookup will look only in the class of the receiver. 
+
+!!!!! Context and tests
+
+[[[
+BasicInterpreterTest >> testSendMessageReturnX
+	"
+	sendMessageReturnX
+		^ self returnX
+	"
+	| ast result |
+	ast := (Interpretable >> #sendMessageReturnX) ast.
+	result := self interpreter execute: ast with: (Interpretable new x: 100).
+	self assert: result equals: 100. 
+]]]
+
+
+
+
+
+!!!!! Implementation
+
+[[[
+BasicInterpreter >> visitMessageNode: aMessageNode
+
+	| rec args method | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+
+	method := aMessageNode receiver lookup: aMessageNode selector fromClass: rec class. 
+
+	^ self execute: method 
+]]]
+
+[[[
+RBSelfNode >> lookup: aSymbol fromClass: aClass 
+	"return the method ast or nil."
+	
+	^ (aClass includesSelector: aSymbol)
+		ifTrue: [ (aClass compiledMethodAt: aSymbol) ast ]
+		ifFalse: [ "no lookup for now" nil ]
+]]]
+
+
+
+Now we can check that the returning ==self== return the message receiver. 
+
+[[[
+BasicInterpreterTest >> testReturnSelf
+	"
+	returnSelf
+
+		^ self
+	"
+	| ast result object |
+	ast := (Interpretable >> #returnSelf) ast.
+	object := (Interpretable new x: 100; yourself).
+	result := self interpreter execute: ast with: object.
+	self assert: result equals: object 
+]]]
 
 
 
@@ -331,12 +424,10 @@ BasicInterpreterTest >> testSettingAValueToTempEmbedded
 !!! Different receivers 
 
 
-
-!!! Message
-
 !!! Lookup
 
-!!! 
+!!! Nested temporaries and shadowing
+
 
 
 
