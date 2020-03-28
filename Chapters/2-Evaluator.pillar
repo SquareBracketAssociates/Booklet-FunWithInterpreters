@@ -104,6 +104,7 @@ BasicInterpreter >> visitLiteralValueNode: aRBLiteralValueNode
 
 !!! Accessing receiver state
 
+!!!!! Context and Test
 [[[
 Interpretable >> returnX
 
@@ -120,13 +121,13 @@ BasicInterpreterTest >> testAccessXInInstance
 	
 ]]]
 
-
 [[[
 Interpretable >> x: anInteger
 
 	x := anInteger
 ]]]
 
+!!!!!Implementation
 
 
 [[[
@@ -154,7 +155,7 @@ BasicInterpreter >> visitInstanceVariableNode: aVariableNode
 
 !!! Instance variable assignment
 
-
+!!!!! Context and Test
 [[[
 Interpretable >> store100IntoX
 
@@ -180,7 +181,7 @@ BasicInterpreterTest >> testStore100IntoX
 	self assert: object x equals: 100
 ]]]
 
-
+!!!!!Implementation
 
 [[[
 BasicInterpreter >> visitAssignmentNode: anAssignmentNode
@@ -200,9 +201,136 @@ RBInstanceVariableNode >> store: anObject with: anInterpreter
 ]]]
 
 
+!!! Temps
+
+
+[[[
+Interpretable >>settingAValueToTemp
+
+	| temp | 
+	temp := 10.
+	^ temp
+]]]
+
+[[[
+BasicInterpreterTest >> testSettingAValueToTemp
+
+	| ast result |
+	ast := (Interpretable >> #settingAValueToTemp) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 10 
+]]
+
+[[[
+BasicInterpreter >> newFrame
+	"a new scope is an environment, i.e., a dictionary which supports lookup in its parent.
+	This is important to manage variable shadowing. A local temp can hide another temp of a parent
+	scope in a local scope."
+	
+	^ CTEnvironment new
+]]]
+
+[[[
+BasicInterpreter >> tempAt: aSymbol
+
+	^ frame at: aSymbol
+]]]
+
+
+[[[
+BasicInterpreter >> tempAt: aSymbol put: anInteger 
+
+	frame at: aSymbol put: anInteger
+]]]
+[[[
+BasicInterpreter >> visitSequenceNode: aSequenceNode
+
+	self visitTemporaryNodes: aSequenceNode temporaries.
+	aSequenceNode statements allButLast do: [ :each | self visitNode: each ].
+	^ self visitNode: aSequenceNode statements last.
+]]]
+
+[[[
+BasicInterpreter >> visitTemporaryNodes: aNodeCollection
+	"This is triggered when defining the temporaries between the pipes |a b c|"
+
+	frame := self newFrame. 
+	^ aNodeCollection
+		do: [ :each | self visitTemporaryDeclarationNode: each ]
+]]]
+
+[[[
+BasicInterpreter >> visitTemporaryNode: aTemporaryNode
+
+	^ self tempAt: aTemporaryNode name
+]]]
+
+[[[
+BasicInterpreter >> visitTemporaryDeclarationNode: aTemporaryDeclarationNode
+	"| temp |
+	temp is a temporary node as we can find in the body of methods."
+
+	self tempAt: aTemporaryDeclarationNode name put: nil.
+]]]
+
+!!! More temps tests
+
+[[[
+Interpretable >> settingAValueToTempInARow
+
+	| temp1 temp2| 
+	temp1 := 10.
+	temp2 := temp1.
+	^ temp2
+]]]
+
+[[[
+BasicInterpreterTest >> testSettingAValueToTempInARow
+		"settingAValueToTempInARow
+
+			| temp1 temp2| 
+			temp1 := 10.
+			temp2 := temp1.
+			^ temp2
+		"
+		| ast result |
+		ast := (Interpretable >> #settingAValueToTempInARow) ast.
+		result := self interpreter execute: ast. 
+		self assert: result equals: 10 
+
+]]]
+
+
+[[[
+Interpretable >> settingAValueToTempEmbedded
+
+	| temp1 temp2 | 
+	temp2 := temp1 := 10.
+	^ temp2
+]]]
+
+[[[
+BasicInterpreterTest >> testSettingAValueToTempEmbedded
+	"settingAValueToTempEmbedded
+
+		| temp1 temp2 | 
+		temp2 := temp1 := 10.
+		^ temp2
+	"
+	| ast result |
+	ast := (Interpretable >> #settingAValueToTempEmbedded) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 10 
+]]]
+
+!!! Nested temporaries and shadowing
+
+
+
+
 !!! Different receivers 
 
-!!! Temps
+
 
 !!! Message
 
