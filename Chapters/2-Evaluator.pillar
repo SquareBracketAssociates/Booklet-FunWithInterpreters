@@ -392,7 +392,7 @@ First it computes the message receiver (in the future the receiver may be compos
 Then arguments values are computed.
 We look for the method to execute using the message ==lookup:fromClass:==. Note that we dispactch on the receiver node
 
-@@note SD: I have probably a bug because if I have (self +3 ) bar the lookup of bar should not be in the node message + 
+@@note SD: I have probably a bug because if I have (self \+ 3 ) bar the lookup of bar should not be in the node message \+ 
 
 [[[
 BasicInterpreter >> visitMessageNode: aMessageNode
