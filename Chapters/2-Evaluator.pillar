@@ -355,7 +355,7 @@ BasicInterpreterTest >> testSettingAValueToTempEmbedded
 ]]]
 
 
-!!! self Message
+!!! self Messages
 We will implement now an extremely simple version of message: messages sent to self without arguments. 
 The lookup will look only in the class of the receiver. 
 
@@ -389,30 +389,25 @@ BasicInterpreter >> visitSelfNode: aRBSelfNode
 The ==visitMessageNode:== is the core of the Pharo computation. 
 We do a bit more than just managing self send messages.
 First it computes the message receiver (in the future the receiver may be composed of multiple message).
-Then arguments values are computed.
-We look for the method to execute using the message ==lookup:fromClass:==. Note that we dispactch on the receiver node
-
-@@note SD: I have probably a bug because if I have (self \+ 3 ) bar the lookup of bar should not be in the node message \+ 
+We look for the method to execute using the message ==lookup:fromClass:==. 
 
 [[[
 BasicInterpreter >> visitMessageNode: aMessageNode
 
 	| rec args method | 
 	rec := self visitNode: aMessageNode receiver.
-	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
-
-	method := aMessageNode receiver lookup: aMessageNode selector fromClass: rec class. 
-
+	method := self lookup: aMessageNode selector fromClass: rec class.
 	^ self execute: method 
 ]]]
 
 [[[
-RBSelfNode >> lookup: aSymbol fromClass: aClass 
+BasicInterpreter >> lookup: aSymbol fromClass: aClass 
 	"return the method ast or nil."
 	
 	^ (aClass includesSelector: aSymbol)
 		ifTrue: [ (aClass compiledMethodAt: aSymbol) ast ]
-		ifFalse: [ "no lookup for now" nil ]
+		ifFalse: [ "no lookup for now" 
+					nil ]
 ]]]
 
 
@@ -446,7 +441,7 @@ BasicInterpreterTest >> testLookupMessageInSuperclass
 
 
 [[[
-RBSelfNode >> lookup: aSymbol fromClass: aClass 
+BasicInterpreter >> lookup: aSymbol fromClass: aClass 
 	"return the method ast or nil."
 	
 	^ (aClass includesSelector: aSymbol)
@@ -456,6 +451,59 @@ RBSelfNode >> lookup: aSymbol fromClass: aClass
 				ifTrue: [ nil ]
 				ifFalse: [ self lookup: aSymbol fromClass: aClass superclass ]]
 ]]]
+
+
+
+
+
+
+!!! Sending messages to other objects
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+!!! Sending messages to class
+
+
+[[[
+visitGlobalNode: aRBGlobalNode 
+
+	^ self class environment at: aRBGlobalNode name ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
+]]]
+
+
+
+
+
 
 
 !!! Handling super
