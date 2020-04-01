@@ -457,7 +457,67 @@ BasicInterpreter >> lookup: aSymbol fromClass: aClass
 
 
 
-!!! Sending messages to other objects
+!!! Sending (self-)messages to other objects
+
+[[[
+testNot
+	"
+	not
+		^ false not
+	"
+	| ast result |
+	ast := (Interpretable >> #not) ast.
+	result := self interpreter execute: ast.
+	self assert: result
+]]]
+
+
+
+
+[[[
+pushNewFrame
+	"Pushing a new scope consists in creating a new dictionary whose parent is the top of the stack
+	and pushing it as a new top. This way a variable not found in current scope will be looked up in previous scope."
+
+	| newTop |
+	newTop := self newFrame.
+	newTop parent: stack top.
+	stack push: newTop 
+]]]	
+
+[[[
+initialize 
+	super initialize. 
+	stack := Stack new.
+	stack push: self newFrame.
+]]]
+
+[[[
+receiver
+	^ stack top at: #self
+]]]
+
+
+Note that the method ==visitMessageNode:== is incomplete because it does not handle arguments and does not pop the stack
+once the execution is done. 
+
+
+[[[
+popFrame
+	stack pop 
+]]]
+
+[[[
+visitMessageNode: aMessageNode
+
+	| rec method | 
+	self pushNewFrame.
+	rec := self visitNode: aMessageNode receiver.
+	method := self lookup: aMessageNode selector fromClass: rec class. 
+	res := self execute: method.
+	self popFrame.
+	^ res
+]]]	 
 
 
 
@@ -471,11 +531,127 @@ BasicInterpreter >> lookup: aSymbol fromClass: aClass
 
 
 
+!!!!! Another little test
+[[[
+testIsLiteral
+	"
+	not
+
+		^ false not
+	"
+	| ast result |
+	ast := (Interpretable >> #isLiteral) ast.
+	result := self interpreter execute: ast.
+	self assert: result
+]]]
+
+
+!!! Supporting message arguments
+
+
+[[[
+testReturnLastOfAnd
+	"
+	returnLastOf: a and: b
+		^ b
+	"
+	| ast result |
+	ast := (Interpretable >> #returnLastOf:and:) ast.
+	result := self interpreter execute: ast withReceiver: Interpretable new andArguments: { 10 . 20}.
+	self assert: result equals: 20. 
+]]]
+
+[[[
+execute: aMethodAST withReceiver: anObject andArguments: args
+
+	self tempAt: #self put: anObject.
+	aMethodAST arguments 
+		with: args 
+		do: [ :arg :value | self tempAt: arg name put: value ].
+	^ self visitNode: aMethodAST
+]]]
 
 
 
+[[[
+visitArgumentNode: aRBArgumentNode 
+	^ self tempAt: aRBArgumentNode name
+]]]
+
+[[[
+visitSequenceNode: aSequenceNode
+	| res |
+	aSequenceNode hasTemporaries
+		ifTrue: [ self pushNewFrame 
+			self visitTemporaryNodes: aSequenceNode temporaries ].
+	aSequenceNode statements allButLast do: [ :each | self visitNode: each ].
+	res := self visitNode: aSequenceNode statements last.
+	aSequenceNode hasTemporaries
+		ifTrue: [ self popFrame ].
+	^ res
+]]]
+
+[[[
+returnLastOf2: b and: a
+
+	^ self returnLastOf: b and: a
+]]]
+
+[[[
+testReturnLastOfAnd2
+	"
+	returnLastOf2: b and: a
+		^ self returnLastOf: b and: a
+	returnLastOf: a and: b
+		^ b
+		"
+	| ast result |
+	ast := (Interpretable >> #returnLastOf2:and:) ast.
+	result := self interpreter execute: ast withReceiver: Interpretable new andArguments: { 10 . 20}.
+	self assert: result  equals: 20. 
+]]]
 
 
+!!! Supporting super
+
+[[[
+InterpretableSubclass >> not
+	^ super not & false not
+]]]
+
+[[[
+testSuperNot
+	"
+	not
+		^ super not & false not
+	"
+	| ast result |
+	ast := (InterpretableSubclass >> #not) ast.
+	result := self interpreter execute: ast withReceiver: InterpretableSubclass new andArguments: #().
+	self assert: result
+]]]
+
+
+[[[
+BasicInterpreter >> visitMessageNode: aMessageNode
+
+	| rec args method res | 
+	self pushNewFrame.
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	method :=  aMessageNode receiver isSuper
+		ifTrue: [ self lookup: aMessageNode selector fromClass: rec class superclass ]
+		ifFalse: [ self lookup: aMessageNode selector fromClass: rec class ].
+	res := self execute: method withReceiver: rec andArguments: args.
+	self popFrame.
+	^ res 
+]]]
+
+
+[[[
+BasicInterpreter >> visitSuperNode: aRBSuperNode 
+	^ self receiver
+]]]
 
 
 
