@@ -654,8 +654,59 @@ BasicInterpreter >> visitSuperNode: aRBSuperNode
 ]]]
 
 
+!!! First basic handling of primitives
+
+[[[
+addition
+
+	^ 3 + 2
+]]]
+
+[[[
+SmallInteger >> + aNumber 
+	"Primitive. Add the receiver to the argument and answer with the result
+	if it is a SmallInteger. Fail if the argument or the result is not a
+	SmallInteger  Essential  No Lookup. See Object documentation whatIsAPrimitive."
+
+	<primitive: 1>
+	^ super + aNumber
+]]]
 
 
+[[[
+testPrimitiveAddition
+	"
+	addition
+
+		^ 3 + 2
+	"
+	| ast result |
+	ast := (Interpretable >> #addition) ast.
+	result := self interpreter execute: ast.
+	self assert: result  equals: 5. 
+]]]
+
+
+[[[
+visitMessageNode: aMessageNode
+
+	| rec args method res | 
+	self pushNewFrame.
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	aMessageNode methodNode isPrimitive
+		ifTrue: [
+			res := rec 
+					tryPrimitive: (aMessageNode methodNode pragmas first argumentAt: 'primitive:') value 
+					withArgs: args ]
+		ifFalse: [ 	
+			method :=  aMessageNode receiver isSuper
+				ifTrue: [ self lookup: aMessageNode selector fromClass: rec class superclass ]
+				ifFalse: [ self lookup: aMessageNode selector fromClass: rec class ].
+			res := self execute: method withReceiver: rec andArguments: args] .
+	self popFrame.
+	^ res 
+]]]
 
 
 
