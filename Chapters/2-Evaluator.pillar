@@ -712,51 +712,100 @@ visitMessageNode: aMessageNode
 
 
 
+!!! More tests 
 
+[[[
+InterpretableSubclass >> returnFive
+	^ super returnFive + super returnFive 
+]]]
 
-
-
+[[[
+testReturnFive10
+	"
+	returnFive
+			^ super returnFive + super returnFive 
+	"
+	
+	| ast result |
+	ast := (InterpretableSubclass >> #returnFive) ast.
+	result := self interpreter execute: ast withReceiver: InterpretableSubclass new andArguments: #().
+	self assert: result  equals: 10. 
+]]]
 
 
 !!! Sending messages to class
 
 
 [[[
-visitGlobalNode: aRBGlobalNode 
+Interpretable class >> return42
 
-	^ self class environment at: aRBGlobalNode name ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
+		^ 42
+]]]
+
+[[[
+Interpretable >> return42
+
+	^ self class return42
+]]]
+
+[[[
+BasicInterpreterTest >> testMessageToClass
+	"
+	return42
+
+		^ 42
+	"
+	| ast result |
+	ast := (Interpretable class >> #return42) ast.
+	result := self interpreter execute: ast withReceiver: Interpretable andArguments: {  }.
+	self assert: result equals: 42 
+]]]
+
+[[[
+BasicInterpreterTest >> testIndirectMessageToClass
+	"
+	return42
+		^ self class return42
+	"
+	| ast result |
+	ast := (Interpretable >> #return42) ast.
+	result := self interpreter execute: ast withReceiver: Interpretable new andArguments: {  }.
+	self assert: result equals: 42 
+]]]
+
+
+[[[
+Interpretable >> returnExplicitClass42
+
+	^ Interpretable return42
+]]]
+
+[[[
+testReturnExplicitClass42
+	"
+	returnExplicitClass42
+		^ Interpretable return42
+	"
+	| ast result |
+	ast := (Interpretable >> #returnExplicitClass42) ast.
+	result := self interpreter execute: ast withReceiver: Interpretable new andArguments: {  }.
+	self assert: result equals: 42 
+]]]	
+	
+This is different because and we need to support direct references to global. 
+
+
+[[[
+BasicInterpreter >> visitGlobalNode: aRBGlobalNode 
+
+	^ self class environment 
+		at: aRBGlobalNode name 
+		ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
 ]]]
 
 
 
 
-
-
-
-!!! Handling super
-
-
-
-!!! Handling arguments
-
-
-!!! Different receivers 
-
-
-
-!!! Nested temporaries and shadowing
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+!!! Conclusion
+This interpreter is basic. It does not cover blocks and more dynamic features. 
+We will cover more advanced topics in the following chapter.
