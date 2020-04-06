@@ -133,6 +133,47 @@ BasicInterpreter >> visitLiteralValueNode: aRBLiteralValueNode
 ]]]
 
 
+!!! Handling Arrays
+Literal arrays are another kind of constants. Let us add some support for them. 
+
+
+[[[
+returnEmptyArray
+
+	^ #()
+]]]
+
+[[[
+BasicInterpreterTest >> testReturnEmptyArray
+
+	| ast result |
+	ast := (CInterpretable >> #returnEmptyArray) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: #() 
+]]]
+
+[[[
+BasicInterpreter >> visitLiteralArrayNode: aRBLiteralArrayNode 
+	
+	^ aRBLiteralArrayNode contents collect: [ :each | self visitNode: each ] 
+]]]	
+	
+Since we love tests, let us write another one. 	
+[[[
+Interpretable >> returnLiteralArray
+
+	^ #(true 1 'ahah')
+]]]
+
+[[[
+BasicInterpreterTest >> testReturnLiteralArray
+
+	| ast result |
+	ast := (CInterpretable >> #returnLiteralArray) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals:  #(true 1 'ahah')
+]]]
+
 !!! Accessing receiver state
 
 !!!!! Context and Test
@@ -460,7 +501,7 @@ BasicInterpreter >> lookup: aSymbol fromClass: aClass
 !!! Sending (self-)messages to other objects
 
 [[[
-testNot
+BasicInterpreterTest >> testNot
 	"
 	not
 		^ false not
@@ -475,7 +516,7 @@ testNot
 
 
 [[[
-pushNewFrame
+BasicInterpreter >> pushNewFrame
 	"Pushing a new scope consists in creating a new dictionary whose parent is the top of the stack
 	and pushing it as a new top. This way a variable not found in current scope will be looked up in previous scope."
 
@@ -486,14 +527,14 @@ pushNewFrame
 ]]]	
 
 [[[
-initialize 
+BasicInterpreter >> initialize 
 	super initialize. 
 	stack := Stack new.
 	stack push: self newFrame.
 ]]]
 
 [[[
-receiver
+BasicInterpreter >> receiver
 	^ stack top at: #self
 ]]]
 
@@ -503,12 +544,12 @@ once the execution is done.
 
 
 [[[
-popFrame
+BasicInterpreter >> popFrame
 	stack pop 
 ]]]
 
 [[[
-visitMessageNode: aMessageNode
+BasicInterpreter >> visitMessageNode: aMessageNode
 
 	| rec method | 
 	self pushNewFrame.
@@ -533,7 +574,7 @@ visitMessageNode: aMessageNode
 
 !!!!! Another little test
 [[[
-testIsLiteral
+BasicInterpreterTest >> testIsLiteral
 	"
 	not
 
@@ -550,7 +591,7 @@ testIsLiteral
 
 
 [[[
-testReturnLastOfAnd
+BasicInterpreterTest >> testReturnLastOfAnd
 	"
 	returnLastOf: a and: b
 		^ b
@@ -562,7 +603,7 @@ testReturnLastOfAnd
 ]]]
 
 [[[
-execute: aMethodAST withReceiver: anObject andArguments: args
+BasicInterpreter >> execute: aMethodAST withReceiver: anObject andArguments: args
 
 	self tempAt: #self put: anObject.
 	aMethodAST arguments 
@@ -574,12 +615,12 @@ execute: aMethodAST withReceiver: anObject andArguments: args
 
 
 [[[
-visitArgumentNode: aRBArgumentNode 
+BasicInterpreter >> visitArgumentNode: aRBArgumentNode 
 	^ self tempAt: aRBArgumentNode name
 ]]]
 
 [[[
-visitSequenceNode: aSequenceNode
+BasicInterpreter >> visitSequenceNode: aSequenceNode
 	| res |
 	aSequenceNode hasTemporaries
 		ifTrue: [ self pushNewFrame 
@@ -592,13 +633,13 @@ visitSequenceNode: aSequenceNode
 ]]]
 
 [[[
-returnLastOf2: b and: a
+Interpretable >> returnLastOf2: b and: a
 
 	^ self returnLastOf: b and: a
 ]]]
 
 [[[
-testReturnLastOfAnd2
+BasicInterpreterTest >> testReturnLastOfAnd2
 	"
 	returnLastOf2: b and: a
 		^ self returnLastOf: b and: a
@@ -620,7 +661,7 @@ InterpretableSubclass >> not
 ]]]
 
 [[[
-testSuperNot
+BasicInterpreterTest >> testSuperNot
 	"
 	not
 		^ super not & false not
@@ -657,7 +698,7 @@ BasicInterpreter >> visitSuperNode: aRBSuperNode
 !!! First basic handling of primitives
 
 [[[
-addition
+Interpretable >> addition
 
 	^ 3 + 2
 ]]]
@@ -674,7 +715,7 @@ SmallInteger >> + aNumber
 
 
 [[[
-testPrimitiveAddition
+BasicInterpreterTest >> testPrimitiveAddition
 	"
 	addition
 
@@ -688,7 +729,7 @@ testPrimitiveAddition
 
 
 [[[
-visitMessageNode: aMessageNode
+BasicInterpreter >> visitMessageNode: aMessageNode
 
 	| rec args method res | 
 	self pushNewFrame.
@@ -720,7 +761,7 @@ InterpretableSubclass >> returnFive
 ]]]
 
 [[[
-testReturnFive10
+BasicInterpreterTest >> testReturnFive10
 	"
 	returnFive
 			^ super returnFive + super returnFive 
@@ -781,7 +822,7 @@ Interpretable >> returnExplicitClass42
 ]]]
 
 [[[
-testReturnExplicitClass42
+BasicInterpreterTest >> testReturnExplicitClass42
 	"
 	returnExplicitClass42
 		^ Interpretable return42
