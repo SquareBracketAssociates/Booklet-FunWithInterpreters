@@ -295,6 +295,56 @@ RBInstanceVariableNode >> store: anObject with: anInterpreter
 
 Now our tests should pass. 
 
+
+!!! Intermezzo -- About temporaries
+
+Before implementing the interpretation of temporaries we want to show some particularities of Pharo semantics.
+Temporaries cannot shadow other temporaries.
+
+The following expression is not allowed because the second tmp definition is illegal. 
+[[[
+[ 
+	| tmp |
+	tmp := 2. 
+	[  
+		| tmp |
+		tmp := 3 ]]
+]]]
+
+Simiarly a temporary cannot shadow a block or a method parameter.
+Therefore the following expression is not allowed.
+[[[
+[ :tmp |
+	| tmp |
+	tmp := 2]
+]]]
+
+The following method is not valid either. 
+[[[
+with: arg
+
+	| arg |
+	^ arg
+]]]	
+
+Finally parameters are read only. 
+Therefore the following method is not valid. 
+[[[
+with: arg
+	arg := 42	
+]]]
+
+As well as the following expression
+
+[[[
+[ :tmp |
+	tmp := 2
+	 ]
+]]]
+
+We can say that inside a method the names of parameters, temporaries and instance variables are flattened and use a single namespace.
+
+
 !!! Temps
 
 
