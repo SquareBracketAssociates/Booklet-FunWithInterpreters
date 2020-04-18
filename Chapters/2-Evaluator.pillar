@@ -133,7 +133,7 @@ BasicInterpreter >> visitLiteralValueNode: aRBLiteralValueNode
 ]]]
 
 
-!!! Handling Arrays
+!!! Handling Arrays of Literals
 Literal arrays are another kind of constants. Let us add some support for them. 
 
 
@@ -169,12 +169,15 @@ Interpretable >> returnLiteralArray
 BasicInterpreterTest >> testReturnLiteralArray
 
 	| ast result |
-	ast := (CInterpretable >> #returnLiteralArray) ast.
+	ast := (Interpretable >> #returnLiteralArray) ast.
 	result := self interpreter execute: ast. 
 	self assert: result equals:  #(true 1 'ahah')
 ]]]
 
 !!! Accessing receiver state
+
+We add support to access receiver's instance variables.
+Let us start to add one simple accessor. 
 
 !!!!! Context and Test
 [[[
@@ -183,6 +186,7 @@ Interpretable >> returnX
 	^ x 
 ]]]
 
+Then we define a test showing that the interpreter can effectively 
 [[[
 BasicInterpreterTest >> testAccessXInInstance
 
@@ -193,14 +197,18 @@ BasicInterpreterTest >> testAccessXInInstance
 	
 ]]]
 
+We define a setter to be able to control the value put in the instance variable of our instance. 
 [[[
 Interpretable >> x: anInteger
 
 	x := anInteger
 ]]]
 
+Our test is failing so we are ready to work. 
+
 !!!!!Implementation
 
+Since we need to have access to the receiver for now we add an instance variable.
 
 [[[
 Object subclass: #BasicInterpreter
@@ -210,12 +218,15 @@ Object subclass: #BasicInterpreter
 	category: 'Champollion'
 ]]]
 
+We make sure that we can set the receiver when we launch the interpretation. 
 [[[
 BasicInterpreter >> execute: anAST with: anObject
 
 	receiver := anObject.
 	^ self visitNode: anAST
 ]]]
+
+And now we can define the method ==visitInstanceVariableNode:== to reflectivity access the state of receiver. 
 
 
 [[[
@@ -224,17 +235,23 @@ BasicInterpreter >> visitInstanceVariableNode: aVariableNode
 	^ receiver instVarNamed: aVariableNode name
 ]]]
 
+Our test should pass. 
 
 !!! Instance variable assignment
 
-!!!!! Context and Test
+We will add now support for assignment in receiver's instance variables.
+
+
+!!!!! Context and Tests
+
+We define a method doing an assignment into the instance variable ==x==.
 [[[
 Interpretable >> store100IntoX
 
 	x := 100.
 ]]]
 
-
+We add an accessor to be able to nicely test.
 
 [[[
 Interpretable >> x
@@ -242,6 +259,7 @@ Interpretable >> x
 	^ x 
 ]]]
 
+The test ==testStore100IntoX== launches the interpretation of method ==store100IntoX==.
 
 [[[
 BasicInterpreterTest >> testStore100IntoX
@@ -254,6 +272,9 @@ BasicInterpreterTest >> testStore100IntoX
 ]]]
 
 !!!!!Implementation
+
+The implementation is straighforward. We define the method ==visitAssignmentNode:==.
+Here since we expect to have other variable types in the future we define the storing behavior  (method == store:with:==) of the assigned variable node itself. 
 
 [[[
 BasicInterpreter >> visitAssignmentNode: anAssignmentNode
@@ -272,6 +293,7 @@ RBInstanceVariableNode >> store: anObject with: anInterpreter
 	anInterpreter receiver instVarNamed: name put: anObject
 ]]]
 
+Now our tests should pass. 
 
 !!! Temps
 
