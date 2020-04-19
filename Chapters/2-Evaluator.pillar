@@ -369,7 +369,7 @@ BasicInterpreterTest >> testSettingAValueToTemp
 	self assert: result equals: 10 
 ]]
 
-!!!!!Implementation
+!!!!!Implementation: Some infrastructure
 
 We need a way to store temporaries as they are defined and assigned values to. 
 We add an instance variable to the interpreter to hold such structure, for now a dictionary. 
@@ -385,14 +385,13 @@ Object subclass: #CBasicInterpreter
 
 [[[
 BasicInterpreter >> newFrame
-	"A new scope is an environment, i.e., a dictionary which supports lookup in its parent."
-	
-	^ CTEnvironment new
+	^ Dictionary new
 ]]]
+
+Then we manage accesses to the temp value based on its name
 
 [[[
 BasicInterpreter >> tempAt: aSymbol
-
 	^ frame at: aSymbol
 ]]]
 
@@ -403,6 +402,13 @@ BasicInterpreter >> tempAt: aSymbol put: anInteger
 	frame at: aSymbol put: anInteger
 ]]]
 
+
+!!!!!Implementation: Interpretation
+
+We refine the ==visitSequenceNode:== method to handle the definition of temporaries. 
+This is not really needed since we will just put nil in the temporaries, but it will simplify
+their management. 
+
 [[[
 BasicInterpreter >> visitSequenceNode: aSequenceNode
 
@@ -411,31 +417,37 @@ BasicInterpreter >> visitSequenceNode: aSequenceNode
 	^ self visitNode: aSequenceNode statements last.
 ]]]
 
+During the declaration of temporaries we initialize a frame.
+
 [[[
 BasicInterpreter >> visitTemporaryNodes: aNodeCollection
-	"This is triggered when defining the temporaries between the pipes |a b c|"
+	"For temporary definition i.e., between the pipes |a b c|"
 
 	frame := self newFrame. 
 	^ aNodeCollection
 		do: [ :each | self visitTemporaryDeclarationNode: each ]
 ]]]
 
+Note that when we will support message and blocks we will revisit this decision because as we saw
+in the temporaries, method and block parameters we can use the same frame. 
+
+[[[
+BasicInterpreter >> visitTemporaryDeclarationNode: aTemporaryDeclarationNode
+
+	self tempAt: aTemporaryDeclarationNode name put: nil.
+]]]
+
+When we get a reference to a temporary variable we simply check and return its value. 
 [[[
 BasicInterpreter >> visitTemporaryNode: aTemporaryNode
 
 	^ self tempAt: aTemporaryNode name
 ]]]
 
-[[[
-BasicInterpreter >> visitTemporaryDeclarationNode: aTemporaryDeclarationNode
-	"| temp |
-	temp is a temporary node as we can find in the body of methods."
 
-	self tempAt: aTemporaryDeclarationNode name put: nil.
-]]]
+!!! More temporary tests
 
-!!! More temps tests
-
+Let us take the opportunity to add more tests.
 [[[
 Interpretable >> settingAValueToTempInARow
 
@@ -447,21 +459,20 @@ Interpretable >> settingAValueToTempInARow
 
 [[[
 BasicInterpreterTest >> testSettingAValueToTempInARow
-		"settingAValueToTempInARow
+	"settingAValueToTempInARow
 
-			| temp1 temp2| 
-			temp1 := 10.
-			temp2 := temp1.
-			^ temp2
-		"
-		| ast result |
-		ast := (Interpretable >> #settingAValueToTempInARow) ast.
-		result := self interpreter execute: ast. 
-		self assert: result equals: 10 
-
+	| temp1 temp2| 
+	temp1 := 10.
+	temp2 := temp1.
+	^ temp2
+	"
+	| ast result |
+	ast := (Interpretable >> #settingAValueToTempInARow) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 10 
 ]]]
 
-
+Let us check that we manage also sequenced assignments. 
 [[[
 Interpretable >> settingAValueToTempEmbedded
 
