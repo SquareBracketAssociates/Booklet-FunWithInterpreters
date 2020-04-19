@@ -496,7 +496,7 @@ BasicInterpreterTest >> testSettingAValueToTempEmbedded
 ]]]
 
 
-!!! self Messages
+!!! self Unary Messages
 We will implement now an extremely simple version of message: messages sent to self without arguments. 
 The lookup will look only in the class of the receiver. 
 
@@ -569,7 +569,7 @@ BasicInterpreterTest >> testReturnSelf
 	self assert: result equals: object 
 ]]]
 
-!!! Looking in superclass
+!!! Looking in superclasses
 
 [[[
 BasicInterpreterTest >> testLookupMessageInSuperclass
@@ -593,12 +593,7 @@ BasicInterpreter >> lookup: aSymbol fromClass: aClass
 				ifFalse: [ self lookup: aSymbol fromClass: aClass superclass ]]
 ]]]
 
-
-
-
-
-
-!!! Sending (self-)messages to other objects
+!!! Sending unary messages to other objects
 
 [[[
 BasicInterpreterTest >> testNot
@@ -661,17 +656,6 @@ BasicInterpreter >> visitMessageNode: aMessageNode
 ]]]	 
 
 
-
-
-
-
-
-
-
-
-
-
-
 !!!!! Another little test
 [[[
 BasicInterpreterTest >> testIsLiteral
@@ -688,7 +672,6 @@ BasicInterpreterTest >> testIsLiteral
 
 
 !!! Supporting message arguments
-
 
 [[[
 BasicInterpreterTest >> testReturnLastOfAnd
@@ -711,7 +694,6 @@ BasicInterpreter >> execute: aMethodAST withReceiver: anObject andArguments: arg
 		do: [ :arg :value | self tempAt: arg name put: value ].
 	^ self visitNode: aMethodAST
 ]]]
-
 
 
 [[[
