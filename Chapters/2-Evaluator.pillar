@@ -345,17 +345,21 @@ As well as the following expression
 We can say that inside a method the names of parameters, temporaries and instance variables are flattened and use a single namespace.
 
 
-!!! Temps
+!!! Temporaries
 
+Now that we get refreshed on the accepted definitions of temporary variables, we can start supporting them 
+in method bodies. We will see that block semantics is a bit more complex in the next chapter.
 
+We start by defining a simple temporary definition and assignment. 
 [[[
-Interpretable >>settingAValueToTemp
+Interpretable >> settingAValueToTemp
 
 	| temp | 
 	temp := 10.
 	^ temp
 ]]]
 
+We define the associated test.
 [[[
 BasicInterpreterTest >> testSettingAValueToTemp
 
@@ -365,11 +369,23 @@ BasicInterpreterTest >> testSettingAValueToTemp
 	self assert: result equals: 10 
 ]]
 
+!!!!!Implementation
+
+We need a way to store temporaries as they are defined and assigned values to. 
+We add an instance variable to the interpreter to hold such structure, for now a dictionary. 
+As you expect, in the future we will manage a stack of such structure one for each method.
+
+[[[
+Object subclass: #CBasicInterpreter
+	instanceVariableNames: 'frame'
+	classVariableNames: ''
+	package: 'Champollion'
+]]]
+
+
 [[[
 BasicInterpreter >> newFrame
-	"a new scope is an environment, i.e., a dictionary which supports lookup in its parent.
-	This is important to manage variable shadowing. A local temp can hide another temp of a parent
-	scope in a local scope."
+	"A new scope is an environment, i.e., a dictionary which supports lookup in its parent."
 	
 	^ CTEnvironment new
 ]]]
@@ -386,6 +402,7 @@ BasicInterpreter >> tempAt: aSymbol put: anInteger
 
 	frame at: aSymbol put: anInteger
 ]]]
+
 [[[
 BasicInterpreter >> visitSequenceNode: aSequenceNode
 
