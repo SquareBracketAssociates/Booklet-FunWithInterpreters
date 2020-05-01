@@ -10,5 +10,5 @@ Since we are not a native english speaker, we appreciate pull requests that help
 
 Guille and Stef
 
-[travis]: https://travis-ci.org/SquareBracketAssociates/FunWithInterpreters
-[badge]: https://travis-ci.org/SquareBracketAssociates/FunWithInterpreters.svg?branch=master
+[travis]: https://travis-ci.com/SquareBracketAssociates/FunWithInterpreters
+[badge]: https://travis-ci.com/SquareBracketAssociates/FunWithInterpreters.svg?branch=master
