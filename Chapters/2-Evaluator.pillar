@@ -301,17 +301,17 @@ Now our tests should pass.
 Before implementing the interpretation of temporaries we want to show some particularities of Pharo semantics.
 Temporaries cannot shadow other temporaries.
 
-The following expression is not allowed because the second tmp definition is illegal. 
+The following expression is rejected by the compiler because the second ==tmp== definition is illegal. 
 [[[
 [ 
 	| tmp |
 	tmp := 2. 
-	[  
+	[
 		| tmp |
 		tmp := 3 ]]
 ]]]
 
-Simiarly a temporary cannot shadow a block or a method parameter.
+Similarly a temporary cannot shadow a block or a method parameter.
 Therefore the following expression is not allowed.
 [[[
 [ :tmp |
@@ -319,7 +319,7 @@ Therefore the following expression is not allowed.
 	tmp := 2]
 ]]]
 
-The following method is not valid either. 
+The following method is not valid either.
 [[[
 with: arg
 
@@ -448,6 +448,7 @@ BasicInterpreter >> visitTemporaryNode: aTemporaryNode
 !!! More temporary tests
 
 Let us take the opportunity to add more tests.
+First we can test that we can read and write to temporaries. 
 [[[
 Interpretable >> settingAValueToTempInARow
 
@@ -501,6 +502,12 @@ We will implement now an extremely simple version of message: messages sent to s
 The lookup will look only in the class of the receiver. 
 
 !!!!! Context and tests
+
+
+[[[
+Interpretable >> sendMessageReturnX
+	^ self returnX
+]]]
 
 [[[
 BasicInterpreterTest >> testSendMessageReturnX
