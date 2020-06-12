@@ -36,7 +36,6 @@ Here we define the first method that we would like to execute: the method ==retu
 
 [[[
 Interpretable >> returnFive
-
 	^ 5
 ]]]
 
@@ -57,13 +56,11 @@ We define two helper methods: ==interpreter== and ==interpreterClass== as follow
 
 [[[
 BasicInterpreterTest >> interpreterClass 
-
 	^ BasicInterpreter
 ]]]
 
 [[[
 BasicInterpreterTest >> interpreter
-
 	^ self interpreterClass new
 ]]]
 
@@ -141,11 +138,10 @@ And we are ready to continue our journey.
 
 !!! Handling Arrays of Literals
 Literal arrays are another kind of constants. Let us add some support for them. 
-
+We start with a sample: the method  ==returnEmptyArray== and a test ==testReturnEmptyArray==.
 
 [[[
-returnEmptyArray
-
+Interpretable >> returnEmptyArray
 	^ #()
 ]]]
 
@@ -153,21 +149,22 @@ returnEmptyArray
 BasicInterpreterTest >> testReturnEmptyArray
 
 	| ast result |
-	ast := (CInterpretable >> #returnEmptyArray) ast.
+	ast := (Interpretable >> #returnEmptyArray) ast.
 	result := self interpreter execute: ast. 
 	self assert: result equals: #() 
 ]]]
 
+The definition is simple we will return a collection of literals by visiting the contents of the literal array as shown in method ==visitLiteralArrayNode:==.
 [[[
 BasicInterpreter >> visitLiteralArrayNode: aRBLiteralArrayNode 
 	
 	^ aRBLiteralArrayNode contents collect: [ :each | self visitNode: each ] 
 ]]]	
 	
-Since we love tests, let us write another one. 	
+Since we love tests, let us write another one. 
+
 [[[
 Interpretable >> returnLiteralArray
-
 	^ #(true 1 'ahah')
 ]]]
 
@@ -185,14 +182,23 @@ BasicInterpreterTest >> testReturnLiteralArray
 We add support to access receiver's instance variables.
 Let us start to add one simple accessor. 
 
-!!!!! Context and Test
+!!!!! Fixture and Test
+
+We define a getter and setter to be able to control the value put in the instance variable of our instance.
+
 [[[
 Interpretable >> returnX
-
 	^ x 
 ]]]
+ 
+[[[
+Interpretable >> x: anInteger
+	x := anInteger
+]]]
 
-Then we define a test showing that the interpreter can effectively 
+
+Then we define a test showing that the interpreter can effectively access the value of an object using the accessor we just defined.
+
 [[[
 BasicInterpreterTest >> testAccessXInInstance
 
@@ -203,18 +209,11 @@ BasicInterpreterTest >> testAccessXInInstance
 	
 ]]]
 
-We define a setter to be able to control the value put in the instance variable of our instance. 
-[[[
-Interpretable >> x: anInteger
-
-	x := anInteger
-]]]
-
 Our test is failing so we are ready to work. 
 
 !!!!!Implementation
 
-Since we need to have access to the receiver for now we add an instance variable.
+Since we need to have access to the receiver for now we add an instance variable called ==receiver==.
 
 [[[
 Object subclass: #BasicInterpreter
@@ -224,7 +223,7 @@ Object subclass: #BasicInterpreter
 	category: 'Champollion'
 ]]]
 
-We make sure that we can set the receiver when we launch the interpretation. 
+We make sure that we can set the receiver when we launch the interpretation and we introduce a new method ==execute:with:== for this.
 [[[
 BasicInterpreter >> execute: anAST with: anObject
 
@@ -232,8 +231,7 @@ BasicInterpreter >> execute: anAST with: anObject
 	^ self visitNode: anAST
 ]]]
 
-And now we can define the method ==visitInstanceVariableNode:== to reflectivity access the state of receiver. 
-
+And now we can define the method ==visitInstanceVariableNode:== to reflectivity access the state of receiver.
 
 [[[
 BasicInterpreter >> visitInstanceVariableNode: aVariableNode
@@ -241,14 +239,14 @@ BasicInterpreter >> visitInstanceVariableNode: aVariableNode
 	^ receiver instVarNamed: aVariableNode name
 ]]]
 
-Our test should pass. 
+Our test should pass and we are read
 
 !!! Instance variable assignment
 
 We will add now support for assignment in receiver's instance variables.
 
 
-!!!!! Context and Tests
+!!!!! Fixture and Tests
 
 We define a method doing an assignment into the instance variable ==x==.
 [[[
@@ -507,7 +505,7 @@ BasicInterpreterTest >> testSettingAValueToTempEmbedded
 We will implement now an extremely simple version of message: messages sent to self without arguments. 
 The lookup will look only in the class of the receiver. 
 
-!!!!! Context and tests
+!!!!! Fixture and tests
 
 
 [[[
