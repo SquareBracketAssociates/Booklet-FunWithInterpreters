@@ -2,8 +2,9 @@
 
 In this chapter we will develop step by step a Pharo program interprerter.
 We will incrementally add support for language characteristics.
-Here is the progression: returning constants, accessing receiver state, instance variable assignment, 
-simple temporaries, self messages, ....
+Here is the progression: returning constants, accessing receiver state, instance variable assignment, simple temporaries, self messages, ....
+
+
 
 For each of the steps we will start by defining a method illustrating the situation, then we define a test and 
 we implement the features. 
@@ -14,7 +15,7 @@ functionalities.
 
 !!! Setting the stage
 
-The tests that we will define will be hosted in the class ==BasicInterpreterTest==.
+The tests that we will define are hosted in the class ==BasicInterpreterTest==.
 [[[
 TestCase subclass: #BasicInterpreterTest
 	instanceVariableNames: ''
@@ -22,7 +23,7 @@ TestCase subclass: #BasicInterpreterTest
 	package: 'Champollion'
 ]]]
 
-The class ==Interpretable== is a class hosting methods that we will execute. 
+The class ==Interpretable== is a class hosting the sample methods that we will execute. 
 
 [[[
 Object subclass: #Interpretable
@@ -70,7 +71,7 @@ BasicInterpreterTest >> interpreter
 
 !!! Building a minimal constant evaluator
 
-Now we are ready to define our interpreter:
+We are ready to define our interpreter:
 
 [[[
 Object subclass: #BasicInterpreter
@@ -79,7 +80,8 @@ Object subclass: #BasicInterpreter
 	package: 'Champollion'
 ]]]
 
-The method ==execute:== simply call the visitor main entry point. 
+Note that we do not inherit from the default Pharo AST visitor so that we build it step by step. Nevertheless we follow the same API and use the node ==accept:== visit methods.
+The method ==execute:== simply calls the visitor main entry point. 
 
 [[[
 BasicInterpreter >> execute: anAST
@@ -100,14 +102,13 @@ BasicInterpreter >> visitMethodNode: aMethodNode
 	^ self visitMethodBodyNode: aMethodNode body
 ]]]
 
-For now ==visitMethodBodyNode:== just visit the method body (an ==RBSequenceNode==).
+For now ==visitMethodBodyNode:== just visits the method body (an ==RBSequenceNode==).
 [[[
 BasicInterpreter >> visitMethodBodyNode: aMethodBodyNode
 	^ self visitNode: aMethodBodyNode 
 ]]]
 
-The first version of ==visitSequenceNode:== ignore possible temporary declarations and 
-handle all the statements paying attention that the last statement value should be returned.
+The first version of ==visitSequenceNode:== ignores possible temporary declarations and handles all the statements paying attention that the last statement value should be returned.
 
 [[[
 BasicInterpreter >> visitSequenceNode: aSequenceNode
@@ -117,7 +118,7 @@ BasicInterpreter >> visitSequenceNode: aSequenceNode
 ]]]
 
 
-Since we want to be able to access return value we define the ==visitReturnNode:== to handle 
+Since we want to be able to access return value, we define the ==visitReturnNode:== to handle 
 [[[
 BasicInterpreter >> visitReturnNode: aReturnNode
 
@@ -125,12 +126,17 @@ BasicInterpreter >> visitReturnNode: aReturnNode
 ]]]
 
 For now we only manage literal object such as number, booleans, ...
+So we redefine the method
 
 [[[
 BasicInterpreter >> visitLiteralValueNode: aRBLiteralValueNode
 
 	^ aRBLiteralValueNode value
 ]]]
+
+Our first test passes. 
+And we are ready to continue our journey.
+
 
 
 !!! Handling Arrays of Literals
