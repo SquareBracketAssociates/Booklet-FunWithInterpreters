@@ -1,0 +1,43 @@
+!!! Structural interpreter
+No message
+
+	Constant 
+		int
+		float
+		boolean 
+		arrays
+		Globals
+	
+	Instance
+		self super	
+		instvar		read/write
+	Assignment
+		
+!!! Calls and Activation
+	
+	message send
+	lookup
+	activation
+	temps
+
+	inheritance and super sends
+	DNU
+	
+	Shared vars/pool
+	
+!!! Blocks and control flow
+
+	declaration block
+		block home context
+	activitation block
+	return 
+	
+	Control flow
+		if
+		while
+	Unwinding
+	non local return
+	
+!!! thisContext Exceptions
+	Reification
+
