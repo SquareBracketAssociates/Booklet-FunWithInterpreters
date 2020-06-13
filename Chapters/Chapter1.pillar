@@ -176,7 +176,7 @@ And we are ready to continue our journey.
 
 Since we will write many tests during this book, we exact some logic from our test method, it will help future evolution. 
 
-We define the method ==executeSelector:==, it accesses the method, gets its AST and returns the value of the  
+We define the method ==executeSelector:==, it accesses the method, gets its AST and returns the value of the  execution of the ast.
 [[[
 CHInterpreterTest >> executeSelector: aSymbol
 
@@ -222,10 +222,8 @@ CHInterpreterTest >> testReturnFloat
 
 !!! Literal Array
 
-[[[
-CInterpretable >> returnLiteralArray
-	^ #(true 1 'ahah')
-]]]
+We add support for Array. 
+First we define some method returning an empty array and a literal array. 
 
 [[[
 CInterpretable >> returnEmptyArray
@@ -233,24 +231,32 @@ CInterpretable >> returnEmptyArray
 ]]]
 
 [[[
+CInterpretable >> returnLiteralArray
+	^ #(true 1 'ahah')
+]]]
+
+We add a test to cover case.
+
+
+[[[
 CHInterpreterTest >> testReturnEmptyArray
 
-	| ast result |
-	ast := (CInterpretable >> #returnEmptyArray) ast.
-	result := self interpreter execute: ast. 
-	self assert: result equals: #() 
+	self 
+		assert: (self executeSelector: #returnEmptyArray) 
+		equals: #() 
 ]]]
 
 
 [[[
 CHInterpreterTest >> testReturnLiteralArray
 
-	| ast result |
-	ast := (CInterpretable >> #returnLiteralArray) ast.
-	result := self interpreter execute: ast. 
-	self assert: result equals:  #(true 1 'ahah')
+	self 
+		assert: (self executeSelector: #returnLiteralArray) 
+		equals: #(true 1 'ahah')
 ]]]
 
+We now have to implement the method ==visitLiteralArrayNode:== to handle arrays.
+Here we return the values returned by the interpretation of the elements. 
 
 [[[
 CHInterpreter >> visitLiteralArrayNode: aRBLiteralArrayNode 
@@ -259,7 +265,42 @@ CHInterpreter >> visitLiteralArrayNode: aRBLiteralArrayNode
 			collect: [ :each | self visitNode: each ] 
 ]]]
 
+The tests are green.
+Up until now we did not consider that any form of variable and we should handle such case.
+
 !!! Handling Self 
+The first kind of variable that we handle is ==self== that represents the receiver of the message. 
+THe first things we need to do is to make sure that we can specify the receiver of a message
+
+
+Since we need to have access to the receiver for now we add an instance variable called ==receiver==.
+
+[[[
+Object subclass: #CHInterpreter
+	instanceVariableNames: 'receiver'
+	classVariableNames: ''
+	package: 'Champollion'
+]]]
+
+
+[[[
+CHInterpreter >> receiver
+	^ receiver
+]]]
+
+We make sure that we can set the receiver when we launch the interpretation and we introduce a new method ==execute:with:== for this.
+
+[[[
+CHInterpreter >> execute: anAST withReceiver: anObject
+
+	receiver := anObject.
+	^ self visitNode: anAST
+]]]
+
+
+
+
+
 
 [[[
 CHInterpreterTest >> executeSelector: aSymbol
@@ -274,20 +315,11 @@ CHInterpreterTest >> executeSelector: aSymbol
 
 [[[
 CInterpretable >> returnSelf
-	^ self
+	^ self 
 ]]]
 
 [[[
-CHInterpreterTest >> testReturnSelf
-
-	| ast result |
-	ast := (CInterpretable >> #returnBoolean) ast.
-	result := self interpreter execute: ast withReceiver: 42. 
-	self deny: result 
-]]]
-
-[[[
-CBasicInterpreter >> visitSelfNode: aRBSelfNode 
+CInterpretable >> visitSelfNode: aRBSelfNode 
 	^ self receiver
 ]]]
 
@@ -435,51 +467,16 @@ CHInterpreterTest >> testReturnBoolean
 	self assert: result equals: false 
 ]]]
 
-!!! Visiting Core Behavior
-
-[[[
-CHInterpreter >> visitNode: aNode
-	^ aNode acceptVisitor: self
-]]]
-
-[[[
-CHInterpreter >> visitMethodNode: aMethodNode
-	
-	^ self visitMethodBodyNode: aMethodNode body
-]]]
-
-
-[[[
-CHInterpreter >> visitMethodBodyNode: aMethodBodyNode
-	^ self visitNode: aMethodBodyNode 
-]]]
-
-[[[
-CHInterpreter >> visitSequenceNode: aSequenceNode
-	| res |
-	aSequenceNode statements allButLast 
-		do: [ :each | self visitNode: each ].
-	res := self visitNode: aSequenceNode statements last.
-	^ res
-]]]
 
 
 
 
 
 
-[[[
-CHInterpreterTest >> testReturnEmptyArray
-
-	self assert: (self executeSelector: #returnEmptyArray) equals: #() 
-]]]
 
 
-[[[
-CHInterpreterTest >> testReturnLiteralArray
 
-	self assert: (self executeSelector: #returnLiteralArray) equals: #(true 1 'ahah')
-]]]
+
 
 [[[
 TestCase subclass: #CHInterpreterTest
