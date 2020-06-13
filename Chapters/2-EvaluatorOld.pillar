@@ -1,0 +1,945 @@
+!! A First Interpreter: An Simple Evaluator
+
+In this chapter we will develop step by step a Pharo program interprerter.
+We will incrementally add support for language characteristics.
+Here is the progression: returning constants, accessing receiver state, instance variable assignment, simple temporaries, self messages, ....
+
+
+
+For each of the steps we will start by defining a method illustrating the situation, then we define a test and 
+we implement the features. 
+
+Doing so we will define and refine a visitor. 
+Note that we will write the visitor from scratch but we will reuse the node of the Pharo AST and their  
+functionalities.
+
+!!! Setting the stage
+
+The tests that we will define are hosted in the class ==BasicInterpreterTest==.
+[[[
+TestCase subclass: #BasicInterpreterTest
+	instanceVariableNames: ''
+	classVariableNames: ''
+	package: 'Champollion'
+]]]
+
+The class ==Interpretable== is a class hosting the sample methods that we will execute. 
+
+[[[
+Object subclass: #Interpretable
+	instanceVariableNames: ''
+	classVariableNames: ''
+	package: 'Champollion'
+]]]
+
+Here we define the first method that we would like to execute: the method ==returnFive==
+
+[[[
+Interpretable >> returnFive
+	^ 5
+]]]
+
+Our first test is worth one comment: we access the AST of the method that we want to execute
+then we instantiate our interpreter and ask it to execute the ast. 
+And we check that we get the expected result. 
+
+[[[
+BasicInterpreterTest >> testReturnConstant
+
+	| ast result |
+	ast := (Interpretable >> #returnFive) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 5
+]]]
+
+We define two helper methods: ==interpreter== and ==interpreterClass== as follows: 
+
+[[[
+BasicInterpreterTest >> interpreterClass 
+	^ BasicInterpreter
+]]]
+
+[[[
+BasicInterpreterTest >> interpreter
+	^ self interpreterClass new
+]]]
+
+
+
+!!! Building a minimal constant evaluator
+
+We are ready to define our interpreter:
+
+[[[
+Object subclass: #BasicInterpreter
+	instanceVariableNames: ''
+	classVariableNames: ''
+	package: 'Champollion'
+]]]
+
+Note that we do not inherit from the default Pharo AST visitor so that we build it step by step. Nevertheless we follow the same API and use the node ==accept:== visit methods.
+The method ==execute:== simply calls the visitor main entry point. 
+
+[[[
+BasicInterpreter >> execute: anAST
+
+	^ self visitNode: anAST
+]]]
+
+[[[
+BasicInterpreter >> visitNode: aNode
+	^ aNode acceptVisitor: self
+]]]
+
+The first visitor method of interest is the method ==visitMethodNode:==
+It just dispatches on ==visitMethodBodyNode:==.
+[[[
+BasicInterpreter >> visitMethodNode: aMethodNode
+
+	^ self visitMethodBodyNode: aMethodNode body
+]]]
+
+For now ==visitMethodBodyNode:== just visits the method body (an ==RBSequenceNode==).
+[[[
+BasicInterpreter >> visitMethodBodyNode: aMethodBodyNode
+	^ self visitNode: aMethodBodyNode 
+]]]
+
+The first version of ==visitSequenceNode:== ignores possible temporary declarations and handles all the statements paying attention that the last statement value should be returned.
+
+[[[
+BasicInterpreter >> visitSequenceNode: aSequenceNode
+	
+	aSequenceNode statements allButLast do: [ :each | self visitNode: each ].
+	^ self visitNode: aSequenceNode statements last.
+]]]
+
+
+Since we want to be able to access return value, we define the ==visitReturnNode:== to handle 
+[[[
+BasicInterpreter >> visitReturnNode: aReturnNode
+
+	^ self visitNode: aReturnNode value
+]]]
+
+For now we only manage literal object such as number, booleans, ...
+So we redefine the method
+
+[[[
+BasicInterpreter >> visitLiteralValueNode: aRBLiteralValueNode
+
+	^ aRBLiteralValueNode value
+]]]
+
+Our first test passes. 
+And we are ready to continue our journey.
+
+
+
+!!! Handling Arrays of Literals
+Literal arrays are another kind of constants. Let us add some support for them. 
+We start with a sample: the method  ==returnEmptyArray== and a test ==testReturnEmptyArray==.
+
+[[[
+Interpretable >> returnEmptyArray
+	^ #()
+]]]
+
+[[[
+BasicInterpreterTest >> testReturnEmptyArray
+
+	| ast result |
+	ast := (Interpretable >> #returnEmptyArray) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: #() 
+]]]
+
+The definition is simple we will return a collection of literals by visiting the contents of the literal array as shown in method ==visitLiteralArrayNode:==.
+[[[
+BasicInterpreter >> visitLiteralArrayNode: aRBLiteralArrayNode 
+	
+	^ aRBLiteralArrayNode contents collect: [ :each | self visitNode: each ] 
+]]]	
+	
+Since we love tests, let us write another one. 
+
+[[[
+Interpretable >> returnLiteralArray
+	^ #(true 1 'ahah')
+]]]
+
+[[[
+BasicInterpreterTest >> testReturnLiteralArray
+
+	| ast result |
+	ast := (Interpretable >> #returnLiteralArray) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals:  #(true 1 'ahah')
+]]]
+
+!!! Accessing receiver state
+
+We add support to access receiver's instance variables.
+Let us start to add one simple accessor. 
+
+!!!!! Fixture and Test
+
+We define a getter and setter to be able to control the value put in the instance variable of our instance.
+
+[[[
+Interpretable >> returnX
+	^ x 
+]]]
+ 
+[[[
+Interpretable >> x: anInteger
+	x := anInteger
+]]]
+
+
+Then we define a test showing that the interpreter can effectively access the value of an object using the accessor we just defined.
+
+[[[
+BasicInterpreterTest >> testAccessXInInstance
+
+	| ast result |
+	ast := (Interpretable >> #returnX) ast.
+	result := self interpreter execute: ast with: (Interpretable new x: 100).
+	self assert: result equals: 100. 
+	
+]]]
+
+Our test is failing so we are ready to work. 
+
+!!!!!Implementation
+
+Since we need to have access to the receiver for now we add an instance variable called ==receiver==.
+
+[[[
+Object subclass: #BasicInterpreter
+	instanceVariableNames: 'receiver'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion'
+]]]
+
+We make sure that we can set the receiver when we launch the interpretation and we introduce a new method ==execute:with:== for this.
+[[[
+BasicInterpreter >> execute: anAST with: anObject
+
+	receiver := anObject.
+	^ self visitNode: anAST
+]]]
+
+And now we can define the method ==visitInstanceVariableNode:== to reflectivity access the state of receiver.
+
+[[[
+BasicInterpreter >> visitInstanceVariableNode: aVariableNode
+
+	^ receiver instVarNamed: aVariableNode name
+]]]
+
+Our test should pass and we are read
+
+!!! Instance variable assignment
+
+We will add now support for assignment in receiver's instance variables.
+
+
+!!!!! Fixture and Tests
+
+We define a method doing an assignment into the instance variable ==x==.
+[[[
+Interpretable >> store100IntoX
+
+	x := 100.
+]]]
+
+We add an accessor to be able to nicely test.
+
+[[[
+Interpretable >> x
+
+	^ x 
+]]]
+
+The test ==testStore100IntoX== launches the interpretation of method ==store100IntoX==.
+
+[[[
+BasicInterpreterTest >> testStore100IntoX
+
+	| ast result object  |
+	ast := (Interpretable >> #store100IntoX) ast.
+	object := Interpretable new. 
+	result := self interpreter execute: ast with: object. 
+	self assert: object x equals: 100
+]]]
+
+!!!!!Implementation
+
+The implementation is straighforward. We define the method ==visitAssignmentNode:==.
+Here since we expect to have other variable types in the future we define the storing behavior  (method == store:with:==) of the assigned variable node itself. 
+
+[[[
+BasicInterpreter >> visitAssignmentNode: anAssignmentNode
+	" x := 100"
+	
+	| value | 
+	value := (self visitNode: anAssignmentNode value).
+	anAssignmentNode variable store: value with: self.
+	^ value
+]]]
+
+
+[[[
+RBInstanceVariableNode >> store: anObject with: anInterpreter 
+	
+	anInterpreter receiver instVarNamed: name put: anObject
+]]]
+
+Now our tests should pass. 
+
+
+!!! Intermezzo -- About temporaries
+
+Before implementing the interpretation of temporaries we want to show some particularities of Pharo semantics.
+Temporaries cannot shadow other temporaries.
+
+The following expression is rejected by the compiler because the second ==tmp== definition is illegal. 
+[[[
+[ 
+	| tmp |
+	tmp := 2. 
+	[
+		| tmp |
+		tmp := 3 ]]
+]]]
+
+Similarly a temporary cannot shadow a block or a method parameter.
+Therefore the following expression is not allowed.
+[[[
+[ :tmp |
+	| tmp |
+	tmp := 2]
+]]]
+
+The following method is not valid either.
+[[[
+with: arg
+
+	| arg |
+	^ arg
+]]]	
+
+Finally parameters are read only. 
+Therefore the following method is not valid. 
+[[[
+with: arg
+	arg := 42	
+]]]
+
+As well as the following expression
+
+[[[
+[ :tmp |
+	tmp := 2
+	 ]
+]]]
+
+We can say that inside a method the names of parameters, temporaries and instance variables are flattened and use a single namespace.
+
+
+!!! Temporaries
+
+Now that we get refreshed on the accepted definitions of temporary variables, we can start supporting them 
+in method bodies. We will see that block semantics is a bit more complex in the next chapter.
+
+We start by defining a simple temporary definition and assignment. 
+[[[
+Interpretable >> settingAValueToTemp
+
+	| temp | 
+	temp := 10.
+	^ temp
+]]]
+
+We define the associated test.
+[[[
+BasicInterpreterTest >> testSettingAValueToTemp
+
+	| ast result |
+	ast := (Interpretable >> #settingAValueToTemp) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 10 
+]]
+
+!!!!!Implementation: Some infrastructure
+
+We need a way to store temporaries as they are defined and assigned values to. 
+We add an instance variable to the interpreter to hold such structure, for now a dictionary. 
+As you expect, in the future we will manage a stack of such structure one for each method.
+
+[[[
+Object subclass: #CBasicInterpreter
+	instanceVariableNames: 'frame'
+	classVariableNames: ''
+	package: 'Champollion'
+]]]
+
+
+[[[
+BasicInterpreter >> newFrame
+	^ Dictionary new
+]]]
+
+Then we manage accesses to the temp value based on its name
+
+[[[
+BasicInterpreter >> tempAt: aSymbol
+	^ frame at: aSymbol
+]]]
+
+
+[[[
+BasicInterpreter >> tempAt: aSymbol put: anInteger 
+
+	frame at: aSymbol put: anInteger
+]]]
+
+
+!!!!!Implementation: Interpretation
+
+We refine the ==visitSequenceNode:== method to handle the definition of temporaries. 
+This is not really needed since we will just put nil in the temporaries, but it will simplify
+their management. 
+
+[[[
+BasicInterpreter >> visitSequenceNode: aSequenceNode
+
+	self visitTemporaryNodes: aSequenceNode temporaries.
+	aSequenceNode statements allButLast do: [ :each | self visitNode: each ].
+	^ self visitNode: aSequenceNode statements last.
+]]]
+
+During the declaration of temporaries we initialize a frame.
+
+[[[
+BasicInterpreter >> visitTemporaryNodes: aNodeCollection
+	"For temporary definition i.e., between the pipes |a b c|"
+
+	frame := self newFrame. 
+	^ aNodeCollection
+		do: [ :each | self visitTemporaryDeclarationNode: each ]
+]]]
+
+Note that when we will support message and blocks we will revisit this decision because as we saw
+in the temporaries, method and block parameters we can use the same frame. 
+
+[[[
+BasicInterpreter >> visitTemporaryDeclarationNode: aTemporaryDeclarationNode
+
+	self tempAt: aTemporaryDeclarationNode name put: nil.
+]]]
+
+When we get a reference to a temporary variable we simply check and return its value. 
+[[[
+BasicInterpreter >> visitTemporaryNode: aTemporaryNode
+
+	^ self tempAt: aTemporaryNode name
+]]]
+
+
+!!! More temporary tests
+
+Let us take the opportunity to add more tests.
+First we can test that we can read and write to temporaries. 
+[[[
+Interpretable >> settingAValueToTempInARow
+
+	| temp1 temp2| 
+	temp1 := 10.
+	temp2 := temp1.
+	^ temp2
+]]]
+
+[[[
+BasicInterpreterTest >> testSettingAValueToTempInARow
+	"settingAValueToTempInARow
+
+	| temp1 temp2| 
+	temp1 := 10.
+	temp2 := temp1.
+	^ temp2
+	"
+	| ast result |
+	ast := (Interpretable >> #settingAValueToTempInARow) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 10 
+]]]
+
+Let us check that we manage also sequenced assignments. 
+[[[
+Interpretable >> settingAValueToTempEmbedded
+
+	| temp1 temp2 | 
+	temp2 := temp1 := 10.
+	^ temp2
+]]]
+
+[[[
+BasicInterpreterTest >> testSettingAValueToTempEmbedded
+	"settingAValueToTempEmbedded
+
+		| temp1 temp2 | 
+		temp2 := temp1 := 10.
+		^ temp2
+	"
+	| ast result |
+	ast := (Interpretable >> #settingAValueToTempEmbedded) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 10 
+]]]
+
+
+!!! self Unary Messages
+We will implement now an extremely simple version of message: messages sent to self without arguments. 
+The lookup will look only in the class of the receiver. 
+
+!!!!! Fixture and tests
+
+
+[[[
+Interpretable >> sendMessageReturnX
+	^ self returnX
+]]]
+
+[[[
+BasicInterpreterTest >> testSendMessageReturnX
+	"
+	sendMessageReturnX
+		^ self returnX
+	"
+	| ast result |
+	ast := (Interpretable >> #sendMessageReturnX) ast.
+	result := self interpreter execute: ast with: (Interpretable new x: 100).
+	self assert: result equals: 100. 
+]]]
+
+
+
+
+
+!!!!! Implementation
+
+The first behavior is to return the receiver as value for the ==self== node. 
+Right now we only have one receiver and we will change this when we will support messages to any objects.
+[[[
+BasicInterpreter >> visitSelfNode: aRBSelfNode 
+	^ receiver
+]]]
+
+The ==visitMessageNode:== is the core of the Pharo computation. 
+We do a bit more than just managing self send messages.
+First it computes the message receiver (in the future the receiver may be composed of multiple message).
+We look for the method to execute using the message ==lookup:fromClass:==. 
+
+[[[
+BasicInterpreter >> visitMessageNode: aMessageNode
+
+	| rec args method | 
+	rec := self visitNode: aMessageNode receiver.
+	method := self lookup: aMessageNode selector fromClass: rec class.
+	^ self execute: method 
+]]]
+
+[[[
+BasicInterpreter >> lookup: aSymbol fromClass: aClass 
+	"return the method ast or nil."
+	
+	^ (aClass includesSelector: aSymbol)
+		ifTrue: [ (aClass compiledMethodAt: aSymbol) ast ]
+		ifFalse: [ "no lookup for now" 
+					nil ]
+]]]
+
+
+
+Now we can check that the returning ==self== return the message receiver. 
+
+[[[
+BasicInterpreterTest >> testReturnSelf
+	"
+	returnSelf
+
+		^ self
+	"
+	| ast result object |
+	ast := (Interpretable >> #returnSelf) ast.
+	object := (Interpretable new x: 100; yourself).
+	result := self interpreter execute: ast with: object.
+	self assert: result equals: object 
+]]]
+
+!!! Looking in superclasses
+
+[[[
+BasicInterpreterTest >> testLookupMessageInSuperclass
+
+	| ast result |
+	ast := (Interpretable >> #sendMessageReturnX) ast.
+	result := self interpreter execute: ast with: (InterpretableSubclass new x: 100).
+	self assert: result equals: 100. 
+]]]
+
+
+[[[
+BasicInterpreter >> lookup: aSymbol fromClass: aClass 
+	"return the method ast or nil."
+	
+	^ (aClass includesSelector: aSymbol)
+		ifTrue: [ (aClass compiledMethodAt: aSymbol) ast ]
+		ifFalse: [
+			aClass = ProtoObject 
+				ifTrue: [ nil ]
+				ifFalse: [ self lookup: aSymbol fromClass: aClass superclass ]]
+]]]
+
+!!! Sending unary messages to other objects
+
+[[[
+BasicInterpreterTest >> testNot
+	"
+	not
+		^ false not
+	"
+	| ast result |
+	ast := (Interpretable >> #not) ast.
+	result := self interpreter execute: ast.
+	self assert: result
+]]]
+
+
+
+
+[[[
+BasicInterpreter >> pushNewFrame
+	"Pushing a new scope consists in creating a new dictionary whose parent is the top of the stack
+	and pushing it as a new top. This way a variable not found in current scope will be looked up in previous scope."
+
+	| newTop |
+	newTop := self newFrame.
+	newTop parent: stack top.
+	stack push: newTop 
+]]]	
+
+[[[
+BasicInterpreter >> initialize 
+	super initialize. 
+	stack := Stack new.
+	stack push: self newFrame.
+]]]
+
+[[[
+BasicInterpreter >> receiver
+	^ stack top at: #self
+]]]
+
+
+Note that the method ==visitMessageNode:== is incomplete because it does not handle arguments and does not pop the stack
+once the execution is done. 
+
+
+[[[
+BasicInterpreter >> popFrame
+	stack pop 
+]]]
+
+[[[
+BasicInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method | 
+	self pushNewFrame.
+	rec := self visitNode: aMessageNode receiver.
+	method := self lookup: aMessageNode selector fromClass: rec class. 
+	res := self execute: method.
+	self popFrame.
+	^ res
+]]]	 
+
+
+!!!!! Another little test
+[[[
+BasicInterpreterTest >> testIsLiteral
+	"
+	not
+
+		^ false not
+	"
+	| ast result |
+	ast := (Interpretable >> #isLiteral) ast.
+	result := self interpreter execute: ast.
+	self assert: result
+]]]
+
+
+!!! Supporting message arguments
+
+[[[
+BasicInterpreterTest >> testReturnLastOfAnd
+	"
+	returnLastOf: a and: b
+		^ b
+	"
+	| ast result |
+	ast := (Interpretable >> #returnLastOf:and:) ast.
+	result := self interpreter execute: ast withReceiver: Interpretable new andArguments: { 10 . 20}.
+	self assert: result equals: 20. 
+]]]
+
+[[[
+BasicInterpreter >> execute: aMethodAST withReceiver: anObject andArguments: args
+
+	self tempAt: #self put: anObject.
+	aMethodAST arguments 
+		with: args 
+		do: [ :arg :value | self tempAt: arg name put: value ].
+	^ self visitNode: aMethodAST
+]]]
+
+
+[[[
+BasicInterpreter >> visitArgumentNode: aRBArgumentNode 
+	^ self tempAt: aRBArgumentNode name
+]]]
+
+[[[
+BasicInterpreter >> visitSequenceNode: aSequenceNode
+	| res |
+	aSequenceNode hasTemporaries
+		ifTrue: [ self pushNewFrame 
+			self visitTemporaryNodes: aSequenceNode temporaries ].
+	aSequenceNode statements allButLast do: [ :each | self visitNode: each ].
+	res := self visitNode: aSequenceNode statements last.
+	aSequenceNode hasTemporaries
+		ifTrue: [ self popFrame ].
+	^ res
+]]]
+
+[[[
+Interpretable >> returnLastOf2: b and: a
+
+	^ self returnLastOf: b and: a
+]]]
+
+[[[
+BasicInterpreterTest >> testReturnLastOfAnd2
+	"
+	returnLastOf2: b and: a
+		^ self returnLastOf: b and: a
+	returnLastOf: a and: b
+		^ b
+		"
+	| ast result |
+	ast := (Interpretable >> #returnLastOf2:and:) ast.
+	result := self interpreter execute: ast withReceiver: Interpretable new andArguments: { 10 . 20}.
+	self assert: result  equals: 20. 
+]]]
+
+
+!!! Supporting super
+
+[[[
+InterpretableSubclass >> not
+	^ super not & false not
+]]]
+
+[[[
+BasicInterpreterTest >> testSuperNot
+	"
+	not
+		^ super not & false not
+	"
+	| ast result |
+	ast := (InterpretableSubclass >> #not) ast.
+	result := self interpreter execute: ast withReceiver: InterpretableSubclass new andArguments: #().
+	self assert: result
+]]]
+
+
+[[[
+BasicInterpreter >> visitMessageNode: aMessageNode
+
+	| rec args method res | 
+	self pushNewFrame.
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	method :=  aMessageNode receiver isSuper
+		ifTrue: [ self lookup: aMessageNode selector fromClass: rec class superclass ]
+		ifFalse: [ self lookup: aMessageNode selector fromClass: rec class ].
+	res := self execute: method withReceiver: rec andArguments: args.
+	self popFrame.
+	^ res 
+]]]
+
+
+[[[
+BasicInterpreter >> visitSuperNode: aRBSuperNode 
+	^ self receiver
+]]]
+
+
+!!! First basic handling of primitives
+
+[[[
+Interpretable >> addition
+
+	^ 3 + 2
+]]]
+
+[[[
+SmallInteger >> + aNumber 
+	"Primitive. Add the receiver to the argument and answer with the result
+	if it is a SmallInteger. Fail if the argument or the result is not a
+	SmallInteger  Essential  No Lookup. See Object documentation whatIsAPrimitive."
+
+	<primitive: 1>
+	^ super + aNumber
+]]]
+
+
+[[[
+BasicInterpreterTest >> testPrimitiveAddition
+	"
+	addition
+
+		^ 3 + 2
+	"
+	| ast result |
+	ast := (Interpretable >> #addition) ast.
+	result := self interpreter execute: ast.
+	self assert: result  equals: 5. 
+]]]
+
+
+[[[
+BasicInterpreter >> visitMessageNode: aMessageNode
+
+	| rec args method res | 
+	self pushNewFrame.
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	aMessageNode methodNode isPrimitive
+		ifTrue: [
+			res := rec 
+					tryPrimitive: (aMessageNode methodNode pragmas first argumentAt: 'primitive:') value 
+					withArgs: args ]
+		ifFalse: [ 	
+			method :=  aMessageNode receiver isSuper
+				ifTrue: [ self lookup: aMessageNode selector fromClass: rec class superclass ]
+				ifFalse: [ self lookup: aMessageNode selector fromClass: rec class ].
+			res := self execute: method withReceiver: rec andArguments: args] .
+	self popFrame.
+	^ res 
+]]]
+
+
+
+
+
+!!! More tests 
+
+[[[
+InterpretableSubclass >> returnFive
+	^ super returnFive + super returnFive 
+]]]
+
+[[[
+BasicInterpreterTest >> testReturnFive10
+	"
+	returnFive
+			^ super returnFive + super returnFive 
+	"
+	
+	| ast result |
+	ast := (InterpretableSubclass >> #returnFive) ast.
+	result := self interpreter execute: ast withReceiver: InterpretableSubclass new andArguments: #().
+	self assert: result  equals: 10. 
+]]]
+
+
+!!! Sending messages to class
+
+
+[[[
+Interpretable class >> return42
+
+		^ 42
+]]]
+
+[[[
+Interpretable >> return42
+
+	^ self class return42
+]]]
+
+[[[
+BasicInterpreterTest >> testMessageToClass
+	"
+	return42
+
+		^ 42
+	"
+	| ast result |
+	ast := (Interpretable class >> #return42) ast.
+	result := self interpreter execute: ast withReceiver: Interpretable andArguments: {  }.
+	self assert: result equals: 42 
+]]]
+
+[[[
+BasicInterpreterTest >> testIndirectMessageToClass
+	"
+	return42
+		^ self class return42
+	"
+	| ast result |
+	ast := (Interpretable >> #return42) ast.
+	result := self interpreter execute: ast withReceiver: Interpretable new andArguments: {  }.
+	self assert: result equals: 42 
+]]]
+
+
+[[[
+Interpretable >> returnExplicitClass42
+
+	^ Interpretable return42
+]]]
+
+[[[
+BasicInterpreterTest >> testReturnExplicitClass42
+	"
+	returnExplicitClass42
+		^ Interpretable return42
+	"
+	| ast result |
+	ast := (Interpretable >> #returnExplicitClass42) ast.
+	result := self interpreter execute: ast withReceiver: Interpretable new andArguments: {  }.
+	self assert: result equals: 42 
+]]]	
+	
+This is different because and we need to support direct references to global. 
+
+
+[[[
+BasicInterpreter >> visitGlobalNode: aRBGlobalNode 
+
+	^ self class environment 
+		at: aRBGlobalNode name 
+		ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
+]]]
+
+
+
+
+!!! Conclusion
+This interpreter is basic. It does not cover blocks and more dynamic features. 
+We will cover more advanced topics in the following chapter.
