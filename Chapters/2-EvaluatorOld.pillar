@@ -1,4 +1,4 @@
-!! A First Interpreter: An Simple Evaluator
+!! A First Interpreter: A Simple Evaluator
 
 In this chapter we will develop step by step a Pharo program interprerter.
 We will incrementally add support for language characteristics.
@@ -39,18 +39,6 @@ Interpretable >> returnFive
 	^ 5
 ]]]
 
-Our first test is worth one comment: we access the AST of the method that we want to execute
-then we instantiate our interpreter and ask it to execute the ast. 
-And we check that we get the expected result. 
-
-[[[
-BasicInterpreterTest >> testReturnConstant
-
-	| ast result |
-	ast := (Interpretable >> #returnFive) ast.
-	result := self interpreter execute: ast. 
-	self assert: result equals: 5
-]]]
 
 We define two helper methods: ==interpreter== and ==interpreterClass== as follows: 
 
