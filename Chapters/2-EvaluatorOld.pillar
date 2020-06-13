@@ -34,25 +34,7 @@ BasicInterpreterTest >> testAccessXInInstance
 
 Our test is failing so we are ready to work. 
 
-!!!!!Implementation
 
-Since we need to have access to the receiver for now we add an instance variable called ==receiver==.
-
-[[[
-Object subclass: #BasicInterpreter
-	instanceVariableNames: 'receiver'
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Champollion'
-]]]
-
-We make sure that we can set the receiver when we launch the interpretation and we introduce a new method ==execute:with:== for this.
-[[[
-BasicInterpreter >> execute: anAST with: anObject
-
-	receiver := anObject.
-	^ self visitNode: anAST
-]]]
 
 And now we can define the method ==visitInstanceVariableNode:== to reflectivity access the state of receiver.
 

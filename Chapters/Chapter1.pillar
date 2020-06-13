@@ -274,6 +274,7 @@ THe first things we need to do is to make sure that we can specify the receiver 
 
 
 Since we need to have access to the receiver for now we add an instance variable called ==receiver==.
+This is a super naive way to handle it since we will need a way to automatically manage receiver and arguments.
 
 [[[
 Object subclass: #CHInterpreter
@@ -282,6 +283,7 @@ Object subclass: #CHInterpreter
 	package: 'Champollion'
 ]]]
 
+We define an accessor so that we can easily adapt when we will introduce a better way representation later. 
 
 [[[
 CHInterpreter >> receiver
