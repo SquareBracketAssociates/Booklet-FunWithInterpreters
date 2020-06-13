@@ -1,0 +1,2878 @@
+
+
+
+[[[
+CBasicInterpreterTest >> testReturnSelf
+	"
+	returnSelf
+
+		^ self
+	"
+	| ast result object |
+	ast := (CInterpretable >> #returnSelf) ast.
+	object := (CInterpretable new x: 100; yourself).
+	result := self interpreter execute: ast withReceiver: object.
+	self assert: result equals: object 
+	
+]]]
+
+[[[
+CHInterpreterTest >> testSelfSend
+	"
+	sendMessageReturnX
+
+		^ self returnX
+	"
+
+	receiver x: 100.
+	self assert: (self executeSelector: #sendMessageReturnX) equals: 100
+]]]
+
+[[[
+CHInterpreterTest >> testSelfSend
+	"
+	sendMessageReturnX
+
+		^ self returnX
+	"
+
+	receiver x: 100.
+	self assert: (self executeSelector: #sendMessageReturnX) equals: 100
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec args method res | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method | 
+	rec := self visitNode: aMessageNode receiver.
+	method := self lookup: aMessageNode selector fromClass: rec class.
+	^ self execute: method withReceiver: rec
+]]]
+
+
+[[[
+CHInterpreter >> lookup: aSymbol fromClass: aClass 
+	"return the method ast or nil."
+	
+	^ (aClass includesSelector: aSymbol)
+			ifTrue: [ (aClass compiledMethodAt: aSymbol) ast ]
+			ifFalse: [
+				aClass = ProtoObject 
+					ifTrue: [ nil ]
+					ifFalse: [ self lookup: aSymbol fromClass: aClass superclass ]]
+]]]
+
+[[[
+CHInterpreter >> lookup: aSymbol fromClass: aClass 
+	"Return the AST of a method or nil if none is found"
+
+	"If the class defines a method for the selector, return the AST corresponding to the method"
+	(aClass includesSelector: aSymbol)
+		ifTrue: [ ^ (aClass compiledMethodAt: aSymbol) ast ].
+
+	"Otherwise lookup recursively in the superclass.
+	If we reach the end of the hierarchy return nil"
+	^ aClass = ProtoObject 
+		ifTrue: [ nil ]
+		ifFalse: [ self lookup: aSymbol fromClass: aClass superclass ]
+]]]
+
+[[[
+CHInterpreter >> execute: anAST withReceiver: anObject
+
+	self newFrame.
+	^ self visitNode: anAST
+]]]
+
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method | 
+	rec := self visitNode: aMessageNode receiver.
+	method := self lookup: aMessageNode selector fromClass: rec class.
+	^ self executeMethod: method withReceiver: rec
+]]]
+
+
+[[[
+CHInterpreterTest >> testInstanceVariableAccessInMethodActivationDoesNotEscape
+	"
+	sendMessageReturnX
+
+		^ self returnX
+	"
+
+	receiver x: 100.
+	self assert: (self executeSelector: #sendMessageReturnX) equals: 100
+]]]
+
+[[[
+TestCase subclass: #CHInterpreterTest
+	instanceVariableNames: 'interpreter receiver collaborator'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+[[[
+CHInterpreterTest >> setUp
+
+	interpreter := self interpreterClass new.
+	receiver := CInterpretable new.
+	collaborator := CInterpretable new.
+]]]
+
+[[[
+CHInterpreterTest >> setUp
+
+	interpreter := self interpreterClass new.
+	receiver := CInterpretable new.
+	collaborator := CInterpretable new.
+	receiver collaborator: collaborator
+]]]
+
+[[[
+Object subclass: #CInterpretable
+	instanceVariableNames: 'x collaborator'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+[[[
+CHInterpreterTest >> collaborator: anObject
+
+	collaborator := anObject
+]]]
+
+[[[
+CInterpretable >> collaborator: anObject
+
+	collaborator := anObject
+]]]
+
+[[[
+CInterpretable >> collaborator: anObject
+
+	collaborator := anObject
+]]]
+
+[[[
+CHInterpreterTest >> collaborator: anObject
+
+	collaborator := anObject
+]]]
+
+
+[[[
+TestCase subclass: #CHInterpreterTest
+	instanceVariableNames: 'interpreter receiver'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+[[[
+CInterpretable >> returnFalse
+
+	^ false
+]]]
+
+
+[[[
+CInterpretable >> returnFive
+
+	^ 5
+]]]
+
+
+[[[
+CInterpretable >> returnX
+
+	^ x 
+]]]
+
+[[[
+CInterpretable >> store100IntoX
+
+	x := 100.
+]]]
+
+[[[
+CInterpretable >> store100IntoXAndReturnX
+
+	x := 100.
+	
+]]]
+
+
+
+
+[[[
+CInterpretable >> sendMessageReturnX
+
+	^ self returnX
+]]]
+
+[[[
+CInterpretable >> collaboratorX
+
+	^ collaborator x
+]]]
+
+[[[
+CInterpretable >> x
+
+	^ x
+]]]
+
+
+[[[
+CInterpretable >> x: anInteger
+
+	x := anInteger
+]]]
+
+[[[
+TestCase subclass: #CHInterpreterTest
+	instanceVariableNames: 'interpreter receiver collaborator'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+[[[
+CHInterpreterTest >> setUp
+
+	interpreter := self interpreterClass new.
+	receiver := CInterpretable new.
+	collaborator := CInterpretable new.
+	receiver collaborator: collaborator 
+]]]
+
+[[[
+CHInterpreterTest >> testInstanceVariableAccessInMethodActivationDoesNotEscape
+	"
+	collaboratorX
+
+		^ collaborator x
+	"
+
+	receiver x: 100.
+	collaborator x: 200.
+	self assert: (self executeSelector: #collaboratorX) equals: 200
+]]]
+
+[[[
+CInterpretable >> collaboratorX: anInteger
+
+	collaborator x: anInteger
+]]]
+
+[[[
+CInterpretable >> changeCollaboratorX
+
+	collaborator x: 200
+]]]
+
+[[[
+CHInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSender
+	"
+	changeCollaboratorX
+		collaborator x: 200
+	"
+
+	receiver x: 100.
+	collaborator x: 300.
+	self assert: (self executeSelector: #changeCollaboratorX) equals: 200
+]]]
+
+[[[
+CInterpretable >> changeCollaboratorX
+
+	collaborator store100IntoX
+]]]
+
+[[[
+CHInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSender
+	"
+	changeCollaboratorX
+ 		collaborator store100IntoX
+	"
+
+	receiver x: 200.
+	collaborator x: 300.
+	(self executeSelector: #changeCollaboratorX).
+	self assert: receiver x equals: 200.
+	self assert: collaborator x equals: 100
+]]]
+
+
+[[[
+CHInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSender
+	"
+	changeCollaboratorX
+ 		collaborator store100IntoX
+	"
+
+	receiver x: 200.
+	collaborator x: 300.
+	self executeSelector: #changeCollaboratorX.
+	self assert: receiver x equals: 200.
+	self assert: collaborator x equals: 100
+]]]
+
+[[[
+CInterpretable >> cocollaboratorX: anInteger
+
+	self collaboratorX: anInteger
+
+	
+]]]
+
+[[[
+CInterpretable >> changeCollaboratorWithArgument
+
+	collaborator x: 500
+]]]
+
+[[[
+CHInterpreterTest >> testArgumentAccess
+	"
+	changeCollaboratorWithArgument
+		collaborator x: 500
+	"
+
+	receiver x: 200.
+	collaborator x: 300.
+	self executeSelector: #changeCollaboratorWithArgument.
+	self assert: receiver x equals: 200.
+	self assert: collaborator x equals: 500
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	method := self lookup: aMessageNode selector fromClass: rec class.
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
+	self pushNewFrame.
+	self topFrame at: #self  put: anObject.
+	^ self visitNode: anAST
+]]]
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject
+	^ self executeMethod: anAST withReceiver: anObject andArguments: #()
+]]]
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
+	self pushNewFrame.
+	self topFrame at: #self  put: anObject.
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
+	^ self visitNode: anAST
+]]]
+
+[[[
+CHInterpreter >> tempAt: aSymbol put: anInteger 
+
+	self topFrame at: aSymbol put: anInteger
+]]]
+
+[[[
+CHInterpreter >> tempAt: aSymbol
+
+	^ self topFrame at: aSymbol
+]]]
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
+	self pushNewFrame.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
+	^ self visitNode: anAST
+]]]
+
+[[[
+CHInterpreter >> visitArgumentNode: aRBArgumentNode
+
+	^ self tempAt: aRBArgumentNode name
+]]]
+
+[[[
+CInterpretable >> collaboratorXIgnoringArgumentWithSameName: anInteger
+
+	collaborator x: 100
+]]]
+
+[[[
+CInterpretable >> collaboratorXIgnoringArgumentWithSameName: anInteger
+	"precondition: The argument of method x: has name anInteger too, and they should not collide"
+	collaborator x: 100
+]]]
+
+[[[
+CInterpretable >> changeCollaboratorXWithConflictingArgumentNAmes
+
+	collaborator collaboratorXIgnoringArgumentWithSameName: 1987
+]]]
+
+[[[
+CHInterpreterTest >> testArgumentAccessDoesNotEscapeItsDefinition
+	"
+	changeCollaboratorWithArgument
+		collaborator x: 500
+	"
+
+	receiver x: 200.
+	collaborator x: 300.
+
+	"Test precondition. Both methods have arguments with the same name.
+	Otherwise this test could be green but false."
+	self
+		assert: (CInterpretable >> #collaboratorXIgnoringArgumentWithSameName:) arguments
+		equals: (CInterpretable >> #x:) arguments.
+	
+	self executeSelector: #changeCollaboratorXWithConflictingArgumentNAmes.
+
+	self assert: receiver x equals: 200.
+	self assert: collaborator x equals: 100
+]]]
+
+[[[
+CHInterpreterTest >> testArgumentAccessDoesNotEscapeItsDefinition
+	"
+	changeCollaboratorWithArgument
+		collaborator x: 500
+	"
+
+	receiver x: 200.
+	collaborator x: 300.
+
+	"Test precondition. Both methods have arguments with the same name.
+	Otherwise this test could be green but false."
+	self
+		assert: (CInterpretable >> #collaboratorXIgnoringArgumentWithSameName:) argumentNames
+		equals: (CInterpretable >> #x:) argumentNames.
+	
+	self executeSelector: #changeCollaboratorXWithConflictingArgumentNAmes.
+
+	self assert: receiver x equals: 200.
+	self assert: collaborator x equals: 100
+]]]
+
+[[[
+CHInterpreterTest >> testArgumentAccessDoesNotEscapeItsDefinition
+	"
+	changeCollaboratorXWithConflictingArgumentNAmes
+		collaborator collaboratorXIgnoringArgumentWithSameName: 1987
+	"
+
+	receiver x: 200.
+	collaborator x: 300.
+
+	"Test precondition. Both methods have arguments with the same name.
+	Otherwise this test could be green but false."
+	self
+		assert: (CInterpretable >> #collaboratorXIgnoringArgumentWithSameName:) argumentNames
+		equals: (CInterpretable >> #x:) argumentNames.
+	
+	self executeSelector: #changeCollaboratorXWithConflictingArgumentNAmes.
+
+	self assert: receiver x equals: 200.
+	self assert: collaborator x equals: 100
+]]]
+
+
+[[[
+CInterpretable >> changeCollaboratorXWithConflictingArgumentNAmes
+
+	self collaboratorXIgnoringArgumentWithSameName: 1987
+]]]
+
+[[[
+CInterpretable >> returnUnassignedTemp
+
+	| temp |
+	^ temp
+]]]
+
+[[[
+CHInterpreterTest >> testUnassignedTempHasNilValue
+	"
+	changeCollaboratorWithArgument
+		collaborator x: 500
+	"
+
+	self assert: (self executeSelector: #returnUnassignedTemp) equals: nil
+]]]
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
+	self pushNewFrame.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
+	anAST temporaryNames do: [ :tempName | self tempAt: tempName name put: nil ]. 
+	^ self visitNode: anAST
+]]]
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
+	self pushNewFrame.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
+	anAST temporaryNames do: [ :tempName | self tempAt: tempName put: nil ]. 
+	^ self visitNode: anAST
+]]]
+
+[[[
+CHInterpreter >> visitTemporaryNode: aRBTemporaryNode 
+	self shouldBeImplemented.
+]]]
+
+[[[
+CHInterpreter >> visitTemporaryNode: aRBTemporaryNode 
+	
+	^ self tempAt: aRBTemporaryNode name
+]]]
+
+[[[
+CInterpretable >> readCollaboratorTemporaryVariable
+
+	| temp |
+	temp := 17.
+	collaborator readTemporaryVariable.
+	^ temp
+]]]
+
+[[[
+CInterpretable >> readTemporaryVariable
+
+	| temp |
+	^ temp
+]]]
+
+[[[
+CInterpretable >> readCollaboratorTemporaryVariable
+
+	| temp |
+	temp := 17.
+	^ collaborator readTemporaryVariable
+]]]
+
+[[[
+CHInterpreterTest >> testReadTemporaryVariableDoesNotEscapeItsDefinition
+
+	self assert: (self executeSelector: #readCollaboratorTemporaryVariable) equals: nil
+]]]
+
+[[[
+CInterpretable >> writeCollaboratorTemporaryVariable
+
+	| temp |
+	temp := 17.
+	collaborator writeTemporaryVariable.
+	^ temp
+]]]
+
+[[[
+CInterpretable >> writeTemporaryVariable
+
+	| temp |
+	temp := 100.
+	^ temp
+]]]
+
+[[[
+CHInterpreterTest >> testWriteTemporaryVariableDoesNotEscapeItsDefinition
+
+	self assert: (self executeSelector: #writeCollaboratorTemporaryVariable) equals: 17
+]]]
+
+[[[
+CHInterpreterTest >> testWriteTemporaryVariableDoesNotEscapeItsDefinition
+	"writeCollaboratorTemporaryVariable
+
+		| temp |
+		temp := 17.
+		collaborator writeTemporaryVariable.
+		^ temp
+	
+	writeTemporaryVariable
+
+		| temp |
+		temp := 100.
+		^ temp
+	"
+	self assert: (self executeSelector: #writeCollaboratorTemporaryVariable) equals: 17
+]]]
+
+
+[[[
+CHInterpreterTest >> testWriteTemporaryVariableDoesNotEscapeItsDefinition
+	"writeCollaboratorTemporaryVariable
+
+		| temp |
+		temp := 17.
+		collaborator writeTemporaryVariable.
+		^ temp
+	
+	writeTemporaryVariable
+
+		| temp |
+		temp := 100.
+		^ temp
+	"
+	1halt.
+	self assert: (self executeSelector: #writeCollaboratorTemporaryVariable) equals: 17
+]]]
+
+[[[
+CHInterpreterTest >> testWriteTemporaryVariableDoesNotEscapeItsDefinition
+	"writeCollaboratorTemporaryVariable
+
+		| temp |
+		temp := 17.
+		collaborator writeTemporaryVariable.
+		^ temp
+	
+	writeTemporaryVariable
+
+		| temp |
+		temp := 100.
+		^ temp
+	"
+	self assert: (self executeSelector: #writeCollaboratorTemporaryVariable) equals: 17
+]]]
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
+	| result |
+	self pushNewFrame.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
+	anAST temporaryNames do: [ :tempName | self tempAt: tempName put: nil ]. 
+	
+	result := self visitNode: anAST.
+	
+	self popFrame.
+	^ result
+]]]
+
+[[[
+CHInterpreter >> popFrame
+	
+	^ stack pop
+]]]
+
+[[[
+CHInterpreterTest >> testWriteTemp
+	"
+	returnUnassignedTemp
+		| temp |
+		^ temp
+	"
+
+	self assert: (self executeSelector: #returnUnassignedTemp) equals: nil
+]]]
+
+[[[
+CHInterpreterTest >> testUnassignedTempHasNilValue
+	"
+	creturnUnassignedTemp
+		| temp |
+		^ temp
+	"
+
+	self assert: (self executeSelector: #returnUnassignedTemp) equals: nil
+]]]
+
+[[[
+CHInterpreterTest >> testWriteTemp
+	"
+	returnUnassignedTemp
+		| temp |
+		^ temp
+	"
+
+	self assert: (self executeSelector: #returnUnassignedTemp) equals: nil
+]]]
+
+
+[[[
+CInterpretable >> readCollaboratorTemporaryVariable
+
+	| temp |
+	temp := 17.
+	^ collaborator returnUnassignedTemp
+]]]
+
+[[[
+CHInterpreterTest >> testReadTemporaryVariableDoesNotEscapeItsDefinition
+	"
+	readCollaboratorTemporaryVariable
+		| temp |
+		temp := 17.
+		^ collaborator returnUnassignedTemp
+	
+	returnUnassignedTemp
+		| temp |
+		^ temp
+	"
+	self assert: (self executeSelector: #readCollaboratorTemporaryVariable) equals: 17
+]]]
+
+[[[
+CHInterpreterTest >> testReadTemporaryVariableDoesNotEscapeItsDefinition
+	"
+	readCollaboratorTemporaryVariable
+		| temp |
+		temp := 17.
+		^ collaborator returnUnassignedTemp
+	
+	returnUnassignedTemp
+		| temp |
+		^ temp
+	"
+	self assert: (self executeSelector: #readCollaboratorTemporaryVariable) equals: nil
+]]]
+
+[[[
+CInterpretable >> readTemporaryVariableAfterMessageSend
+
+	| temp |
+	temp := 17.
+	collaborator returnUnassignedTemp.
+	^ temp
+]]]
+
+[[[
+CHInterpreterTest >> testReadTemporaryVariableAfterMessageSend
+	"
+	readTemporaryVariableAfterMessageSend
+		| temp |
+		temp := 17.
+		collaborator returnUnassignedTemp.
+		^ temp
+	
+	returnUnassignedTemp
+		| temp |
+		^ temp
+	"
+	self assert: (self executeSelector: #readCollaboratorTemporaryVariable) equals: 17
+]]]
+
+[[[
+CHInterpreterTest >> testReadTemporaryVariableAfterMessageSend
+	"
+	readTemporaryVariableAfterMessageSend
+		| temp |
+		temp := 17.
+		collaborator returnUnassignedTemp.
+		^ temp
+	
+	returnUnassignedTemp
+		| temp |
+		^ temp
+	"
+	self assert: (self executeSelector: #readTemporaryVariableAfterMessageSend) equals: 17
+]]]
+
+[[[
+CHInterpreterTest >> testReadInstanceVariableAfterMessageSend
+	"
+	readTemporaryVariableAfterMessageSend
+		collaborator returnUnassignedTemp.
+		^ x
+	
+	returnUnassignedTemp
+		| temp |
+		^ temp
+	"
+	receiver x: 1.
+	collaborator x: 2.
+	self assert: (self executeSelector: #readTemporaryVariableAfterMessageSend) equals: 1
+]]]
+
+[[[
+CInterpretable >> readTemporaryVariableAfterMessageSend
+
+	collaborator returnUnassignedTemp.
+	^ x
+]]]
+
+[[[
+CInterpretable >> readInstanceVariableAfterMessageSend
+
+	collaborator returnUnassignedTemp.
+	^ x
+]]]
+
+[[[
+CInterpretable >> readTemporaryVariableAfterMessageSend
+
+	| temp |
+	temp := 17.
+	collaborator returnUnassignedTemp.
+	^ temp
+]]]
+
+[[[
+CHInterpreterTest >> testReadInstanceVariableAfterMessageSend
+	"
+	readTemporaryVariableAfterMessageSend
+		collaborator returnUnassignedTemp.
+		^ x
+	
+	returnUnassignedTemp
+		| temp |
+		^ temp
+	"
+	receiver x: 1.
+	collaborator x: 2.
+	self assert: (self executeSelector: #testReadInstanceVariableAfterMessageSend) equals: 1
+]]]
+
+[[[
+CHInterpreterTest >> testReadInstanceVariableAfterMessageSend
+	"
+	readInstanceVariableAfterMessageSend
+		collaborator returnUnassignedTemp.
+		^ x
+	
+	returnUnassignedTemp
+		| temp |
+		^ temp
+	"
+	receiver x: 1.
+	collaborator x: 2.
+	self assert: (self executeSelector: #readInstanceVariableAfterMessageSend) equals: 1
+]]]
+
+
+[[[
+CHInterpreterTest >> testReadArgumentVariableAfterMessageSend
+	"
+	readArgumentVariableAfterMessageSend
+		^ self readArgumentVariableAfterMessageSend: 17
+	
+	readArgumentVariableAfterMessageSend: arg
+		collaborator returnUnassignedTemp.
+		^ arg
+	
+	returnUnassignedTemp
+		| temp |
+		^ temp
+	"
+	receiver x: 1.
+	collaborator x: 2.
+	self assert: (self executeSelector: #readArgumentVariableAfterMessageSend) equals: 1
+]]]
+
+[[[
+CInterpretable >> readArgumentVariableAfterMessageSend
+	^ self readArgumentVariableAfterMessageSend: 17
+]]]
+
+[[[
+CInterpretable >> readArgumentVariableAfterMessageSend
+	
+	^ self readArgumentVariableAfterMessageSend: 17
+]]]
+
+[[[
+CHInterpreterTest >> testReadArgumentVariableAfterMessageSend
+	"
+	readArgumentVariableAfterMessageSend
+		^ self readArgumentVariableAfterMessageSend: 17
+	
+	readArgumentVariableAfterMessageSend: arg
+		collaborator returnUnassignedTemp.
+		^ arg
+	
+	returnUnassignedTemp
+		| temp |
+		^ temp
+	"
+	receiver x: 1.
+	collaborator x: 2.
+	self assert: (self executeSelector: #readArgumentVariableAfterMessageSend) equals: 17
+]]]
+
+[[[
+CInterpretable >> readArgumentVariableAfterMessageSend: arg
+
+	collaborator returnUnassignedTemp.
+	^ arg
+]]]
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
+	| result |
+	self pushNewFrame.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
+	anAST temporaryNames do: [ :tempName | self tempAt: tempName put: nil ]. 
+	
+	result := self visitNode: anAST.
+	
+	"self popFrame."
+	^ result
+]]]
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
+	| result |
+	self pushNewFrame.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
+	anAST temporaryNames do: [ :tempName | self tempAt: tempName put: nil ]. 
+	
+	result := self visitNode: anAST.
+	
+	self popFrame.
+	^ result
+]]]
+
+
+
+
+
+
+[[[
+Object subclass: #CInterpretableSuperclass
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+[[[
+CInterpretableSuperclass subclass: #CInterpretable
+	instanceVariableNames: 'x collaborator'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+[[[
+CInterpretableSuperclass >> methodNotInSubclass
+
+	^ 5
+]]]
+
+[[[
+CHInterpreterTest >> testLookupMessageInSuperclass
+	"
+	methodNotInSubclass
+		^ 5
+	"
+
+	self assert: (self executeSelector: #methodNotInSubclass) equals: 5
+]]]
+
+
+[[[
+CHInterpreterTest >> testLookupMessageInSuperclass
+	"
+	methodNotInSubclass
+		^ 5
+	"
+
+1halt
+	self assert: (self executeSelector: #methodNotInSubclass) equals: 5
+]]]
+
+[[[
+CHInterpreterTest >> executeSelector: aSymbol
+
+	| ast |
+	ast := (CInterpretable lookupSelector: aSymbol) ast.
+	^ self interpreter executeMethod: ast withReceiver: receiver. 
+	
+]]]
+
+[[[
+CHInterpreterTest >> testLookupMessageInSuperclass
+	"
+	methodNotInSubclass
+		^ 5
+	"
+
+	self assert: (self executeSelector: #methodNotInSubclass) equals: 5
+]]]
+
+[[[
+CHInterpreterTest >> executeSelector: aSymbol
+
+	| ast |
+	ast := (CInterpretable lookupSelector: aSymbol) ast.
+	^ self interpreter executeMethod: ast withReceiver: receiver. 
+	
+]]]
+
+[[[
+CHInterpreterTest >> executeSelector: aSymbol
+
+	| ast |
+	ast := (CInterpretable lookupSelector: aSymbol) ast.
+	^ self interpreter executeMethod: ast withReceiver: receiver
+]]]
+
+
+[[[
+CInterpretable >> sendMessageInSuperclass
+
+	^ self returnX
+]]]
+
+[[[
+CInterpretable >> superMessageSend
+
+	^ super methodNotInSubclass
+]]]
+
+[[[
+CInterpretable >> sendMessageInSuperclass
+
+	^ self methodNotInSubclass
+]]]
+
+[[[
+CHInterpreterTest >> testLookupMessageInSuperclass
+	"
+	Subclass>>sendMessageInSuperclass
+
+	^ self methodNotInSubclass
+	
+	Superclass>>methodNotInSubclass
+		^ 5
+	"
+
+	self assert: (self executeSelector: #sendMessageInSuperclass) equals: 5
+]]]
+
+[[[
+CHInterpreterTest >> testLookupSuperMessage
+	"
+	Subclass>>superMessageSend
+
+	^ super methodNotInSubclass
+	
+	Superclass>>methodNotInSubclass
+		^ 5
+	"
+
+	self assert: (self executeSelector: #sendMessageInSuperclass) equals: 5
+]]]
+
+[[[
+CHInterpreterTest >> testLookupSuperMessage
+	"
+	Subclass>>superMessageSend
+
+	^ super methodNotInSubclass
+	
+	Superclass>>methodNotInSubclass
+		^ 5
+	"
+
+	self assert: (self executeSelector: #superMessageSend) equals: 5
+]]]
+
+[[[
+CInterpretableSuperclass >> redefinedMethod
+
+	^ 5
+]]]
+
+[[[
+CInterpretable >> redefinedMethod
+
+	^ super redefinedMethod
+]]]
+
+[[[
+CHInterpreterTest >> testLookupRedefinedMethod
+	"
+	Subclass>>redefinedMethod
+
+	^ super redefinedMethod
+	
+	Superclass>>redefinedMethod
+		^ 5
+	"
+
+	self assert: (self executeSelector: #redefinedMethod) equals: 5
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	1halt..
+	method := self lookup: aMessageNode selector fromClass: rec class.
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	1halt.
+	method := self lookup: aMessageNode selector fromClass: rec class.
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args lookupClass | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	lookupClass := aMessageNode receiver isSuper ifTrue: [ self halt ] ifFalse: [ rec class ].
+	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args lookupClass | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	lookupClass := aMessageNode receiver isSuper ifTrue: [ self currentMethod methodClass superclass ] ifFalse: [ rec class ].
+	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+[[[
+CHInterpreter >> currentMethod
+	self shouldBeImplemented.
+]]]
+
+[[[
+CHInterpreter >> currentMethod
+	
+	^ self tempAt: #___method
+]]]
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
+	| result |
+	self pushNewFrame.
+	self tempAt: #___method put: anAST.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
+	anAST temporaryNames do: [ :tempName | self tempAt: tempName put: nil ]. 
+	
+	result := self visitNode: anAST.
+	
+	self popFrame.
+	^ result
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args lookupClass | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	lookupClass := aMessageNode receiver isSuper ifTrue: [ rec class superclass ] ifFalse: [ rec class ].
+	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+[[[
+Object subclass: #CInterpretableSecondSuperclass
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+[[[
+CInterpretableSecondSuperclass subclass: #CInterpretableSuperclass
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+[[[
+CInterpretableSecondSuperclass >> redefinedMethodAtThreeLevels
+
+	^ 5
+]]]
+
+[[[
+CInterpretable >> redefinedMethodAtThreeLevels
+
+	^ super redefinedMethodAtThreeLevels
+]]]
+
+[[[
+CInterpretableSuperclass >> redefinedMethodAtThreeLevels
+
+	^ super redefinedMethodAtThreeLevels
+]]]
+
+[[[
+CInterpretable >> redefinedMethodAtThreeLevels
+
+	^ super redefinedMethodAtThreeLevels
+]]]
+
+
+[[[
+CHInterpreterTest >> testLookupSuperMessageNotInReceiverSuperclass
+	"
+	This tests tests that it does not loop\
+	
+	MiddleSuperclass>>redefinedMethodAtThreeLevels
+
+	^ super redefinedMethodAtThreeLevels
+
+	Superclass>>redefinedMethodAtThreeLevels
+		^ 5
+	"
+
+	self assert: (self executeSelector: #superMessageSend) equals: 5
+]]]
+
+
+[[[
+CHInterpreterTest >> testLookupSuperMessageNotInReceiverSuperclass
+	"
+	This tests tests that it does not loop\
+	
+	MiddleSuperclass>>redefinedMethodAtThreeLevels
+
+	^ super redefinedMethodAtThreeLevels
+
+	Superclass>>redefinedMethodAtThreeLevels
+		^ 5
+	"
+
+	self assert: (self executeSelector: #redefinedMethodAtThreeLevels) equals: 5
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args lookupClass | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	lookupClass := aMessageNode receiver isSuper ifTrue: [ self currentMethod methodClass superclass ] ifFalse: [ rec class ].
+	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+
+
+[[[
+CHInterpreterTest >> testBlockValueIsLastStatementValue
+	"
+	This tests tests that it does not loop\
+	
+	returnBlockValue
+		^ [ 1 . 5 ] value
+	"
+
+	self assert: (self executeSelector: #returnBlockValue) equals: 5
+]]]
+
+
+[[[
+CInterpretable >> changeCollaboratorXWithConflictingArgumentNAmes
+
+	self collaboratorXIgnoringArgumentWithSameName: 1987
+]]]
+
+[[[
+CInterpretable >> sendMessageInSuperclass
+
+	^ self methodNotInSubclass
+]]]
+
+[[[
+CInterpretable >> readTemporaryVariableAfterMessageSend
+
+	| temp |
+	temp := 17.
+	collaborator returnUnassignedTemp.
+	^ temp
+]]]
+
+[[[
+CInterpretable >> redefinedMethod
+
+	^ super redefinedMethod
+]]]
+
+[[[
+CInterpretable >> readCollaboratorTemporaryVariable
+
+	| temp |
+	temp := 17.
+	^ collaborator returnUnassignedTemp
+]]]
+
+[[[
+CInterpretable >> returnUnassignedTemp
+
+	| temp |
+	^ temp
+]]]
+
+[[[
+CInterpretable >> superMessageSend
+
+	^ super methodNotInSubclass
+]]]
+
+[[[
+CInterpretable >> readInstanceVariableAfterMessageSend
+
+	collaborator returnUnassignedTemp.
+	^ x
+]]]
+
+[[[
+CInterpretable >> writeTemporaryVariable
+
+	| temp |
+	temp := 100.
+	^ temp
+]]]
+
+[[[
+CInterpretable >> writeCollaboratorTemporaryVariable
+
+	| temp |
+	temp := 17.
+	collaborator writeTemporaryVariable.
+	^ temp
+]]]
+
+[[[
+CInterpretable >> readArgumentVariableAfterMessageSend
+	
+	^ self readArgumentVariableAfterMessageSend: 17
+]]]
+
+[[[
+CInterpretable >> collaboratorX: anInteger
+
+	collaborator x: anInteger
+]]]
+
+[[[
+CInterpretable >> collaboratorXIgnoringArgumentWithSameName: anInteger
+	"precondition: The argument of method x: has name anInteger too, and they should not collide"
+	collaborator x: 100
+]]]
+
+[[[
+CInterpretable >> sendMessageReturnX
+
+	^ self returnX
+]]]
+
+[[[
+CInterpretable >> collaboratorX
+
+	^ collaborator x
+]]]
+
+[[[
+CInterpretable >> changeCollaboratorWithArgument
+
+	collaborator x: 500
+]]]
+
+[[[
+CInterpretable >> readTemporaryVariable
+
+	| temp |
+	^ temp
+]]]
+
+[[[
+CInterpretable >> cocollaboratorX: anInteger
+
+	self collaboratorX: anInteger
+
+	
+]]]
+
+[[[
+CInterpretable >> changeCollaboratorX
+
+	collaborator store100IntoX
+]]]
+
+
+[[[
+CInterpretable >> readArgumentVariableAfterMessageSend: arg
+
+	collaborator returnUnassignedTemp.
+	^ arg
+]]]
+
+[[[
+CInterpretable >> returnInteger
+
+	^ 5
+]]]
+
+[[[
+CInterpretable >> returnFloat
+
+	^ 3.14
+]]]
+
+[[[
+CInterpretable >> returnEmptyArray
+
+	^ #()
+]]]
+
+[[[
+CInterpretable >> returnX
+
+	^ x 
+]]]
+
+[[[
+CInterpretable >> store100IntoX
+
+	x := 100.
+]]]
+
+[[[
+CInterpretable >> returnLiteralArray
+
+	^ #(true 1 'ahah')
+]]]
+
+[[[
+CInterpretable >> returnSuper
+
+	^ super
+]]]
+
+[[[
+CInterpretable >> returnBoolean
+
+	^ false
+]]]
+
+[[[
+CInterpretable >> returnSelf
+
+	^ self
+]]]
+
+
+[[[
+CInterpretable >> returnGlobal
+
+	^ Global
+]]]
+
+[[[
+CInterpretable >> changeCollaboratorXWithConflictingArgumentNAmes
+
+	self collaboratorXIgnoringArgumentWithSameName: 1987
+]]]
+
+[[[
+CInterpretable >> sendMessageInSuperclass
+
+	^ self methodNotInSubclass
+]]]
+
+[[[
+CInterpretable >> readTemporaryVariableAfterMessageSend
+
+	| temp |
+	temp := 17.
+	collaborator returnUnassignedTemp.
+	^ temp
+]]]
+
+[[[
+CInterpretable >> redefinedMethod
+
+	^ super redefinedMethod
+]]]
+
+[[[
+CInterpretable >> readCollaboratorTemporaryVariable
+
+	| temp |
+	temp := 17.
+	^ collaborator returnUnassignedTemp
+]]]
+
+[[[
+CInterpretable >> returnUnassignedTemp
+
+	| temp |
+	^ temp
+]]]
+
+[[[
+CInterpretable >> superMessageSend
+
+	^ super methodNotInSubclass
+]]]
+
+[[[
+CInterpretable >> readInstanceVariableAfterMessageSend
+
+	collaborator returnUnassignedTemp.
+	^ x
+]]]
+
+[[[
+CInterpretable >> writeTemporaryVariable
+
+	| temp |
+	temp := 100.
+	^ temp
+]]]
+
+[[[
+CInterpretable >> writeCollaboratorTemporaryVariable
+
+	| temp |
+	temp := 17.
+	collaborator writeTemporaryVariable.
+	^ temp
+]]]
+
+[[[
+CInterpretable >> readArgumentVariableAfterMessageSend
+	
+	^ self readArgumentVariableAfterMessageSend: 17
+]]]
+
+[[[
+CInterpretable >> collaboratorX: anInteger
+
+	collaborator x: anInteger
+]]]
+
+[[[
+CInterpretable >> collaboratorXIgnoringArgumentWithSameName: anInteger
+	"precondition: The argument of method x: has name anInteger too, and they should not collide"
+	collaborator x: 100
+]]]
+
+[[[
+CInterpretable >> sendMessageReturnX
+
+	^ self returnX
+]]]
+
+[[[
+CInterpretable >> collaboratorX
+
+	^ collaborator x
+]]]
+
+[[[
+CInterpretable >> changeCollaboratorWithArgument
+
+	collaborator x: 500
+]]]
+
+[[[
+CInterpretable >> readTemporaryVariable
+
+	| temp |
+	^ temp
+]]]
+
+[[[
+CInterpretable >> cocollaboratorX: anInteger
+
+	self collaboratorX: anInteger
+
+	
+]]]
+
+[[[
+CInterpretable >> changeCollaboratorX
+
+	collaborator store100IntoX
+]]]
+
+
+[[[
+CInterpretable >> readArgumentVariableAfterMessageSend: arg
+
+	collaborator returnUnassignedTemp.
+	^ arg
+]]]
+
+[[[
+CInterpretable >> returnInteger
+
+	^ 5
+]]]
+
+[[[
+CInterpretable >> returnFloat
+
+	^ 3.14
+]]]
+
+[[[
+CInterpretable >> returnEmptyArray
+
+	^ #()
+]]]
+
+[[[
+CInterpretable >> returnX
+
+	^ x 
+]]]
+
+[[[
+CInterpretable >> store100IntoX
+
+	x := 100.
+]]]
+
+[[[
+CInterpretable >> returnLiteralArray
+
+	^ #(true 1 'ahah')
+]]]
+
+[[[
+CInterpretable >> returnSuper
+
+	^ super
+]]]
+
+[[[
+CInterpretable >> returnBoolean
+
+	^ false
+]]]
+
+[[[
+CInterpretable >> returnSelf
+
+	^ self
+]]]
+
+
+[[[
+CInterpretable >> returnGlobal
+
+	^ Global
+]]]
+
+[[[
+CInterpretable >> returnBlockValue
+		^ [ 1 . 5 ] value
+]]]
+
+[[[
+CInterpretable >> returnBlockValue
+	
+	^ [ 1 . 5 ] value
+]]]
+
+[[[
+CHInterpreter >> visitBlockNode: aRBBlockNode 
+	self shouldBeImplemented.
+]]]
+
+[[[
+Object subclass: #CHBlock
+	instanceVariableNames: 'code'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+[[[
+CHInterpreter >> visitBlockNode: aRBBlockNode 
+	
+	^ CHBlock new
+		code: aRBBlockNode;
+		yourself
+]]]
+
+[[[
+CHBlock >> code: aRBBlockNode 
+	code := aRBBlockNode
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args lookupClass | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	
+	self haltIf: [ aMessageNode selector = #value ].
+	
+	lookupClass := aMessageNode receiver isSuper ifTrue: [ self currentMethod methodClass superclass ] ifFalse: [ rec class ].
+	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args lookupClass pragma | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	
+	lookupClass := aMessageNode receiver isSuper ifTrue: [ self currentMethod methodClass superclass ] ifFalse: [ rec class ].
+	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
+
+	pragma := method pragmaNamed: #astInterpreterPrimitive: ifAbsent: [ nil ].
+	pragma ifNotNil: [
+		1halt.
+	].
+	
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+[[[
+CHBlock >> value
+
+	"AST interpreter primitive.
+	This will call"
+	<astInterpreterPrimitive: #value>
+	
+	"If there "
+	self halt.
+]]]
+
+[[[
+CHBlock >> code
+	^ code
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args lookupClass pragma | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	
+	lookupClass := aMessageNode receiver isSuper ifTrue: [ self currentMethod methodClass superclass ] ifFalse: [ rec class ].
+	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
+
+	pragma := method pragmaNamed: #astInterpreterPrimitive: ifAbsent: [ nil ].
+	pragma ifNotNil: [
+		"If the method is marked with the astInterpreterPrimitive: pragma, this is a block evaluation method.
+		The receiver is the block closure and the arguments are the arguments of the evaluation"
+		self
+			executeMethod: rec code body
+			withReceiver: nil
+			andArguments: args
+	].
+	
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args lookupClass pragma | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	
+	lookupClass := aMessageNode receiver isSuper ifTrue: [ self currentMethod methodClass superclass ] ifFalse: [ rec class ].
+	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
+
+	pragma := method pragmaNamed: #astInterpreterPrimitive: ifAbsent: [ nil ].
+	pragma ifNotNil: [
+		"If the method is marked with the astInterpreterPrimitive: pragma, this is a block evaluation method.
+		The receiver is the block closure and the arguments are the arguments of the evaluation"
+		^ self
+			executeMethod: rec code body
+			withReceiver: nil
+			andArguments: args
+	].
+	
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args lookupClass pragma | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	
+	lookupClass := aMessageNode receiver isSuper ifTrue: [ self currentMethod methodClass superclass ] ifFalse: [ rec class ].
+	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
+
+	pragma := method pragmaNamed: #astInterpreterPrimitive: ifAbsent: [ nil ].
+	pragma ifNotNil: [
+		"If the method is marked with the astInterpreterPrimitive: pragma, this is a block evaluation method.
+		The receiver is the block closure and the arguments are the arguments of the evaluation"
+		^ self
+			executeMethod: rec code
+			withReceiver: nil
+			andArguments: args
+	].
+	
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args lookupClass pragma | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	
+	lookupClass := aMessageNode receiver isSuper ifTrue: [ self currentMethod methodClass superclass ] ifFalse: [ rec class ].
+	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
+
+	pragma := method pragmaNamed: #astInterpreterPrimitive: ifAbsent: [ nil ].
+	pragma ifNotNil: [
+		"If the method is marked with the astInterpreterPrimitive: pragma, this is a block evaluation method.
+		The receiver is the block closure and the arguments are the arguments of the evaluation"
+		^ self
+			executeMethod: rec code body
+			withReceiver: nil
+			andArguments: args
+	].
+	
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+[[[
+CHInterpreter >> executeBlock: anAST withReceiver: anObject andArguments: aCollection
+	| result |
+	self pushNewFrame.
+	self tempAt: #___method put: anAST.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
+	anAST temporaryNames do: [ :tempName | self tempAt: tempName put: nil ]. 
+	
+	result := self visitNode: anAST body.
+	
+	self popFrame.
+	^ result
+]]]
+
+[[[
+CHInterpreter >> executeBlock: aBlockNode withReceiver: anObject andArguments: aCollection
+	| result |
+	self pushNewFrame.
+	self tempAt: #___method put: aBlockNode.
+	self tempAt: #self put: anObject.
+	aBlockNode arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
+	aBlockNode temporaryNames do: [ :tempName | self tempAt: tempName put: nil ]. 
+	
+	result := self visitNode: aBlockNode body.
+	
+	self popFrame.
+	^ result
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args lookupClass pragma | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	
+	lookupClass := aMessageNode receiver isSuper ifTrue: [ self currentMethod methodClass superclass ] ifFalse: [ rec class ].
+	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
+
+	pragma := method pragmaNamed: #astInterpreterPrimitive: ifAbsent: [ nil ].
+	pragma ifNotNil: [
+		"If the method is marked with the astInterpreterPrimitive: pragma, this is a block evaluation method.
+		The receiver is the block closure and the arguments are the arguments of the evaluation"
+		^ self
+			executeBlock: rec code body
+			withReceiver: nil
+			andArguments: args
+	].
+	
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args lookupClass pragma | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	
+	lookupClass := aMessageNode receiver isSuper ifTrue: [ self currentMethod methodClass superclass ] ifFalse: [ rec class ].
+	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
+
+	pragma := method pragmaNamed: #astInterpreterPrimitive: ifAbsent: [ nil ].
+	pragma ifNotNil: [
+		"If the method is marked with the astInterpreterPrimitive: pragma, this is a block evaluation method.
+		The receiver is the block closure and the arguments are the arguments of the evaluation"
+		^ self
+			executeBlock: rec code
+			withReceiver: nil
+			andArguments: args
+	].
+	
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
+	| result |
+	self pushNewFrame.
+	self tempAt: #___method put: anAST.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
+	anAST temporaryNames do: [ :tempName | self tempAt: tempName put: nil ]. 
+	
+	result := self visitNode: anAST body.
+	
+	self popFrame.
+	^ result
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args lookupClass pragma | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	
+	lookupClass := aMessageNode receiver isSuper ifTrue: [ self currentMethod methodClass superclass ] ifFalse: [ rec class ].
+	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
+
+	pragma := method pragmaNamed: #astInterpreterPrimitive: ifAbsent: [ nil ].
+	pragma ifNotNil: [
+		"If the method is marked with the astInterpreterPrimitive: pragma, this is a block evaluation method.
+		The receiver is the block closure and the arguments are the arguments of the evaluation"
+		^ self
+			executeMethod: rec code
+			withReceiver: nil
+			andArguments: args
+	].
+	
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+[[[
+CHInterpreter >> executeBlock: aBlockNode withReceiver: anObject andArguments: aCollection
+	| result |
+	self pushNewFrame.
+	self tempAt: #___method put: aBlockNode.
+	self tempAt: #self put: anObject.
+	aBlockNode arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
+	aBlockNode temporaryNames do: [ :tempName | self tempAt: tempName put: nil ]. 
+	
+	result := self visitNode: aBlockNode body.
+	
+	self popFrame.
+	^ result
+]]]
+
+
+[[[
+CHInterpreter >> visitMethodNode: aMethodNode
+	
+	^ self visitMethodBodyNode: aMethodNode body
+]]]
+
+
+[[[
+CHInterpreter >> visitMethodBodyNode: aMethodBodyNode
+	^ self visitNode: aMethodBodyNode 
+]]]
+
+
+[[[
+CHInterpreterTest >> testBlockValueIsLastStatementValue
+	"
+	returnBlockValue
+		^ [ 1 . 5 ] value
+	"
+
+	self assert: (self executeSelector: #returnBlockValue) equals: 5
+]]]
+
+[[[
+CHInterpreterTest >> testReadBlockTemporaryVariable
+	"
+	returnBlockValue
+		^ [ | temp | temp := 100. temp ] value
+	"
+
+	self assert: (self executeSelector: #returnBlockValue) equals: 5
+]]]
+
+[[[
+CHInterpreterTest >> testReadBlockTemporaryVariable
+	"
+	returnBlockValue
+		^ [ | temp | temp := 100. temp ] value
+	"
+
+	self assert: (self executeSelector: #returnBlockValue) equals: 100
+]]]
+
+[[[
+CHInterpreterTest >> testReadBlockTemporaryVariable
+	"
+	readBlockTemporaryVariable
+		^ [ | temp | temp := 100. temp ] value
+	"
+
+	self assert: (self executeSelector: #returnBlockValue) equals: 100
+]]]
+
+[[[
+CHInterpreterTest >> testReadBlockTemporaryVariable
+	"
+	readBlockTemporaryVariable
+		^ [ | temp | temp := 100. temp ] value
+	"
+
+	self assert: (self executeSelector: #readBlockTemporaryVariable) equals: 100
+]]]
+
+[[[
+CInterpretable >> readBlockTemporaryVariable
+
+	^ [ | temp | temp := 100. temp ] value
+]]]
+
+[[[
+CHInterpreterTest >> testReadSelfInBlock
+	"
+	readSelfInBlock
+		^ [ self ] value
+	"
+
+	self assert: (self executeSelector: #readBlockTemporaryVariable) equals: receiver
+]]]
+
+[[[
+CHInterpreterTest >> testReadSelfInBlock
+	"
+	readSelfInBlock
+		^ [ self ] value
+	"
+
+	self assert: (self executeSelector: #readSelfInBlock) equals: receiver
+]]]
+
+[[[
+CInterpretable >> readSelfInBlock
+
+	^ [ self ] value
+]]]
+
+[[[
+Object subclass: #CHBlock
+	instanceVariableNames: 'code homeContext'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+
+[[[
+CHBlock >> homeContext
+	^ homeContext
+]]]
+
+[[[
+CHBlock >> homeContext: anObject
+	homeContext := anObject
+]]]
+
+[[[
+CHInterpreter >> visitBlockNode: aRBBlockNode 
+	
+	^ CHBlock new
+		code: aRBBlockNode;
+		homeContext: self topFrame;
+		yourself
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args lookupClass pragma | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	
+	lookupClass := aMessageNode receiver isSuper ifTrue: [ self currentMethod methodClass superclass ] ifFalse: [ rec class ].
+	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
+
+	pragma := method pragmaNamed: #astInterpreterPrimitive: ifAbsent: [ nil ].
+	pragma ifNotNil: [
+		"If the method is marked with the astInterpreterPrimitive: pragma, this is a block evaluation method.
+		The receiver is the block closure and the arguments are the arguments of the evaluation"
+		^ self
+			executeMethod: rec code
+			withReceiver: rec homeContext receiver
+			andArguments: args
+	].
+	
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args lookupClass pragma | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	
+	lookupClass := aMessageNode receiver isSuper ifTrue: [ self currentMethod methodClass superclass ] ifFalse: [ rec class ].
+	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
+
+	pragma := method pragmaNamed: #astInterpreterPrimitive: ifAbsent: [ nil ].
+	pragma ifNotNil: [
+		"If the method is marked with the astInterpreterPrimitive: pragma, this is a block evaluation method.
+		The receiver is the block closure and the arguments are the arguments of the evaluation"
+		^ self
+			executeMethod: rec code
+			withReceiver: (rec homeContext at: #self)
+			andArguments: args
+	].
+	
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+[[[
+CInterpretable >> readSuperInBlock
+
+	^ [ super ] value
+]]]
+
+[[[
+CHInterpreterTest >> testReadSuperInBlock
+	"
+	readSuperInBlock
+		^ [ super ] value
+	"
+
+	self assert: (self executeSelector: #readSuperInBlock) equals: receiver
+]]]
+
+[[[
+CHInterpreterTest >> testReadInstanceVariableInBlock
+	"
+	readInstanceVariableInBlock
+		^ [ x := 17 ] value
+	"
+
+	self executeSelector: #readInstanceVariableInBlock.
+	self assert: receiver x equals: 17
+]]]
+
+[[[
+CInterpretable >> readInstanceVariableInBlock
+		^ [ x := 17 ] value
+]]]
+
+[[[
+CInterpretable >> readInstanceVariableInBlock
+
+	^ [ x := 17 ] value
+]]]
+
+[[[
+CHInterpreterTest >> testWriteInstanceVariableInBlock
+	"
+	writeInstanceVariableInBlock
+		^ [ x := 17 ] value
+	"
+
+	self executeSelector: #writeInstanceVariableInBlock.
+	self assert: receiver x equals: 17
+]]]
+
+[[[
+CInterpretable >> writeInstanceVariableInBlock
+
+	^ [ x := 17 ] value
+]]]
+
+[[[
+CInterpretable >> writeInstanceVariableInBlock
+
+	^ [ x ] value
+]]]
+
+[[[
+CInterpretable >> writeInstanceVariableInBlock
+
+	^ [ x := 17 ] value
+]]]
+
+[[[
+CInterpretable >> readInstanceVariableInBlock
+
+	^ [ x ] value
+]]]
+
+[[[
+CHInterpreterTest >> testReadInstanceVariableInBlock
+	"
+	readInstanceVariableInBlock
+		^ [ x ] value
+	"
+
+	self assert: (self executeSelector: #readInstanceVariableInBlock) equals: receiver x
+]]]
+
+[[[
+CInterpretable >> readTemporaryVariableInBlock
+	
+	| temp |
+	temp := 17.
+	^ [ temp ] value
+]]]
+
+[[[
+CHInterpreterTest >> testReadTemporaryVariableInBlock
+	"
+	readTemporaryVariableInBlock
+		| temp |
+		temp := 17.
+		^ [ temp ] value
+	"
+
+	self assert: (self executeSelector: #readTemporaryVariableInBlock) equals: 17
+]]]
+
+[[[
+CHInterpreter >> tempAt: aSymbol
+
+	| currentSearchFrame |
+	currentSearchFrame := self topFrame.
+	[ currentSearchFrame isNil ] whileFalse: [
+		currentSearchFrame at: aSymbol ifPresent: [ :found | ^ found ].
+		currentSearchFrame := currentSearchFrame at: #___home
+	].
+	self error: 'Variable ', aSymbol, ' not found'
+]]]
+
+[[[
+CHInterpreter >> tempAt: aSymbol
+
+	| currentSearchFrame |
+	currentSearchFrame := self topFrame.
+	[ currentSearchFrame isNil ] whileFalse: [
+		currentSearchFrame at: aSymbol ifPresent: [ :found | ^ found ].
+		currentSearchFrame := currentSearchFrame at: #___home ifAbsent: [ nil ].
+	].
+	self error: 'Variable ', aSymbol, ' not found'
+]]]
+
+[[[
+CHInterpreter >> tempAt: aSymbol
+
+	| currentSearchFrame |
+	currentSearchFrame := self topFrame.
+	[ currentSearchFrame isNil ] whileFalse: [
+		currentSearchFrame at: aSymbol ifPresent: [ :found | ^ found ].
+		currentSearchFrame := currentSearchFrame at: #___block ifPresent: [ :block | block outerContext ] ifAbsent: [ nil ].
+	].
+	self error: 'Variable ', aSymbol, ' not found'
+]]]
+
+[[[
+CHInterpreter >> tempAt: aSymbol
+
+	| currentSearchFrame |
+	currentSearchFrame := self topFrame.
+	[ currentSearchFrame isNil ] whileFalse: [
+		currentSearchFrame at: aSymbol ifPresent: [ :found | ^ found ].
+		currentSearchFrame := currentSearchFrame
+			at: #___block
+			ifPresent: [ :block | block outerContext ]
+			ifAbsent: [ nil ].
+	].
+	self error: 'Variable ', aSymbol, ' not found'
+]]]
+
+[[[
+Object subclass: #CHBlock
+	instanceVariableNames: 'code homeContext outerContext'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+[[[
+CHBlock >> homeContext: anObject
+	outerContext := anObject
+]]]
+
+[[[
+CHBlock >> homeContext
+	^ outerContext
+]]]
+
+[[[
+Object subclass: #CHBlock
+	instanceVariableNames: 'code outerContext'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+
+[[[
+CHBlock >> outerContext: anObject
+	outerContext := anObject
+]]]
+
+[[[
+CHInterpreter >> visitBlockNode: aRBBlockNode 
+	
+	^ CHBlock new
+		code: aRBBlockNode;
+		outerContext: self topFrame;
+		yourself
+]]]
+
+[[[
+CHBlock >> homeContext: anObject
+	outerContext := anObject
+]]]
+
+
+
+[[[
+CHBlock >> outerContext
+	^ outerContext
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args lookupClass pragma | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	
+	lookupClass := aMessageNode receiver isSuper ifTrue: [ self currentMethod methodClass superclass ] ifFalse: [ rec class ].
+	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
+
+	pragma := method pragmaNamed: #astInterpreterPrimitive: ifAbsent: [ nil ].
+	pragma ifNotNil: [
+		"If the method is marked with the astInterpreterPrimitive: pragma, this is a block evaluation method.
+		The receiver is the block closure and the arguments are the arguments of the evaluation"
+		^ self
+			executeMethod: rec code
+			withReceiver: (rec outerContext at: #self)
+			andArguments: args
+	].
+	
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+[[[
+CHBlock >> homeContext
+	^ outerContext
+]]]
+
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection closureOrNil: closureOrNil
+	| result |
+	self pushNewFrame.
+	
+	closureOrNil ifNotNil: [ self tempAt: #___closureOrNil ].
+	self tempAt: #___method put: anAST.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
+	anAST temporaryNames do: [ :tempName | self tempAt: tempName put: nil ]. 
+	
+	result := self visitNode: anAST body.
+	
+	self popFrame.
+	^ result
+]]]
+
+[[[
+CHInterpreter >> tempAt: aSymbol
+
+	| currentSearchFrame |
+	currentSearchFrame := self topFrame.
+	[ currentSearchFrame isNil ] whileFalse: [
+		currentSearchFrame at: aSymbol ifPresent: [ :found | ^ found ].
+		currentSearchFrame := currentSearchFrame
+			at: #___closureOrNil
+			ifPresent: [ :block | block outerContext ]
+			ifAbsent: [ nil ].
+	].
+	self error: 'Variable ', aSymbol, ' not found'
+]]]
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
+	
+	^ self executeMethod: anAST withReceiver: anObject andArguments: aCollection closureOrNil: nil
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args lookupClass pragma | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	
+	lookupClass := aMessageNode receiver isSuper ifTrue: [ self currentMethod methodClass superclass ] ifFalse: [ rec class ].
+	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
+
+	pragma := method pragmaNamed: #astInterpreterPrimitive: ifAbsent: [ nil ].
+	pragma ifNotNil: [
+		"If the method is marked with the astInterpreterPrimitive: pragma, this is a block evaluation method.
+		The receiver is the block closure and the arguments are the arguments of the evaluation"
+		^ self
+			executeMethod: rec code
+			withReceiver: (rec outerContext at: #self)
+			andArguments: args
+			closureOrNil: rec
+	].
+	
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection closureOrNil: closureOrNil
+	| result |
+	self pushNewFrame.
+	
+	closureOrNil ifNotNil: [ self tempAt: #___closureOrNil put: closureOrNil ].
+	self tempAt: #___method put: anAST.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
+	anAST temporaryNames do: [ :tempName | self tempAt: tempName put: nil ]. 
+	
+	result := self visitNode: anAST body.
+	
+	self popFrame.
+	^ result
+]]]
+
+
+[[[
+CHInterpreterTest >> testReadOuterTemporaryVariableInBlock
+	"
+	readTemporaryVariableInBlock
+		| temp |
+		temp := 17.
+		^ [ temp ] value
+	"
+
+	self assert: (self executeSelector: #readTemporaryVariableInBlock) equals: 17
+]]]
+
+[[[
+CHInterpreterTest >> testReadTemporaryVariableInBlock
+	"
+	readTemporaryVariableInBlock
+		| temp |
+		temp := 17.
+		^ [ temp ] value
+	"
+
+	self assert: (self executeSelector: #readTemporaryVariableInBlock) equals: 17
+]]]
+
+
+[[[
+CHInterpreterTest >> testReadOuterArgumentVariableInBlock
+	"
+	readOuterArgumentVariableInBlock
+		self readOuterArgumentVariableInBlock: 25
+
+	readOuterArgumentVariableInBlock: argument
+		^ [ argument ] value
+	"
+
+	self assert: (self executeSelector: #readTemporaryVariableInBlock) equals: 25
+]]]
+
+[[[
+CInterpretable >> readOuterArgumentVariableInBlock
+
+	self readOuterArgumentVariableInBlock: 25
+]]]
+
+[[[
+CInterpretable >> readOuterArgumentVariableInBlock
+
+	^ self readOuterArgumentVariableInBlock: 25
+]]]
+
+[[[
+CInterpretable >> readOuterArgumentVariableInBlock: argument
+
+		^ [ argument ] value
+]]]
+
+[[[
+CInterpretable >> readOuterArgumentVariableInBlock: argument
+
+	^ [ argument ] value
+]]]
+
+[[[
+CHInterpreterTest >> testReadOuterArgumentVariableInBlock
+	"
+	readOuterArgumentVariableInBlock
+		^ self readOuterArgumentVariableInBlock: 25
+
+	readOuterArgumentVariableInBlock: argument
+		^ [ argument ] value
+	"
+
+	self assert: (self executeSelector: #readTemporaryVariableInBlock) equals: 25
+]]]
+
+[[[
+CHInterpreterTest >> testReadOuterArgumentVariableInBlock
+	"
+	readOuterArgumentVariableInBlock
+		^ self readOuterArgumentVariableInBlock: 25
+
+	readOuterArgumentVariableInBlock: argument
+		^ [ argument ] value
+	"
+
+	self assert: (self executeSelector: #readOuterArgumentVariableInBlock) equals: 25
+]]]
+
+[[[
+CHInterpreterTest >> testReadHomeTemporaryVariableInBlock
+	"
+	readHomeTemporaryVariableInBlock
+		| temp |
+		temp := 17.
+		^ [ [ temp ] value ] value
+	"
+
+	self assert: (self executeSelector: #readHomeTemporaryVariableInBlock) equals: 17
+]]]
+
+[[[
+CInterpretable >> readHomeTemporaryVariableInBlock
+		| temp |
+		temp := 17.
+		^ [ [ temp ] value ] value
+]]]
+
+[[[
+CInterpretable >> readHomeTemporaryVariableInBlock
+	
+	| temp |
+	temp := 17.
+	^ [ [ temp ] value ] value
+]]]
+
+[[[
+CInterpretable >> readHomeArgumentVariableInBlock: argument
+
+	^ [ [ argument ] argument ] value
+]]]
+
+[[[
+CInterpretable >> readHomeOuterArgumentVariableInBlock
+
+	^ self readHomeOuterArgumentVariableInBlock: 89
+]]]
+
+[[[
+CInterpretable >> readHomeOuterArgumentVariableInBlock: argument
+
+	^ [ [ argument ] argument ] value
+]]]
+
+[[[
+CInterpretable >> readHomeArgumentVariableInBlock: argument
+
+	^ [ [ argument ] argument ] value
+]]]
+
+
+[[[
+CHInterpreterTest >> testReadHomeOuterArgumentVariableInBlock
+	"
+	readHomeOuterArgumentVariableInBlock
+
+		^ self readHomeOuterArgumentVariableInBlock: 89
+	
+	readHomeOuterArgumentVariableInBlock: argument
+
+		^ [ [ argument ] argument ] value
+	"
+
+	self assert: (self executeSelector: #readHomeOuterArgumentVariableInBlock) equals: 25
+]]]
+
+[[[
+CInterpretable >> readHomeOuterArgumentVariableInBlock: argument
+
+	^ [ [ argument ] value ] value
+]]]
+
+[[[
+CHInterpreterTest >> testReadHomeOuterArgumentVariableInBlock
+	"
+	readHomeOuterArgumentVariableInBlock
+
+		^ self readHomeOuterArgumentVariableInBlock: 89
+	
+	readHomeOuterArgumentVariableInBlock: argument
+
+		^ [ [ argument ] value ] value
+	"
+
+	self assert: (self executeSelector: #readHomeOuterArgumentVariableInBlock) equals: 25
+]]]
+
+[[[
+CHInterpreterTest >> testReadHomeOuterArgumentVariableInBlock
+	"
+	readHomeOuterArgumentVariableInBlock
+
+		^ self readHomeOuterArgumentVariableInBlock: 89
+	
+	readHomeOuterArgumentVariableInBlock: argument
+
+		^ [ [ argument ] value ] value
+	"
+
+	self assert: (self executeSelector: #readHomeOuterArgumentVariableInBlock) equals: 89
+]]]
+
+[[[
+CHInterpreterTest >> testReadTwoLevelOuterArgumentVariableInBlock
+	"
+	readTwoLevelOuterArgumentVariableInBlock
+		^ [ :arg | [ argument ] value ] value: 99
+	"
+
+	self assert: (self executeSelector: #readOuterArgumentVariableInBlock) equals: 99
+]]]
+
+[[[
+CHInterpreterTest >> testReadTwoLevelOuterArgumentVariableInBlock
+	"
+	readTwoLevelOuterArgumentVariableInBlock
+		^ [ :arg | [ argument ] value ] value: 99
+	"
+
+	self assert: (self executeSelector: #readTwoLevelOuterArgumentVariableInBlock) equals: 99
+]]]
+
+[[[
+CInterpretable >> readTwoLevelOuterArgumentVariableInBlock
+	
+	^ [ :argument | [ argument ] value ] value: 99
+]]]
+
+[[[
+CHInterpreterTest >> testReadTwoLevelOuterArgumentVariableInBlock
+	"
+	readTwoLevelOuterArgumentVariableInBlock
+		^ [ :argument | [ argument ] value ] value: 99
+	"
+
+	self assert: (self executeSelector: #readTwoLevelOuterArgumentVariableInBlock) equals: 99
+]]]
+
+[[[
+CHBlock >> value: argument
+
+	"AST interpreter primitive.
+	This will call"
+	<astInterpreterPrimitive: #value>
+	
+	"If there "
+	self halt.
+]]]
+
+[[[
+CHInterpreterTest >> testReadTwoLevelOuterTemporaryVariableInBlock
+	"
+	readTwoLevelOuterTemporaryVariableInBlock
+		^ [ | temp | temp := 88888. [ temp ] value ] value
+	"
+
+	self assert: (self executeSelector: #readTwoLevelOuterTemporaryVariableInBlock) equals: 88888
+]]]
+
+[[[
+CInterpretable >> readTwoLevelOuterTemporaryVariableInBlock
+	
+	^ [ | temp | temp := 88888. [ temp ] value ] value
+]]]
+
+[[[
+CHInterpreterTest >> testReadHomeOuterArgumentVariableInBlockFromDistantCall
+	"
+	readHomeOuterArgumentVariableInBlockFromDistantCall
+
+		^ self readHomeOuterArgumentVariableInBlock: 89
+	
+	readHomeOuterArgumentVariableInBlockFromDistantCall: argument
+
+		^ self evaluateBlock: [ [ argument ] value ]
+	"
+
+	self assert: (self executeSelector: #readHomeOuterArgumentVariableInBlock) equals: 89
+]]]
+
+[[[
+CHInterpreterTest >> testReadHomeOuterArgumentVariableInBlockFromDistantCall
+	"
+	readHomeOuterArgumentVariableInBlockFromDistantCall
+
+		^ self readHomeOuterArgumentVariableInBlockFromDistantCall: 89
+	
+	readHomeOuterArgumentVariableInBlockFromDistantCall: argument
+
+		^ self evaluateBlock: [ [ argument ] value ]
+	"
+
+	self assert: (self executeSelector: #readHomeOuterArgumentVariableInBlock) equals: 89
+]]]
+
+[[[
+CInterpretable >> readHomeOuterArgumentVariableInBlockFromDistantCall
+
+		^ self readHomeOuterArgumentVariableInBlockFromDistantCall: 89
+	
+
+]]]
+
+[[[
+CInterpretable >> readHomeOuterArgumentVariableInBlockFromDistantCall
+
+		^ self readHomeOuterArgumentVariableInBlockFromDistantCall: 89
+
+]]]
+
+[[[
+CInterpretable >> readHomeOuterArgumentVariableInBlockFromDistantCall
+
+		^ self readHomeOuterArgumentVariableInBlockFromDistantCall: 89
+]]]
+
+[[[
+CInterpretable >> readHomeOuterArgumentVariableInBlockFromDistantCall
+
+	^ self readHomeOuterArgumentVariableInBlockFromDistantCall: 89
+]]]
+
+[[[
+CInterpretable >> readHomeOuterArgumentVariableInBlockFromDistantCall: argument
+
+	^ self evaluateBlock: [ [ argument ] value ]
+]]]
+
+[[[
+CInterpretable >> evaluateBlock: aBlock
+
+	^ aBlock value
+]]]
+
+[[[
+CHInterpreterTest >> testReadHomeOuterTemporaryVariableInBlockFromDistantCall
+	"
+	readHomeOuterTemporaryVariableInBlockFromDistantCall
+		| temp block |
+		temp := 1.
+		block := [ [ temp ] value ].
+		temp := 77.
+		^ self evaluateBlock: block
+	"
+
+	self assert: (self executeSelector: #readHomeOuterArgumentVariableInBlock) equals: 89
+]]]
+
+[[[
+CHInterpreterTest >> testReadHomeOuterTemporaryVariableInBlockFromDistantCall
+	"
+	readHomeOuterTemporaryVariableInBlockFromDistantCall
+		| temp block |
+		temp := 1.
+		block := [ [ temp ] value ].
+		temp := 77.
+		^ self evaluateBlock: block
+	"
+
+	self assert: (self executeSelector: #readHomeOuterTemporaryVariableInBlockFromDistantCall) equals: 89
+]]]
+
+[[[
+CHInterpreterTest >> testReadHomeOuterTemporaryVariableInBlockFromDistantCall
+	"
+	readHomeOuterTemporaryVariableInBlockFromDistantCall
+		| temp block |
+		temp := 1.
+		block := [ [ temp ] value ].
+		temp := 77.
+		^ self evaluateBlock: block
+	"
+
+	self assert: (self executeSelector: #readHomeOuterTemporaryVariableInBlockFromDistantCall) equals: 77
+]]]
+
+[[[
+CInterpretable >> readHomeOuterTemporaryVariableInBlockFromDistantCall
+
+	| temp block |
+	temp := 1.
+	block := [ [ temp ] value ].
+	temp := 77.
+	^ self evaluateBlock: block
+]]]
+
+[[[
+CInterpretable >> readHomeOuterTemporaryVariableInBlockFromDistantCall
+
+	| temp block |
+	temp := 1.
+	block := [ [ temp ] value ].
+	temp := 77.
+	^ true ifTrue: block
+]]]
+

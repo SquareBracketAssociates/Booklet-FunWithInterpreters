@@ -1,0 +1,1194 @@
+[[[
+TestCase subclass: #CHInterpreterTest
+	instanceVariableNames: 'interpreter'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+
+[[[
+CBasicInterpreterTest >> testReturnLiteralArray
+
+	| ast result |
+	ast := (CInterpretable >> #returnLiteralArray) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals:  #(true 1 'ahah')
+]]]
+
+
+[[[
+CHInterpreterTest >> testReturnLiteralArray
+
+	| ast result |
+	ast := (CInterpretable >> #returnLiteralArray) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals:  #(true 1 'ahah')
+]]]
+
+[[[
+CBasicInterpreterTest >> testReturnFalse
+
+	| ast result |
+	ast := (CInterpretable >> #returnFalse) ast.
+	result := self interpreter execute: ast. 
+	self deny: result 
+]]]
+
+
+[[[
+CHInterpreterTest >> testReturnFalse
+
+	| ast result |
+	ast := (CInterpretable >> #returnFalse) ast.
+	result := self interpreter execute: ast. 
+	self deny: result 
+]]]
+
+[[[
+CBasicInterpreterTest >> testReturnConstant
+
+	| ast result |
+	ast := (CInterpretable >> #returnFive) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 5
+]]]
+
+
+[[[
+CHInterpreterTest >> testReturnConstant
+
+	| ast result |
+	ast := (CInterpretable >> #returnFive) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 5
+]]]
+
+[[[
+CBasicInterpreterTest >> testReturnEmptyArray
+
+	| ast result |
+	ast := (CInterpretable >> #returnEmptyArray) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: #() 
+]]]
+
+
+[[[
+CHInterpreterTest >> testReturnEmptyArray
+
+	| ast result |
+	ast := (CInterpretable >> #returnEmptyArray) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: #() 
+]]]
+
+
+[[[
+CBasicInterpreterTest >> interpreter
+
+	^ interpreter
+]]]
+
+
+[[[
+CHInterpreterTest >> interpreter
+
+	^ interpreter
+]]]
+
+[[[
+CBasicInterpreterTest >> interpreterClass 
+
+	^ CBasicInterpreter
+]]]
+
+
+[[[
+CHInterpreterTest >> interpreterClass 
+
+	^ CBasicInterpreter
+]]]
+
+[[[
+CBasicInterpreterTest >> setUp
+
+	interpreter := self interpreterClass new
+]]]
+
+
+[[[
+CHInterpreterTest >> setUp
+
+	interpreter := self interpreterClass new
+]]]
+
+[[[
+CHInterpreterTest >> testReturnInteger
+
+	| ast result |
+	ast := (CInterpretable >> #returnFive) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 5
+]]]
+
+[[[
+CHInterpreterTest >> testReturnConstant
+
+	| ast result |
+	ast := (CInterpretable >> #returnFive) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 5
+]]]
+
+[[[
+CHInterpreterTest >> testReturnEmptyArray
+
+	| ast result |
+	ast := (CInterpretable >> #returnEmptyArray) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: #() 
+]]]
+
+[[[
+CHInterpreterTest >> testReturnFalse
+
+	| ast result |
+	ast := (CInterpretable >> #returnFalse) ast.
+	result := self interpreter execute: ast. 
+	self deny: result 
+]]]
+
+[[[
+CHInterpreterTest >> testReturnInteger
+
+	| ast result |
+	ast := (CInterpretable >> #returnFive) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 5
+]]]
+
+
+[[[
+CHInterpreterTest >> testReturnLiteralArray
+
+	| ast result |
+	ast := (CInterpretable >> #returnLiteralArray) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals:  #(true 1 'ahah')
+]]]
+
+[[[
+CHInterpreterTest >> testReturnFloat
+
+	| ast result |
+	ast := (CInterpretable >> #returnPi) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 3.14
+]]]
+
+[[[
+CInterpretable >> returnInteger
+
+	^ 5
+]]]
+
+[[[
+CInterpretable >> returnFloat
+
+	^ 3.14
+]]]
+
+[[[
+CInterpretable >> returnFive
+
+	^ 5
+]]]
+
+[[[
+CInterpretable >> returnBoolean
+
+	^ false
+]]]
+
+[[[
+CInterpretable >> returnFalse
+
+	^ false
+]]]
+
+[[[
+CHInterpreterTest >> testReturnConstant
+
+	| ast result |
+	ast := (CInterpretable >> #returnInteger) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 5
+]]]
+
+[[[
+CHInterpreterTest >> testReturnInteger
+
+	| ast result |
+	ast := (CInterpretable >> #returnInteger) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 5
+]]]
+
+[[[
+CHInterpreterTest >> testReturnConstant
+
+	| ast result |
+	ast := (CInterpretable >> #returnInteger) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 5
+]]]
+
+
+[[[
+CHInterpreterTest >> testReturnBoolean
+
+	| ast result |
+	ast := (CInterpretable >> #returnBoolean) ast.
+	result := self interpreter execute: ast. 
+	self deny: result 
+]]]
+
+[[[
+CHInterpreterTest >> testReturnFalse
+
+	| ast result |
+	ast := (CInterpretable >> #returnFalse) ast.
+	result := self interpreter execute: ast. 
+	self deny: result 
+]]]
+
+
+[[[
+CHInterpreterTest >> testReturnFloat
+
+	| ast result |
+	ast := (CInterpretable >> #returnFloat) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 3.14
+]]]
+
+[[[
+CHInterpreterTest >> testReturnSelf
+
+	| ast result |
+	ast := (CInterpretable >> #returnBoolean) ast.
+	result := self interpreter execute: ast withReceiver: 42. 
+	self deny: result 
+]]]
+
+[[[
+CHInterpreterTest >> testReturnSelf
+
+	| ast result |
+	ast := (CInterpretable >> #returnSelf) ast.
+	result := self interpreter execute: ast withReceiver: 42. 
+	self assert: result equals: 42
+]]]
+
+[[[
+CHInterpreterTest >> testReturnSuper
+
+	| ast result |
+	ast := (CInterpretable >> #returnSuper) ast.
+	result := self interpreter execute: ast withReceiver: 42. 
+	self assert: result equals: 42
+]]]
+
+[[[
+CInterpretable >> returnSelf
+
+	^ self
+]]]
+
+[[[
+CInterpretable >> returnInteger
+
+	^ 5
+]]]
+
+[[[
+CInterpretable >> returnFloat
+
+	^ 3.14
+]]]
+
+[[[
+CInterpretable >> returnLiteralArray
+
+	^ #(true 1 'ahah')
+]]]
+
+[[[
+CInterpretable >> returnBoolean
+
+	^ false
+]]]
+
+[[[
+CInterpretable >> returnEmptyArray
+
+	^ #()
+]]]
+
+
+[[[
+CInterpretable >> returnSelf
+
+	^ self
+]]]
+
+[[[
+CInterpretable >> returnSuper
+
+	^ super
+]]]
+
+[[[
+CHInterpreterTest >> interpreterClass 
+
+	^ CHInterpreter
+]]]
+
+[[[
+CHInterpreter >> execute: anAST withReceiver: anObject
+
+	^ self execute: anAST withReceiver: anObject andArguments: #()
+]]]
+
+[[[
+CHInterpreter >> execute: anAST withReceiver: anObject
+
+	^ self execute: anAST withReceiver: anObject andArguments: #()
+]]]
+
+[[[
+CHInterpreter >> execute: anAST withReceiver: anObject
+
+	^ self execute: anAST withReceiver: anObject
+]]]
+
+[[[
+CHInterpreter >> execute: anAST withReceiver: anObject
+
+	self setSelfTo: anObject.
+	^ self visitNode: anAST
+]]]
+
+[[[
+CHInterpreter >> execute: anAST withReceiver: anObject
+
+	self newFrame.
+	^ self visitNode: anAST
+]]]
+
+[[[
+Object subclass: #CHInterpreter
+	instanceVariableNames: 'stack'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+[[[
+CHInterpreter >> pushNewFrame
+	"Pushing a new scope consists in creating a new dictionary whose parent is the top of the stack
+	and pushing it as a new top. This way a variable not found in current scope will be looked up in previous scope."
+
+	| newTop |
+	newTop := Dictionary new.
+	stack push: newTop.
+	^ newTop
+	
+]]]
+
+[[[
+CHInterpreter >> initialize 
+	super initialize. 
+	stack := CTStack new.
+	self pushNewFrame
+]]]
+
+[[[
+CHInterpreter >> initialize 
+	super initialize. 
+	stack := CTStack new.
+	self pushNewFrame
+]]]
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject
+	self pushNewFrame.
+	^ self visitNode: anAST
+]]]
+
+[[[
+CHInterpreter >> initialize 
+	super initialize. 
+	stack := CTStack new.
+
+]]]
+
+[[[
+CHInterpreter >> initialize 
+	super initialize. 
+	stack := CTStack new
+
+]]]
+
+[[[
+CBasicInterpreter >> visitSelfNode: aRBSelfNode 
+	^ self receiver
+]]]
+
+
+[[[
+CHInterpreter >> visitSelfNode: aRBSelfNode 
+	^ self receiver
+]]]
+
+[[[
+CBasicInterpreter >> visitReturnNode: aReturnNode
+
+	| res |
+	res := self visitNode: aReturnNode value.
+	^ res
+]]]
+
+
+[[[
+CHInterpreter >> visitReturnNode: aReturnNode
+
+	| res |
+	res := self visitNode: aReturnNode value.
+	^ res
+]]]
+
+[[[
+CBasicInterpreter >> visitAssignmentNode: anAssignmentNode
+	"| x y |
+	x := y := 10.
+	x
+	>>> 10"
+	
+	| value | 
+	value := (self visitNode: anAssignmentNode value).
+	anAssignmentNode variable store: value with: self.
+	^ value
+]]]
+
+
+[[[
+CHInterpreter >> visitAssignmentNode: anAssignmentNode
+	"| x y |
+	x := y := 10.
+	x
+	>>> 10"
+	
+	| value | 
+	value := (self visitNode: anAssignmentNode value).
+	anAssignmentNode variable store: value with: self.
+	^ value
+]]]
+
+[[[
+CBasicInterpreter >> visitLiteralArrayNode: aRBLiteralArrayNode 
+	
+	^ aRBLiteralArrayNode contents collect: [ :each | self visitNode: each ] 
+]]]
+
+
+[[[
+CHInterpreter >> visitLiteralArrayNode: aRBLiteralArrayNode 
+	
+	^ aRBLiteralArrayNode contents collect: [ :each | self visitNode: each ] 
+]]]
+
+[[[
+CBasicInterpreter >> visitInstanceVariableNode: aVariableNode
+
+	^ self receiver instVarNamed: aVariableNode name
+]]]
+
+
+[[[
+CHInterpreter >> visitInstanceVariableNode: aVariableNode
+
+	^ self receiver instVarNamed: aVariableNode name
+]]]
+
+[[[
+CBasicInterpreter >> visitSuperNode: aRBSuperNode 
+	^ self receiver
+]]]
+
+
+[[[
+CHInterpreter >> visitSuperNode: aRBSuperNode 
+	^ self receiver
+]]]
+
+[[[
+CBasicInterpreter >> visitGlobalNode: aRBGlobalNode 
+
+	^ self class environment at: aRBGlobalNode name ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
+]]]
+
+
+[[[
+CHInterpreter >> visitGlobalNode: aRBGlobalNode 
+
+	^ self class environment at: aRBGlobalNode name ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
+]]]
+
+[[[
+CBasicInterpreter >> visitLiteralValueNode: aRBLiteralValueNode
+
+	^ aRBLiteralValueNode value
+]]]
+
+
+[[[
+CHInterpreter >> visitLiteralValueNode: aRBLiteralValueNode
+
+	^ aRBLiteralValueNode value
+]]]
+
+[[[
+CHInterpreterTest >> testReturnBoolean
+
+	| ast result |
+	ast := (CInterpretable >> #returnBoolean) ast.
+	result := self interpreter executeMethod: ast. 
+	self deny: result 
+]]]
+
+[[[
+CHInterpreterTest >> testReturnBoolean
+
+	| ast result |
+	ast := (CInterpretable >> #returnBoolean) ast.
+	result := self interpreter executeMethod: ast withReceiver: nil. 
+	self deny: result 
+]]]
+
+[[[
+CHInterpreterTest >> testReturnBoolean
+
+	| ast result |
+	ast := (CInterpretable >> #returnBoolean) ast.
+	result := self interpreter executeMethod: ast withReceiver: nil. 
+	self assert: result equals: false 
+]]]
+
+[[[
+CHInterpreter >> visitNode: aNode
+	^ aNode acceptVisitor: self
+]]]
+
+[[[
+CHInterpreter >> visitNode: aNode
+	^ aNode acceptVisitor: self
+]]]
+
+[[[
+CBasicInterpreter >> visitMethodNode: aMethodNode
+	
+	^ self visitMethodBodyNode: aMethodNode body
+]]]
+
+
+[[[
+CHInterpreter >> visitMethodNode: aMethodNode
+	
+	^ self visitMethodBodyNode: aMethodNode body
+]]]
+
+[[[
+CBasicInterpreter >> visitMethodBodyNode: aMethodBodyNode
+	^ self visitNode: aMethodBodyNode 
+]]]
+
+
+[[[
+CHInterpreter >> visitMethodBodyNode: aMethodBodyNode
+	^ self visitNode: aMethodBodyNode 
+]]]
+
+[[[
+CHInterpreter >> visitSequenceNode: aSequenceNode
+	| res |
+	aSequenceNode statements allButLast do: [ :each | self visitNode: each ].
+	res := self visitNode: aSequenceNode statements last.
+	^ res
+]]]
+
+[[[
+CHInterpreterTest >> testReturnEmptyArray
+
+	| ast result |
+	ast := (CInterpretable >> #returnEmptyArray) ast.
+	result := self interpreter executeMethod: ast withReceiver: nil. 
+	self assert: result equals: #() 
+]]]
+
+[[[
+CHInterpreterTest >> executeSelector: aSymbol
+
+	| ast |
+	ast := (CInterpretable >> aSymbol) ast.
+	^ self interpreter executeMethod: ast withReceiver: nil. 
+	
+]]]
+
+[[[
+CHInterpreterTest >> testReturnBoolean
+
+	self assert: (self executeSelector: #returnBoolean) equals: false 
+]]]
+
+[[[
+CHInterpreterTest >> testReturnEmptyArray
+
+	self assert: (self executeSelector: #returnEmptyArray) equals: #() 
+]]]
+
+[[[
+CHInterpreterTest >> testReturnFloat
+
+	self assert: (self executeSelector: #returnFloat) equals: 3.14 
+]]]
+
+[[[
+CHInterpreterTest >> testReturnInteger
+
+	self assert: (self executeSelector: #returnInteger) equals: 5
+]]]
+
+[[[
+CHInterpreterTest >> testReturnLiteralArray
+
+	self assert: (self executeSelector: #returnLiteralArray) equals: #(true 1 'ahah')
+]]]
+
+[[[
+TestCase subclass: #CHInterpreterTest
+	instanceVariableNames: 'interpreter receiver'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+[[[
+CHInterpreterTest >> testReturnSelf
+
+	self assert: (self executeSelector: #returnSelf) equals: receiver
+]]]
+
+[[[
+CHInterpreterTest >> setUp
+
+	interpreter := self interpreterClass new.
+	receiver := CInterpretable new
+]]]
+
+[[[
+CHInterpreterTest >> executeSelector: aSymbol
+
+	| ast |
+	ast := (CInterpretable >> aSymbol) ast.
+	^ self interpreter executeMethod: ast withReceiver: receiver. 
+	
+]]]
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject
+	self pushNewFrame.
+	self currentFrame at: #self  put: anObject.
+	^ self visitNode: anAST
+]]]
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject
+	self pushNewFrame.
+	self topFrame at: #self  put: anObject.
+	^ self visitNode: anAST
+]]]
+
+[[[
+CHInterpreter >> topFrame
+
+	^ stack top 
+]]]
+
+[[[
+CHInterpreter >> receiver
+
+	^ self topFrame at: #self
+]]]
+
+[[[
+CHInterpreterTest >> testReturnSuper
+
+	self assert: (self executeSelector: #returnSuper) equals: receiver
+]]]
+
+[[[
+CHInterpreterTest >> testReturnBoolean
+
+	| globalObject |
+	globalObject := Object new.
+	interpreter globalEnvironmentAt: #Global put: globalObject. 
+	self assert: (self executeSelector: #returnGlobal) equals: globalObject  
+]]]
+
+[[[
+CHInterpreterTest >> testReturnGlobal
+
+	| globalObject |
+	globalObject := Object new.
+	interpreter globalEnvironmentAt: #Global put: globalObject. 
+	self assert: (self executeSelector: #returnGlobal) equals: globalObject  
+]]]
+
+[[[
+CHInterpreterTest >> testReturnBoolean
+
+	self assert: (self executeSelector: #returnBoolean) equals: false 
+]]]
+
+[[[
+CHInterpreterTest >> testReturnBoolean
+
+	| globalObject |
+	globalObject := Object new.
+	interpreter globalEnvironmentAt: #Global put: globalObject. 
+	self assert: (self executeSelector: #returnGlobal) equals: globalObject  
+]]]
+
+[[[
+CHInterpreterTest >> testReturnBoolean
+
+	self assert: (self executeSelector: #returnBoolean) equals: false
+]]]
+
+[[[
+CHInterpreter >> globalEnvironmentAt: aString put: anObject 
+	self shouldBeImplemented.
+]]]
+
+[[[
+Object subclass: #CHInterpreter
+	instanceVariableNames: 'stack globalEnvironment'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+[[[
+CHInterpreter >> globalEnvironmentAt: aSymbol put: anObject 
+	globalEnvironment at: aSymbol put: anObject
+]]]
+
+[[[
+CHInterpreter >> initialize 
+	super initialize. 
+	stack := CTStack new.
+	globalEnvironment := Dictionary new.
+
+]]]
+
+[[[
+CInterpretable >> returnGlobal
+
+	^ Global
+]]]
+
+[[[
+CHInterpreter >> visitGlobalNode: aRBGlobalNode 
+
+	^ self globalEnvironment at: aRBGlobalNode name ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
+]]]
+
+[[[
+CHInterpreter >> visitGlobalNode: aRBGlobalNode 
+
+	^ globalEnvironment at: aRBGlobalNode name ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
+]]]
+
+
+[[[
+CHInterpreter >> visitAssignmentNode: anAssignmentNode
+	"| x y |
+	x := y := 10.
+	x
+	>>> 10"
+	
+	| value | 
+	value := (self visitNode: anAssignmentNode value).
+	anAssignmentNode variable store: value with: self.
+	^ value
+]]]
+
+
+[[[
+CHInterpreter >> visitLiteralValueNode: aRBLiteralValueNode
+
+	^ aRBLiteralValueNode value
+]]]
+
+[[[
+CHInterpreter >> visitLiteralArrayNode: aRBLiteralArrayNode 
+	
+	^ aRBLiteralArrayNode contents collect: [ :each | self visitNode: each ] 
+]]]
+
+[[[
+CHInterpreter >> receiver
+
+	^ self topFrame at: #self
+]]]
+
+
+[[[
+CHInterpreter >> visitGlobalNode: aRBGlobalNode 
+
+	^ globalEnvironment at: aRBGlobalNode name ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
+]]]
+
+
+[[[
+CHInterpreter >> visitSelfNode: aRBSelfNode 
+	^ self receiver
+]]]
+
+
+[[[
+CHInterpreter >> visitSuperNode: aRBSuperNode 
+	^ self receiver
+]]]
+
+[[[
+CHInterpreter >> topFrame
+
+	^ stack top 
+]]]
+
+[[[
+CHInterpreter >> pushNewFrame
+	"Pushing a new scope consists in creating a new dictionary whose parent is the top of the stack
+	and pushing it as a new top. This way a variable not found in current scope will be looked up in previous scope."
+
+	| newTop |
+	newTop := Dictionary new.
+	stack push: newTop.
+	^ newTop
+	
+]]]
+
+
+[[[
+CHInterpreter >> visitGlobalNode: aRBGlobalNode 
+
+	^ globalEnvironment at: aRBGlobalNode name ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
+]]]
+
+[[[
+CHInterpreter >> visitMethodNode: aMethodNode
+	
+	^ self visitMethodBodyNode: aMethodNode body
+]]]
+
+[[[
+CHInterpreter >> visitMethodBodyNode: aMethodBodyNode
+	^ self visitNode: aMethodBodyNode 
+]]]
+
+[[[
+CHInterpreter >> visitSelfNode: aRBSelfNode 
+	^ self receiver
+]]]
+
+[[[
+CHInterpreter >> visitReturnNode: aReturnNode
+
+	| res |
+	res := self visitNode: aReturnNode value.
+	^ res
+]]]
+
+[[[
+CHInterpreter >> visitAssignmentNode: anAssignmentNode
+	"| x y |
+	x := y := 10.
+	x
+	>>> 10"
+	
+	| value | 
+	value := (self visitNode: anAssignmentNode value).
+	anAssignmentNode variable store: value with: self.
+	^ value
+]]]
+
+[[[
+CHInterpreter >> visitInstanceVariableNode: aVariableNode
+
+	^ self receiver instVarNamed: aVariableNode name
+]]]
+
+
+[[[
+CHInterpreter >> visitSuperNode: aRBSuperNode 
+	^ self receiver
+]]]
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject
+	self pushNewFrame.
+	self topFrame at: #self  put: anObject.
+	^ self visitNode: anAST
+]]]
+
+
+[[[
+CHInterpreter >> execute: anAST withReceiver: anObject
+
+	self newFrame.
+	^ self visitNode: anAST
+]]]
+
+[[[
+CHInterpreter >> pushNewFrame
+	"Pushing a new scope consists in creating a new dictionary whose parent is the top of the stack
+	and pushing it as a new top. This way a variable not found in current scope will be looked up in previous scope."
+
+	| newTop |
+	newTop := Dictionary new.
+	stack push: newTop.
+	^ newTop
+	
+]]]
+
+[[[
+CHInterpreter >> receiver
+
+	^ self topFrame at: #self
+]]]
+
+[[[
+CHInterpreter >> topFrame
+
+	^ stack top 
+]]]
+
+[[[
+CHInterpreter >> visitLiteralValueNode: aRBLiteralValueNode
+
+	^ aRBLiteralValueNode value
+]]]
+
+
+[[[
+CHInterpreter >> visitLiteralArrayNode: aRBLiteralArrayNode 
+	
+	^ aRBLiteralArrayNode contents collect: [ :each | self visitNode: each ] 
+]]]
+
+[[[
+CHInterpreterTest >> testReturnAccessInstanceVariable
+
+	receiver x: 100.
+	self assert: (self executeSelector: #returnX) equals: 100
+]]]
+
+[[[
+CHInterpreterTest >> testStoreInstanceVariable
+
+	receiver x: 17.
+	self executeSelector: #store100IntoX.
+	self assert: receiver x equals: 100
+]]]
+
+[[[
+CBasicInterpreter >> execute: anAST withReceiver: anObject
+
+	self setSelfTo: anObject.
+	^ self visitNode: anAST
+]]]
+
+[[[
+CBasicInterpreter >> visitAssignmentNode: anAssignmentNode
+	"| x y |
+	x := y := 10.
+	x
+	>>> 10"
+	
+	| value | 
+	value := (self visitNode: anAssignmentNode value).
+	anAssignmentNode variable store: value with: self.
+	^ value
+]]]
+
+[[[
+CBasicInterpreter >> visitGlobalNode: aRBGlobalNode 
+
+	^ self class environment at: aRBGlobalNode name ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
+]]]
+
+[[[
+CBasicInterpreter >> visitInstanceVariableNode: aVariableNode
+
+	^ self receiver instVarNamed: aVariableNode name
+]]]
+
+[[[
+CBasicInterpreter >> visitLiteralArrayNode: aRBLiteralArrayNode 
+	
+	^ aRBLiteralArrayNode contents collect: [ :each | self visitNode: each ] 
+]]]
+
+[[[
+CBasicInterpreter >> visitLiteralValueNode: aRBLiteralValueNode
+
+	^ aRBLiteralValueNode value
+]]]
+
+[[[
+CBasicInterpreter >> visitMethodBodyNode: aMethodBodyNode
+	^ self visitNode: aMethodBodyNode 
+]]]
+
+[[[
+CBasicInterpreter >> visitMethodNode: aMethodNode
+	
+	^ self visitMethodBodyNode: aMethodNode body
+]]]
+
+[[[
+CBasicInterpreter >> visitReturnNode: aReturnNode
+
+	| res |
+	res := self visitNode: aReturnNode value.
+	^ res
+]]]
+
+[[[
+CBasicInterpreter >> visitSelfNode: aRBSelfNode 
+	^ self receiver
+]]]
+
+[[[
+CBasicInterpreter >> visitSuperNode: aRBSuperNode 
+	^ self receiver
+]]]
+
+[[[
+CBasicInterpreterTest >> interpreter
+
+	^ interpreter
+]]]
+
+[[[
+CBasicInterpreterTest >> interpreterClass 
+
+	^ CBasicInterpreter
+]]]
+
+[[[
+CBasicInterpreterTest >> setUp
+
+	interpreter := self interpreterClass new
+]]]
+
+[[[
+CBasicInterpreterTest >> testReturnConstant
+
+	| ast result |
+	ast := (CInterpretable >> #returnFive) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 5
+]]]
+
+[[[
+CBasicInterpreterTest >> testReturnEmptyArray
+
+	| ast result |
+	ast := (CInterpretable >> #returnEmptyArray) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: #() 
+]]]
+
+[[[
+CBasicInterpreterTest >> testReturnFalse
+
+	| ast result |
+	ast := (CInterpretable >> #returnFalse) ast.
+	result := self interpreter execute: ast. 
+	self deny: result 
+]]]
+
+[[[
+CBasicInterpreterTest >> testReturnLiteralArray
+
+	| ast result |
+	ast := (CInterpretable >> #returnLiteralArray) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals:  #(true 1 'ahah')
+]]]
+
+[[[
+CBasicInterpreterTest >> testTempsAccessShouldNotEscapeMethods
+
+	| ast result |
+	ast := (CInterpretable >> #methodWithTemp) ast.
+	result := self interpreter execute: ast withReceiver: CInterpretable new. 
+	self assert: result equals: nil 
+]]]
+
+
+[[[
+CBasicInterpreterTest >> testTempsShouldNotEscapeMethods
+
+	| ast result |
+	ast := (CInterpretable >> #methodWithTemp) ast.
+	result := self interpreter execute: ast withReceiver: CInterpretable new. 
+	self assert: result equals: nil 
+]]]
+
+[[[
+CBasicInterpreterTest >> testTempsWritingShouldNotEscapeMethods
+
+	| ast result |
+	ast := (CInterpretable >> #methodCallingModifyingTemp) ast.
+	result := self interpreter execute: ast withReceiver: CInterpretable new. 
+	self assert: result equals: 7
+]]]
+
+
+[[[
+BasicInterpreter1Test >> testAccessInstanceVariable
+
+	| ast result |
+	ast := (CInterpretable >> #returnX) ast.
+	result := self interpreter execute: ast withReceiver: (CInterpretable new x: 100).
+	self assert: result equals: 100. 
+	
+]]]
+
+
+
+[[[
+BasicInterpreter1Test >> testAccessXInInstance
+
+	| ast result |
+	ast := (CInterpretable >> #returnX) ast.
+	result := self interpreter execute: ast withReceiver: (CInterpretable new x: 100).
+	self assert: result equals: 100. 
+	
+]]]
+
