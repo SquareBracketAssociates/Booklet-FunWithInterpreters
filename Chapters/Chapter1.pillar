@@ -150,7 +150,8 @@ CHInterpreter >> visitSequenceNode: aSequenceNode
 	^ self visitNode: aSequenceNode statements last.
 ]]]
 
-Since we want to be able to access return value, we define the ==visitReturnNode:== to handle 
+Since we want to be able to access a return value, we define the ==visitReturnNode:== to handle. This method simply returns the value (invoking recursively the visitor) of the expression that is returned.
+
 [[[
 CHInterpreter >> visitReturnNode: aReturnNode
 
@@ -158,7 +159,7 @@ CHInterpreter >> visitReturnNode: aReturnNode
 ]]]
 
 For now we only manage literal object such as number, booleans, ...
-So we redefine the method
+So we redefine the method ==visitLiteralValueNode:== which is invoked on literal values. 
 
 [[[
 CHInterpreter >> visitLiteralValueNode: aRBLiteralValueNode
@@ -171,45 +172,51 @@ And we are ready to continue our journey.
 
 
 
-!!! Improving the Test
+!!! Improving the Test Infrastructure
 
+Since we will write many tests during this book, we exact some logic from our test method, it will help future evolution. 
+
+We define the method ==executeSelector:==, it accesses the method, gets its AST and returns the value of the  
 [[[
 CHInterpreterTest >> executeSelector: aSymbol
 
 	| ast |
 	ast := (CInterpretable >> aSymbol) ast.
-	^ self interpreter executeMethod: ast withReceiver: nil. 
+	^ self interpreter executeMethod: ast
 	
 ]]]
 
+Now we rewrite our first test as follows: 
+
+[[[
+CHInterpreterTest >> testReturnInteger
+
+	self 
+		assert: (self executeSelection: #returnInteger)
+		equals: 5
+]]]
+
+We are ready to efficiently write tests for the other constants. 
 
 !!! More Tests for Constant
 
-
-[[[
-CHInterpreterTest >> testReturnFloat
-
-	| ast result |
-	ast := (CInterpretable >> #returnPi) ast.
-	result := self interpreter execute: ast. 
-	self assert: result equals: 3.14
-]]]
-
+It is straigth forward to write new tests. 
+We define a test for booleans, here we do not use ==deny:== to make the result explicit.
+Note that we include the method definition ofthe interpreted method to ease understanding. 
 
 [[[
 CHInterpreterTest >> testReturnBoolean
-
-	| ast result |
-	ast := (CInterpretable >> #returnBoolean) ast.
-	result := self interpreter execute: ast. 
-	self deny: result 
+	"returnBoolean
+		^ false"
+		
+	self assert: (self executeSelector: #returnBoolean) equals: false 
 ]]]
 
-
 [[[
-CHInterpreter >> visitLiteralValueNode: aRBLiteralValueNode
-
-	^ aRBLiteralValueNode value
+CHInterpreterTest >> testReturnFloat
+	"returnFloat
+		^ 3.14"
+	self assert: (self executeSelector: #returnFloat) equals: 3.14 
 ]]]
 
 
@@ -253,6 +260,17 @@ CHInterpreter >> visitLiteralArrayNode: aRBLiteralArrayNode
 ]]]
 
 !!! Handling Self 
+
+[[[
+CHInterpreterTest >> executeSelector: aSymbol
+
+	| ast |
+	ast := (CInterpretable >> aSymbol) ast.
+	^ self interpreter executeMethod: ast withReceiver: nil. 
+	
+]]]
+
+
 
 [[[
 CInterpretable >> returnSelf
@@ -449,20 +467,6 @@ CHInterpreter >> visitSequenceNode: aSequenceNode
 
 
 
-[[[
-CHInterpreterTest >> executeSelector: aSymbol
-
-	| ast |
-	ast := (CInterpretable >> aSymbol) ast.
-	^ self interpreter executeMethod: ast withReceiver: nil. 
-	
-]]]
-
-[[[
-CHInterpreterTest >> testReturnBoolean
-
-	self assert: (self executeSelector: #returnBoolean) equals: false 
-]]]
 
 [[[
 CHInterpreterTest >> testReturnEmptyArray
@@ -470,17 +474,6 @@ CHInterpreterTest >> testReturnEmptyArray
 	self assert: (self executeSelector: #returnEmptyArray) equals: #() 
 ]]]
 
-[[[
-CHInterpreterTest >> testReturnFloat
-
-	self assert: (self executeSelector: #returnFloat) equals: 3.14 
-]]]
-
-[[[
-CHInterpreterTest >> testReturnInteger
-
-	self assert: (self executeSelector: #returnInteger) equals: 5
-]]]
 
 [[[
 CHInterpreterTest >> testReturnLiteralArray
