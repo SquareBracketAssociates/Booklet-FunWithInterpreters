@@ -320,7 +320,7 @@ CHInterpreterTest >> testReturnSelf
 
 	self 
 		assert: (self executeSelector: #returnSelf) 
-		equals: receiver
+		equals: nil
 ]]]
 
 
@@ -351,6 +351,9 @@ CHInterpreterTest >> testReturnSuper
 
 !!! Improving the text logic setUp
 
+We want to have a better way to handle receiver in test.
+We add an instance variable to the ==CHInterpreterTest== that will hold the receiver.
+
 [[[
 TestCase subclass: #CHInterpreterTest
 	instanceVariableNames: 'interpreter receiver'
@@ -358,6 +361,7 @@ TestCase subclass: #CHInterpreterTest
 	package: 'Champollion'
 ]]]
 
+In the ==setUp== we assign a new instance to the new instance variable.
 [[[
 CHInterpreterTest >> setUp
 	super setUp.
@@ -365,24 +369,31 @@ CHInterpreterTest >> setUp
 	receiver := CInterpretable new
 ]]]
 
+We then use the new instance variable in ==executeSelector:==.
+
 [[[
 CHInterpreterTest >> executeSelector: aSymbol
 
 	| ast |
 	ast := (CInterpretable >> aSymbol) ast.
-	^ self interpreter executeMethod: ast withReceiver: receiver. 
+	^ self interpreter executeMethod: ast withReceiver: receiver
 ]]]
 
+We rewrite the test methods ==testReturnSelf== and ==testReturnSuper==.
 [[[
 CHInterpreterTest >> testReturnSelf
 
-	self assert: (self executeSelector: #returnSelf) equals: receiver
+	self 
+		assert: (self executeSelector: #returnSelf) 
+		equals: receiver
 ]]]
 
 [[[
 CHInterpreterTest >> testReturnSuper
 
-	self assert: (self executeSelector: #returnSuper) equals: receiver
+	self 
+		assert: (self executeSelector: #returnSuper) 
+		equals: receiver
 ]]]
 
 
