@@ -10,8 +10,7 @@ For each of the steps we will start by defining a method illustrating the situat
 we implement the features. 
 
 Doing so we will define and refine a visitor. 
-Note that we will write the visitor from scratch but we will reuse the node of the Pharo AST and their  
-functionalities.
+Note that we will write the visitor from scratch but we will reuse the node of the Pharo AST and their functionalities.
 
 !!! Setting the stage
 
@@ -21,8 +20,7 @@ The tests that we will define are hosted in the class ==CHInterpreterTest==.
 TestCase subclass: #CHInterpreterTest
 	instanceVariableNames: 'interpreter'
 	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Champollion-Core'
+	package: 'Champollion-Core'
 ]]]
 
 We define two helper methods: ==interpreter== and ==interpreterClass== as follows: 
@@ -147,7 +145,7 @@ CHInterpreter >> visitSequenceNode: aSequenceNode
 	
 	aSequenceNode statements allButLast 
 		do: [ :each | self visitNode: each ].
-	^ self visitNode: aSequenceNode statements last.
+	^ self visitNode: aSequenceNode statements last
 ]]]
 
 Since we want to be able to access a return value, we define the ==visitReturnNode:== to handle. This method simply returns the value (invoking recursively the visitor) of the expression that is returned.
@@ -290,8 +288,8 @@ CHInterpreter >> receiver
 	^ receiver
 ]]]
 
-We make sure that we can set the receiver when we launch the interpretation and we introduce a new method ==execute:with:== for this.
-
+We make sure that we can set the receiver when we launch the interpretation and we introduce a new method ==execute:with:== for this. 
+We will remove 
 [[[
 CHInterpreter >> execute: anAST withReceiver: anObject
 
@@ -299,26 +297,33 @@ CHInterpreter >> execute: anAST withReceiver: anObject
 	^ self visitNode: anAST
 ]]]
 
-
-
-
-
+We redefine the method ==executeSelector:== to use this new method.
 
 [[[
 CHInterpreterTest >> executeSelector: aSymbol
 
 	| ast |
 	ast := (CInterpretable >> aSymbol) ast.
-	^ self interpreter executeMethod: ast withReceiver: nil. 
-	
+	^ self interpreter executeMethod: ast withReceiver: nil.
 ]]]
 
+This way all our tests are still passing and we will be ready to handle the case of ==self== and ==super==.
 
 
 [[[
 CInterpretable >> returnSelf
 	^ self 
 ]]]
+
+[[[
+CHInterpreterTest >> testReturnSelf
+
+	self 
+		assert: (self executeSelector: #returnSelf) 
+		equals: receiver
+]]]
+
+
 
 [[[
 CInterpretable >> visitSelfNode: aRBSelfNode 
@@ -343,10 +348,77 @@ CHInterpreterTest >> testReturnSuper
 ]]]
 
 
+
+!!! Improving the text logic setUp
+
 [[[
-CHInterpreter >> execute: anAST withReceiver: anObject
-	...
+TestCase subclass: #CHInterpreterTest
+	instanceVariableNames: 'interpreter receiver'
+	classVariableNames: ''
+	package: 'Champollion'
 ]]]
+
+[[[
+CHInterpreterTest >> setUp
+	super setUp.
+	interpreter := self interpreterClass new.
+	receiver := CInterpretable new
+]]]
+
+[[[
+CHInterpreterTest >> executeSelector: aSymbol
+
+	| ast |
+	ast := (CInterpretable >> aSymbol) ast.
+	^ self interpreter executeMethod: ast withReceiver: receiver. 
+]]]
+
+[[[
+CHInterpreterTest >> testReturnSelf
+
+	self assert: (self executeSelector: #returnSelf) equals: receiver
+]]]
+
+[[[
+CHInterpreterTest >> testReturnSuper
+
+	self assert: (self executeSelector: #returnSuper) equals: receiver
+]]]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 !!! Introducing Stack Management
 
@@ -406,13 +478,6 @@ CBasicInterpreter >> visitReturnNode: aReturnNode
 ]]]
 
 
-[[[
-CHInterpreter >> visitReturnNode: aReturnNode
-
-	| res |
-	res := self visitNode: aReturnNode value.
-	^ res
-]]]
 
 
 !!! Assignment Nodes
@@ -438,17 +503,6 @@ CHInterpreter >> visitAssignmentNode: anAssignmentNode
 
 
 
-
-[[[
-CBasicInterpreter >> visitSuperNode: aRBSuperNode 
-	^ self receiver
-]]]
-
-
-[[[
-CHInterpreter >> visitSuperNode: aRBSuperNode 
-	^ self receiver
-]]]
 
 
 [[[
@@ -480,35 +534,7 @@ CHInterpreterTest >> testReturnBoolean
 
 
 
-[[[
-TestCase subclass: #CHInterpreterTest
-	instanceVariableNames: 'interpreter receiver'
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Champollion-Core'
-]]]
 
-[[[
-CHInterpreterTest >> testReturnSelf
-
-	self assert: (self executeSelector: #returnSelf) equals: receiver
-]]]
-
-[[[
-CHInterpreterTest >> setUp
-
-	interpreter := self interpreterClass new.
-	receiver := CInterpretable new
-]]]
-
-[[[
-CHInterpreterTest >> executeSelector: aSymbol
-
-	| ast |
-	ast := (CInterpretable >> aSymbol) ast.
-	^ self interpreter executeMethod: ast withReceiver: receiver. 
-	
-]]]
 
 [[[
 CHInterpreter >> executeMethod: anAST withReceiver: anObject
