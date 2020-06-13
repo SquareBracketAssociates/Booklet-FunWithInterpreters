@@ -323,15 +323,18 @@ CHInterpreterTest >> testReturnSelf
 		equals: nil
 ]]]
 
-
+The interpretation of ==self== is done in the method ==visitSelfNode:==.
+It is simple, it just returns the value of the receiver stored in the interpreter.
 
 [[[
 CInterpretable >> visitSelfNode: aRBSelfNode 
 	^ self receiver
 ]]]
 
-
 !!! Handling Super
+Following the same logic as for ==self==, we improve the interpreter to support ==super==.
+
+We start by defining a method using ==super== and its companion test. 
 
 [[[
 CInterpretable >> returnSuper
@@ -341,15 +344,22 @@ CInterpretable >> returnSuper
 [[[
 CHInterpreterTest >> testReturnSuper
 
-	| ast result |
-	ast := (CInterpretable >> #returnSuper) ast.
-	result := self interpreter execute: ast withReceiver: 42. 
-	self assert: result equals: 42
+	self 
+		assert: (self executeSelector: #returnSuper) 
+		equals: nil
 ]]]
 
+What is interesting is that the interpretation of ==super== is that this variable is also the receiver of the message. 
+So contrary to a common and wrong believe, ==super== is not the superclass or an instance of the superclass. It is just the receiver.
 
+[[[
+CHInterpreter >> visitSuperNode: aRBSelfNode 
+	^ self receiver
+]]]
 
-!!! Improving the text logic setUp
+The logic of the tests is not really satisfactory, so we improve it. 
+
+!!! Improving the Logic of setUp
 
 We want to have a better way to handle receiver in test.
 We add an instance variable to the ==CHInterpreterTest== that will hold the receiver.
