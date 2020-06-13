@@ -59,6 +59,7 @@ Object subclass: #CInterpretable
 ]]]
 
 Here we define some simple methods that we would like to execute.
+For now we focus on returning simple literal objects such as booleans, float and integer. 
 
 [[[
 CInterpretable >> returnInteger
@@ -78,8 +79,7 @@ CInterpretable >> returnBoolean
 
 !!! A First Test
 
-Our first test is worth one comment: we access the AST of the method that we want to execute then we instantiate our interpreter and ask it to execute the ast.  
-And we check that we get the expected result. 
+The method ==testReturnInteger== is the first test for specifying the behavior of simple interpreter. 
 
 [[[
 CHInterpreterTest >> testReturnInteger
@@ -90,9 +90,17 @@ CHInterpreterTest >> testReturnInteger
 	self assert: result equals: 5
 ]]]
 
+Our first test is worth one comment: 
+- we access the AST of the method that we want to execute
+- then we instantiate our interpreter and 
+- ask it to execute the ast.
+And we check that we get the expected result. 
+
 !!! Building a minimal constant evaluator
 
-We are ready to define our interpreter:
+We are ready to define our interpreter. 
+We define the class ==CHInterpreter==. 
+We will implement it as a Visitor over the Pharo method AST. 
 
 [[[
 Object subclass: #CHInterpreter
@@ -101,9 +109,78 @@ Object subclass: #CHInterpreter
 	package: 'Champollion'
 ]]]
 
-Note that we do not inherit from the default Pharo AST visitor so that we build it step by step. Nevertheless we follow the same API and use the node ==accept:== visit methods.
-The method ==execute:== simply calls the visitor main entry point. 
+Note that we do not inherit from the default Pharo AST Visitor so that we build it step by step. 
+Nevertheless we follow the same API and use the node ==accept:== visit methods.
+The method ==execute:== simply calls the visitor main entry point (method ==visitNode:==).
 
+[[[
+CHInterpreter >> execute: anAST
+	^ self visitNode: anAST
+]]]
+
+[[[
+CHInterpreter >> visitNode: aNode
+	^ aNode acceptVisitor: self
+]]]
+
+Since the AST we will interpret is an AST of method, 
+The first visitor method of interest is the method ==visitMethodNode:==.
+It just dispatches on ==visitMethodBodyNode:==.
+
+[[[
+CHInterpreter >> visitMethodNode: aMethodNode
+
+	^ self visitMethodBodyNode: aMethodNode body
+]]]
+
+For now ==visitMethodBodyNode:== just visits the method body (an ==RBSequenceNode==).
+[[[
+CHInterpreter >> visitMethodBodyNode: aMethodBodyNode
+	^ self visitNode: aMethodBodyNode 
+]]]
+
+The first version of ==visitSequenceNode:== ignores possible temporary declarations and handles all the statements paying attention that the last statement value should be returned.
+So we visit all the statements except the last one, and we return the value of the last statement. 
+
+[[[
+CHInterpreter >> visitSequenceNode: aSequenceNode
+	
+	aSequenceNode statements allButLast 
+		do: [ :each | self visitNode: each ].
+	^ self visitNode: aSequenceNode statements last.
+]]]
+
+Since we want to be able to access return value, we define the ==visitReturnNode:== to handle 
+[[[
+CHInterpreter >> visitReturnNode: aReturnNode
+
+	^ self visitNode: aReturnNode value
+]]]
+
+For now we only manage literal object such as number, booleans, ...
+So we redefine the method
+
+[[[
+CHInterpreter >> visitLiteralValueNode: aRBLiteralValueNode
+
+	^ aRBLiteralValueNode value
+]]]
+
+Our first test passes. 
+And we are ready to continue our journey.
+
+
+
+!!! Improving the Test
+
+[[[
+CHInterpreterTest >> executeSelector: aSymbol
+
+	| ast |
+	ast := (CInterpretable >> aSymbol) ast.
+	^ self interpreter executeMethod: ast withReceiver: nil. 
+	
+]]]
 
 
 !!! More Tests for Constant
@@ -370,14 +447,7 @@ CHInterpreter >> visitSequenceNode: aSequenceNode
 
 
 
-[[[
-CHInterpreterTest >> testReturnEmptyArray
 
-	| ast result |
-	ast := (CInterpretable >> #returnEmptyArray) ast.
-	result := self interpreter executeMethod: ast withReceiver: nil. 
-	self assert: result equals: #() 
-]]]
 
 [[[
 CHInterpreterTest >> executeSelector: aSymbol
