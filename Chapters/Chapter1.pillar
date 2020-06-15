@@ -407,41 +407,109 @@ CHInterpreterTest >> testReturnSuper
 ]]]
 
 
+We are ready to work on more interesting points. 
 
 
 
+!!! Receiver State Access
+
+We can work on support instance variable access. 
+Let us start with a test.
+
+!!!!! Fixture and Test
+
+We define a getter and setter to be able to control the value put in the instance variable of our instance.
+
+[[[
+CInterpretable >> returnX
+	^ x 
+]]]
+ 
+[[[
+CInterpretable >> x: anInteger
+	x := anInteger
+]]]
+
+We modify the receiver and when we interpret the accessor we should get the correct value.
+
+[[[
+CHInterpreterTest >> testReturnAccessInstanceVariable
+
+	receiver x: 100.
+	self assert: (self executeSelector: #returnX) equals: 100
+]]]
 
 
+Our test is failing so we are ready to work.  And now we can define the method ==visitInstanceVariableNode:== to reflectivity access the state of receiver. Note that this implementation does not take into account the fact that an instance variable can be defined in a superclass and still be accessible in the subclass method. 
+
+[[[
+CHInterpreter >> visitInstanceVariableNode: aVariableNode
+	^ receiver instVarNamed: aVariableNode name
+]]]
+
+Our test should pass!
+
+!!! Receiver State Assignment
+We will add support for assignment in receiver's instance variables.
+
+!!!!! Fixture and Tests
+
+We define a method doing an assignment into the instance variable ==x==.
+[[[
+CInterpretable >> store100IntoX
+	x := 100.
+]]]
+
+[[[
+Interpretable >> x
+	^ x 
+]]]
+
+The test ==testStore100IntoX== launches the interpretation of method ==store100IntoX==.
+
+[[[
+CHInterpreterTest >> testStore100IntoX
+
+	receiver x: 17.
+	self executeSelector: #store100IntoX.
+	self assert: receiver x equals: 100
+]]]
+
+!!!!! Implementation
+
+The implementation is straighforward. We define the method ==visitAssignmentNode:==.
+Here since we expect to have other variable types in the future we define the storing behavior  (method == store:with:==) of the assigned variable node itself. 
+
+[[[
+BasicInterpreter >> visitAssignmentNode: anAssignmentNode
+	" x := 100"
+	
+	| value | 
+	value := (self visitNode: anAssignmentNode value).
+	anAssignmentNode variable store: value with: self.
+	^ value
+]]]
 
 
+[[[
+RBInstanceVariableNode >> store: anObject with: anInterpreter 
+	
+	anInterpreter receiver instVarNamed: name put: anObject
+]]]
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Now our tests should pass. 
 
 
 
 
 !!! Introducing Stack Management
+
+The way we managed the receiver is overly simplistic.
+ Indeed, each time a program will send a message to another object,  we should change the receiver and when the computation ends, the previous receiver should be put back. Therefore we need a stack.
+In addition the same happens for handling methods arguments and temporaries. 
+We address this point now.
+
+We add a stack instance and this stack will keep information about the current receiver, as well as temporaries and arguments as we will see later. 
 
 [[[
 Object subclass: #CHInterpreter
@@ -451,274 +519,8 @@ Object subclass: #CHInterpreter
 	category: 'Champollion-Core'
 ]]]
 
-[[[
-CHInterpreter >> pushNewFrame
-	"Pushing a new scope consists in creating a new dictionary whose parent is the top of the stack
-	and pushing it as a new top. This way a variable not found in current scope will be looked up in previous scope."
-
-	| newTop |
-	newTop := Dictionary new.
-	stack push: newTop.
-	^ newTop
-	
-]]]
-
-[[[
-CHInterpreter >> initialize 
-	super initialize. 
-	stack := CTStack new.
-	self pushNewFrame
-]]]
-
-
-[[[
-CHInterpreter >> receiver
-
-	^ self topFrame at: #self
-]]]
-
-[[[
-CHInterpreter >> executeMethod: anAST withReceiver: anObject
-	self pushNewFrame.
-	^ self visitNode: anAST
-]]]
-
-
-
-[[[
-CHInterpreter >> visitSelfNode: aRBSelfNode 
-	^ self receiver
-]]]
-
-[[[
-CBasicInterpreter >> visitReturnNode: aReturnNode
-
-	| res |
-	res := self visitNode: aReturnNode value.
-	^ res
-]]]
-
-
-
-
-!!! Assignment Nodes
-
-
-[[[
-CHInterpreter >> visitAssignmentNode: anAssignmentNode
-	"| x y |
-	x := y := 10.
-	x
-	>>> 10"
-	
-	| value | 
-	value := (self visitNode: anAssignmentNode value).
-	anAssignmentNode variable store: value with: self.
-	^ value
-]]]
-
-
-
-
-
-
-
-
-
-
-[[[
-CHInterpreterTest >> testReturnBoolean
-
-	| ast result |
-	ast := (CInterpretable >> #returnBoolean) ast.
-	result := self interpreter executeMethod: ast withReceiver: nil. 
-	self deny: result 
-]]]
-
-[[[
-CHInterpreterTest >> testReturnBoolean
-
-	| ast result |
-	ast := (CInterpretable >> #returnBoolean) ast.
-	result := self interpreter executeMethod: ast withReceiver: nil. 
-	self assert: result equals: false 
-]]]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-[[[
-CHInterpreter >> executeMethod: anAST withReceiver: anObject
-	self pushNewFrame.
-	self currentFrame at: #self  put: anObject.
-	^ self visitNode: anAST
-]]]
-
-[[[
-CHInterpreter >> executeMethod: anAST withReceiver: anObject
-	self pushNewFrame.
-	self topFrame at: #self  put: anObject.
-	^ self visitNode: anAST
-]]]
-
-[[[
-CHInterpreter >> topFrame
-
-	^ stack top 
-]]]
-
-[[[
-CHInterpreter >> receiver
-
-	^ self topFrame at: #self
-]]]
-
-[[[
-CHInterpreterTest >> testReturnSuper
-
-	self assert: (self executeSelector: #returnSuper) equals: receiver
-]]]
-
-[[[
-CHInterpreterTest >> testReturnBoolean
-
-	| globalObject |
-	globalObject := Object new.
-	interpreter globalEnvironmentAt: #Global put: globalObject. 
-	self assert: (self executeSelector: #returnGlobal) equals: globalObject  
-]]]
-
-[[[
-CHInterpreterTest >> testReturnGlobal
-
-	| globalObject |
-	globalObject := Object new.
-	interpreter globalEnvironmentAt: #Global put: globalObject. 
-	self assert: (self executeSelector: #returnGlobal) equals: globalObject  
-]]]
-
-[[[
-CHInterpreterTest >> testReturnBoolean
-
-	self assert: (self executeSelector: #returnBoolean) equals: false 
-]]]
-
-
-!!! Handling Global Variables
-
-[[[
-CInterpretable >> returnGlobal
-
-	^ Global
-]]]
-
-[[[
-CHInterpreterTest >> testReturnGlobal
-
-	| globalObject |
-	globalObject := Object new.
-	interpreter globalEnvironmentAt: #Global put: globalObject. 
-	self assert: (self executeSelector: #returnGlobal) equals: globalObject  
-]]]
-
-
-[[[
-Object subclass: #CHInterpreter
-	instanceVariableNames: 'stack globalEnvironment'
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Champollion-Core'
-]]]
-
-[[[
-CHInterpreter >> globalEnvironmentAt: aSymbol put: anObject 
-	globalEnvironment at: aSymbol put: anObject
-]]]
-
-[[[
-CHInterpreter >> initialize 
-	super initialize. 
-	stack := CTStack new.
-	globalEnvironment := Dictionary new.
-
-]]]
-
-
-
-[[[
-CHInterpreter >> visitGlobalNode: aRBGlobalNode 
-
-	^ self globalEnvironment at: aRBGlobalNode name 
-		ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
-]]]
-
-!!! Instance variable 
-
-[[[
-CHInterpreter >> visitInstanceVariableNode: aVariableNode
-
-	^ self receiver instVarNamed: aVariableNode name
-]]]
-
-!!! Assignment 
-
-[[[
-CHInterpreter >> visitAssignmentNode: anAssignmentNode
-	"| x y |
-	x := y := 10.
-	x
-	>>> 10"
-	
-	| value | 
-	value := (self visitNode: anAssignmentNode value).
-	anAssignmentNode variable store: value with: self.
-	^ value
-]]]
-
-
-
-
-[[[
-CHInterpreter >> visitLiteralArrayNode: aRBLiteralArrayNode 
-	
-	^ aRBLiteralArrayNode contents collect: [ :each | self visitNode: each ] 
-]]]
-
-
-
-[[[
-CHInterpreter >> visitGlobalNode: aRBGlobalNode 
-
-	^ globalEnvironment at: aRBGlobalNode name ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
-]]]
-
-
-[[[
-CHInterpreter >> visitSelfNode: aRBSelfNode 
-	^ self receiver
-]]]
-
-
-[[[
-CHInterpreter >> visitSuperNode: aRBSuperNode 
-	^ self receiver
-]]]
-
-[[[
-CHInterpreter >> topFrame
-
-	^ stack top 
-]]]
+The idea is that the stack will hold a ''frame''. A frame can be represented for now as a dictionary. 
+We define the method ==pushNewFrame==. This means that we add on the top of the stack a new dictionary instance. 
 
 [[[
 CHInterpreter >> pushNewFrame
@@ -729,64 +531,30 @@ CHInterpreter >> pushNewFrame
 	newTop := Dictionary new.
 	stack push: newTop.
 	^ newTop
-	
 ]]]
 
+We initialize the interpreter state by creating a new stack. 
 
 [[[
-CHInterpreter >> visitGlobalNode: aRBGlobalNode 
-
-	^ globalEnvironment at: aRBGlobalNode name ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
+CHInterpreter >> initialize 
+	super initialize. 
+	stack := CTStack new.
 ]]]
+
+Accessing the receiver is just accessing the value of the key ==#self== of the current frame. 
 
 [[[
-CHInterpreter >> visitMethodNode: aMethodNode
-	
-	^ self visitMethodBodyNode: aMethodNode body
+CHInterpreter >> receiver
+	^ self topFrame at: #self
 ]]]
 
+We expose also the top frame to ease manipulation. 
 [[[
-CHInterpreter >> visitMethodBodyNode: aMethodBodyNode
-	^ self visitNode: aMethodBodyNode 
+CHInterpreter >> topFrame
+	^ stack top 
 ]]]
 
-[[[
-CHInterpreter >> visitSelfNode: aRBSelfNode 
-	^ self receiver
-]]]
-
-[[[
-CHInterpreter >> visitReturnNode: aReturnNode
-
-	| res |
-	res := self visitNode: aReturnNode value.
-	^ res
-]]]
-
-[[[
-CHInterpreter >> visitAssignmentNode: anAssignmentNode
-	"| x y |
-	x := y := 10.
-	x
-	>>> 10"
-	
-	| value | 
-	value := (self visitNode: anAssignmentNode value).
-	anAssignmentNode variable store: value with: self.
-	^ value
-]]]
-
-[[[
-CHInterpreter >> visitInstanceVariableNode: aVariableNode
-
-	^ self receiver instVarNamed: aVariableNode name
-]]]
-
-
-[[[
-CHInterpreter >> visitSuperNode: aRBSuperNode 
-	^ self receiver
-]]]
+We extend the ==executeMethod:withReceiver:== to create a new frame and define the receiver as value of the ==#self== key.
 
 [[[
 CHInterpreter >> executeMethod: anAST withReceiver: anObject
@@ -796,74 +564,62 @@ CHInterpreter >> executeMethod: anAST withReceiver: anObject
 ]]]
 
 
-[[[
-CHInterpreter >> execute: anAST withReceiver: anObject
+!!! Intermezzo -- About temporaries
 
-	self newFrame.
-	^ self visitNode: anAST
+Before implementing the interpretation of temporaries we want to show some particularities of Pharo semantics.
+Temporaries cannot shadow other temporaries.
+
+The following expression is rejected by the compiler because the second ==tmp== definition is illegal. 
+[[[
+[ 
+	| tmp |
+	tmp := 2. 
+	[
+		| tmp |
+		tmp := 3 ]]
 ]]]
 
+Similarly a temporary cannot shadow a block or a method parameter.
+Therefore the following expression is not allowed.
 [[[
-CHInterpreter >> pushNewFrame
-	"Pushing a new scope consists in creating a new dictionary whose parent is the top of the stack
-	and pushing it as a new top. This way a variable not found in current scope will be looked up in previous scope."
-
-	| newTop |
-	newTop := Dictionary new.
-	stack push: newTop.
-	^ newTop
-	
+[ :tmp |
+	| tmp |
+	tmp := 2]
 ]]]
 
+The following method is not valid either.
 [[[
-CHInterpreter >> receiver
+with: arg
 
-	^ self topFrame at: #self
+	| arg |
+	^ arg
+]]]	
+
+Finally parameters are read only. 
+Therefore the following method is not valid. 
+[[[
+with: arg
+	arg := 42	
 ]]]
 
-[[[
-CHInterpreter >> topFrame
+As well as the following expression
 
-	^ stack top 
+[[[
+[ :tmp |
+	tmp := 2
+	 ]
 ]]]
 
-[[[
-CHInterpreter >> visitLiteralValueNode: aRBLiteralValueNode
-
-	^ aRBLiteralValueNode value
-]]]
+We can say that inside a method the names of parameters, temporaries and instance variables are flattened and use a single namespace.
 
 
-[[[
-CHInterpreter >> visitLiteralArrayNode: aRBLiteralArrayNode 
-	
-	^ aRBLiteralArrayNode contents collect: [ :each | self visitNode: each ] 
-]]]
+!!! Temporaries
+
+Here!
+
 
 [[[
-CHInterpreterTest >> testReturnAccessInstanceVariable
-
-	receiver x: 100.
-	self assert: (self executeSelector: #returnX) equals: 100
-]]]
-
-[[[
-CHInterpreterTest >> testStoreInstanceVariable
-
-	receiver x: 17.
-	self executeSelector: #store100IntoX.
-	self assert: receiver x equals: 100
-]]]
-
-[[[
-CBasicInterpreter >> execute: anAST withReceiver: anObject
-
-	self setSelfTo: anObject.
-	^ self visitNode: anAST
-]]]
-
-[[[
-CBasicInterpreter >> visitAssignmentNode: anAssignmentNode
+CHInterpreter >> visitAssignmentNode: anAssignmentNode
 	"| x y |
 	x := y := 10.
 	x
@@ -875,58 +631,6 @@ CBasicInterpreter >> visitAssignmentNode: anAssignmentNode
 	^ value
 ]]]
 
-[[[
-CBasicInterpreter >> visitGlobalNode: aRBGlobalNode 
-
-	^ self class environment at: aRBGlobalNode name ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
-]]]
-
-[[[
-CBasicInterpreter >> visitInstanceVariableNode: aVariableNode
-
-	^ self receiver instVarNamed: aVariableNode name
-]]]
-
-[[[
-CBasicInterpreter >> visitLiteralArrayNode: aRBLiteralArrayNode 
-	
-	^ aRBLiteralArrayNode contents collect: [ :each | self visitNode: each ] 
-]]]
-
-[[[
-CBasicInterpreter >> visitLiteralValueNode: aRBLiteralValueNode
-
-	^ aRBLiteralValueNode value
-]]]
-
-[[[
-CBasicInterpreter >> visitMethodBodyNode: aMethodBodyNode
-	^ self visitNode: aMethodBodyNode 
-]]]
-
-[[[
-CBasicInterpreter >> visitMethodNode: aMethodNode
-	
-	^ self visitMethodBodyNode: aMethodNode body
-]]]
-
-[[[
-CBasicInterpreter >> visitReturnNode: aReturnNode
-
-	| res |
-	res := self visitNode: aReturnNode value.
-	^ res
-]]]
-
-[[[
-CBasicInterpreter >> visitSelfNode: aRBSelfNode 
-	^ self receiver
-]]]
-
-[[[
-CBasicInterpreter >> visitSuperNode: aRBSuperNode 
-	^ self receiver
-]]]
 
 [[[
 CBasicInterpreterTest >> testTempsAccessShouldNotEscapeMethods
@@ -979,3 +683,60 @@ BasicInterpreter1Test >> testAccessXInInstance
 	
 ]]]
 
+
+
+!!! Handling Global Variables
+
+[[[
+CInterpretable >> returnGlobal
+
+	^ Global
+]]]
+
+[[[
+CHInterpreterTest >> testReturnGlobal
+
+	| globalObject |
+	globalObject := Object new.
+	interpreter globalEnvironmentAt: #Global put: globalObject. 
+	self assert: (self executeSelector: #returnGlobal) equals: globalObject  
+]]]
+
+
+[[[
+Object subclass: #CHInterpreter
+	instanceVariableNames: 'stack globalEnvironment'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+[[[
+CHInterpreter >> globalEnvironmentAt: aSymbol put: anObject 
+	globalEnvironment at: aSymbol put: anObject
+]]]
+
+[[[
+CHInterpreter >> initialize 
+	super initialize. 
+	stack := CTStack new.
+	globalEnvironment := Dictionary new.
+
+]]]
+
+
+
+[[[
+CHInterpreter >> visitGlobalNode: aRBGlobalNode 
+
+	^ self globalEnvironment at: aRBGlobalNode name 
+		ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
+]]]
+
+
+
+
+
+!!! Conclusion
+This interpreter is basic. It does not cover blocks and more dynamic features. 
+We will cover more advanced topics in the following chapter.
