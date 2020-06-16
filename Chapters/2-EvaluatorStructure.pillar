@@ -502,12 +502,19 @@ Now our tests should pass.
 
 
 !!! Handling Global Variables
+We finish this chapter with the handling of global variables such as classes and globals. 
+We decided not to use the default Pharo environment so that we have to be more explicit about how to access globals.
+It also means that we can control the scope of our interpreter and setting different environments.
+
+We first define the method ==returnGlobal== which accesses and returns the global named ==Global==.
 
 [[[
 CInterpretable >> returnGlobal
 
 	^ Global
 ]]]
+
+We define a test which specifies that the interpreter' environment has a binding whose key is #Global and value is a new object.
 
 [[[
 CHInterpreterTest >> testReturnGlobal
@@ -518,18 +525,13 @@ CHInterpreterTest >> testReturnGlobal
 	self assert: (self executeSelector: #returnGlobal) equals: globalObject  
 ]]]
 
+We introduce a new instance variable named ==gloabEnvironment== and we initialize it to a new dictionary.
 
 [[[
 Object subclass: #CHInterpreter
 	instanceVariableNames: 'stack globalEnvironment'
 	classVariableNames: ''
-	poolDictionaries: ''
 	category: 'Champollion-Core'
-]]]
-
-[[[
-CHInterpreter >> globalEnvironmentAt: aSymbol put: anObject 
-	globalEnvironment at: aSymbol put: anObject
 ]]]
 
 [[[
@@ -537,10 +539,16 @@ CHInterpreter >> initialize
 	super initialize. 
 	stack := CTStack new.
 	globalEnvironment := Dictionary new.
-
 ]]]
 
+We add ==globalEnvironmentAt:put:== to add a new binding to the environment.
+[[[
+CHInterpreter >> globalEnvironmentAt: aSymbol put: anObject 
+	globalEnvironment at: aSymbol put: anObject
+]]]
 
+Finally we simply define a new method ==visitGlobalNode:== that will return the value of a global node
+by returning the value associated with the key in the global environment.
 
 [[[
 CHInterpreter >> visitGlobalNode: aRBGlobalNode 
@@ -550,12 +558,8 @@ CHInterpreter >> visitGlobalNode: aRBGlobalNode
 ]]]
 
 
-
-
-
-
-
-
 !!! Conclusion
-This interpreter is basic. It does not cover blocks and more dynamic features. 
-We will cover more advanced topics in the following chapter.
+This interpreter is basic. It does not cover arguments, temporaries or messages. 
+This is what we will cover in the following chapter.
+Then we will cover blocks and their specific semantics in subsequent chapters.
+
