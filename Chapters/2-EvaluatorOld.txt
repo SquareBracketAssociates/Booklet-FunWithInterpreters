@@ -1,157 +1,21 @@
 
 
-!!! Accessing receiver state
-
-We add support to access receiver's instance variables.
-Let us start to add one simple accessor. 
-
-!!!!! Fixture and Test
-
-We define a getter and setter to be able to control the value put in the instance variable of our instance.
-
-[[[
-Interpretable >> returnX
-	^ x 
-]]]
- 
-[[[
-Interpretable >> x: anInteger
-	x := anInteger
-]]]
-
-
-Then we define a test showing that the interpreter can effectively access the value of an object using the accessor we just defined.
-
-[[[
-BasicInterpreterTest >> testAccessXInInstance
-
-	| ast result |
-	ast := (Interpretable >> #returnX) ast.
-	result := self interpreter execute: ast with: (Interpretable new x: 100).
-	self assert: result equals: 100. 
-	
-]]]
-
-Our test is failing so we are ready to work. 
 
 
 
-And now we can define the method ==visitInstanceVariableNode:== to reflectivity access the state of receiver.
-
-[[[
-BasicInterpreter >> visitInstanceVariableNode: aVariableNode
-
-	^ receiver instVarNamed: aVariableNode name
-]]]
-
-Our test should pass and we are read
-
-!!! Instance variable assignment
-
-We will add now support for assignment in receiver's instance variables.
 
 
-!!!!! Fixture and Tests
-
-We define a method doing an assignment into the instance variable ==x==.
-[[[
-Interpretable >> store100IntoX
-
-	x := 100.
-]]]
-
-We add an accessor to be able to nicely test.
-
-[[[
-Interpretable >> x
-
-	^ x 
-]]]
-
-The test ==testStore100IntoX== launches the interpretation of method ==store100IntoX==.
-
-[[[
-BasicInterpreterTest >> testStore100IntoX
-
-	| ast result object  |
-	ast := (Interpretable >> #store100IntoX) ast.
-	object := Interpretable new. 
-	result := self interpreter execute: ast with: object. 
-	self assert: object x equals: 100
-]]]
-
-!!!!!Implementation
-
-The implementation is straighforward. We define the method ==visitAssignmentNode:==.
-Here since we expect to have other variable types in the future we define the storing behavior  (method == store:with:==) of the assigned variable node itself. 
-
-[[[
-BasicInterpreter >> visitAssignmentNode: anAssignmentNode
-	" x := 100"
-	
-	| value | 
-	value := (self visitNode: anAssignmentNode value).
-	anAssignmentNode variable store: value with: self.
-	^ value
-]]]
 
 
-[[[
-RBInstanceVariableNode >> store: anObject with: anInterpreter 
-	
-	anInterpreter receiver instVarNamed: name put: anObject
-]]]
-
-Now our tests should pass. 
 
 
-!!! Intermezzo -- About temporaries
 
-Before implementing the interpretation of temporaries we want to show some particularities of Pharo semantics.
-Temporaries cannot shadow other temporaries.
 
-The following expression is rejected by the compiler because the second ==tmp== definition is illegal. 
-[[[
-[ 
-	| tmp |
-	tmp := 2. 
-	[
-		| tmp |
-		tmp := 3 ]]
-]]]
 
-Similarly a temporary cannot shadow a block or a method parameter.
-Therefore the following expression is not allowed.
-[[[
-[ :tmp |
-	| tmp |
-	tmp := 2]
-]]]
 
-The following method is not valid either.
-[[[
-with: arg
 
-	| arg |
-	^ arg
-]]]	
 
-Finally parameters are read only. 
-Therefore the following method is not valid. 
-[[[
-with: arg
-	arg := 42	
-]]]
 
-As well as the following expression
-
-[[[
-[ :tmp |
-	tmp := 2
-	 ]
-]]]
-
-We can say that inside a method the names of parameters, temporaries and instance variables are flattened and use a single namespace.
 
 
 !!! Temporaries
@@ -743,8 +607,3 @@ BasicInterpreter >> visitGlobalNode: aRBGlobalNode
 ]]]
 
 
-
-
-!!! Conclusion
-This interpreter is basic. It does not cover blocks and more dynamic features. 
-We will cover more advanced topics in the following chapter.

@@ -1,0 +1,287 @@
+
+!! Messages 
+
+!!! Introducing Stack Management
+
+The way we managed the receiver is overly simplistic.
+ Indeed, each time a program will send a message to another object,  we should change the receiver and when the computation ends, the previous receiver should be put back. Therefore we need a stack.
+In addition the same happens for handling methods arguments and temporaries. 
+We address this point now.
+
+We add a stack instance and this stack will keep information about the current receiver, as well as temporaries and arguments as we will see later. 
+
+[[[
+Object subclass: #CHInterpreter
+	instanceVariableNames: 'stack'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+The idea is that the stack will hold a ''frame''. A frame can be represented for now as a dictionary. 
+We define the method ==pushNewFrame==. This means that we add on the top of the stack a new dictionary instance. 
+
+[[[
+CHInterpreter >> pushNewFrame
+	"Pushing a new scope consists in creating a new dictionary whose parent is the top of the stack
+	and pushing it as a new top. This way a variable not found in current scope will be looked up in previous scope."
+
+	| newTop |
+	newTop := Dictionary new.
+	stack push: newTop.
+	^ newTop
+]]]
+
+We initialize the interpreter state by creating a new stack. 
+
+[[[language=pharo
+CHInterpreter >> initialize 
+	super initialize. 
+	stack := CTStack new.
+]]]
+
+Accessing the receiver is just accessing the value of the key ==#self== of the current frame. 
+
+[[[language=pharo
+CHInterpreter >> receiver
+	^ self topFrame at: #self
+]]]
+
+We expose also the top frame to ease manipulation. 
+[[[language=pharo
+CHInterpreter >> topFrame
+	^ stack top 
+]]]
+
+We extend the ==executeMethod:withReceiver:== to create a new frame and define the receiver as value of the ==#self== key.
+
+[[[language=pharo
+CHInterpreter >> executeMethod: anAST withReceiver: anObject
+	self pushNewFrame.
+	self topFrame at: #self  put: anObject.
+	^ self visitNode: anAST
+]]]
+
+
+!!! Intermezzo -- About temporaries
+
+Before implementing the interpretation of temporaries we want to show some particularities of Pharo semantics.
+Temporaries cannot shadow other temporaries.
+
+The following expression is rejected by the compiler because the second ==tmp== definition is illegal. 
+[[[language=pharo
+[ 
+	| tmp |
+	tmp := 2. 
+	[
+		| tmp |
+		tmp := 3 ]]
+]]]
+
+Similarly a temporary cannot shadow a block or a method parameter.
+Therefore the following expression is not allowed.
+[[[language=pharo
+[ :tmp |
+	| tmp |
+	tmp := 2]
+]]]
+
+The following method is not valid either.
+[[[language=pharo
+with: arg
+
+	| arg |
+	^ arg
+]]]	
+
+Finally parameters are read only. 
+Therefore the following method is not valid. 
+[[[language=pharo
+with: arg
+	arg := 42	
+]]]
+
+As well as the following expression
+
+[[[language=pharo
+[ :tmp |
+	tmp := 2
+	 ]
+]]]
+
+We can say that inside a method the names of parameters, temporaries and instance variables are flattened and use a single namespace.
+
+
+!!! Temporaries
+
+Here!
+
+
+[[[
+CHInterpreter >> visitAssignmentNode: anAssignmentNode
+	"| x y |
+	x := y := 10.
+	x
+	>>> 10"
+	
+	| value | 
+	value := (self visitNode: anAssignmentNode value).
+	anAssignmentNode variable store: value with: self.
+	^ value
+]]]
+
+
+[[[
+CBasicInterpreterTest >> testTempsAccessShouldNotEscapeMethods
+
+	| ast result |
+	ast := (CInterpretable >> #methodWithTemp) ast.
+	result := self interpreter execute: ast withReceiver: CInterpretable new. 
+	self assert: result equals: nil 
+]]]
+
+
+[[[
+CBasicInterpreterTest >> testTempsShouldNotEscapeMethods
+
+	| ast result |
+	ast := (CInterpretable >> #methodWithTemp) ast.
+	result := self interpreter execute: ast withReceiver: CInterpretable new. 
+	self assert: result equals: nil 
+]]]
+
+[[[
+CBasicInterpreterTest >> testTempsWritingShouldNotEscapeMethods
+
+	| ast result |
+	ast := (CInterpretable >> #methodCallingModifyingTemp) ast.
+	result := self interpreter execute: ast withReceiver: CInterpretable new. 
+	self assert: result equals: 7
+]]]
+
+
+[[[
+BasicInterpreter1Test >> testAccessInstanceVariable
+
+	| ast result |
+	ast := (CInterpretable >> #returnX) ast.
+	result := self interpreter execute: ast withReceiver: (CInterpretable new x: 100).
+	self assert: result equals: 100. 
+	
+]]]
+
+
+
+[[[
+BasicInterpreter1Test >> testAccessXInInstance
+
+	| ast result |
+	ast := (CInterpretable >> #returnX) ast.
+	result := self interpreter execute: ast withReceiver: (CInterpretable new x: 100).
+	self assert: result equals: 100. 
+	
+]]]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+!!! Looking at Dynamic Features (OLD)
+
+The previous chapter presented the implementation of a simple interpreter for a limited subset of Pharo.
+This chapter will cover lexical closures. 
+
+
+
+!!! Simple blocks
+Simple blocks are blocks without arguments, and without references to anything except literal objects. 
+First the value of a block is the block itself.
+
+
+[[[
+BasicInterpreter >> testSimpleBlock
+	"
+	simpleBlock
+
+		^ [  5 ]
+	"
+	| ast result |
+	ast := (CInterpretable >> #simpleBlock) ast.
+	result := self interpreter execute: ast.
+	self assert: result class equals: CBlock
+
+]]]
+
+[[[
+Object subclass: #CBlock
+	instanceVariableNames: ' interpreter blockDefinition'
+	classVariableNames: ''
+	package: 'Champollion-Core'
+]]]
+
+[[[
+CBlock >> value
+
+	^ interpreter visitNode: blockDefinition body 
+
+]]]
+
+[[[
+BasicInterpreter >> visitBlockNode: aBlockNode 
+	^ CBlock new 	
+		blockDefinition: aBlockNode; 
+		interpreter: self; 
+		yourself
+]]]
+
+[[[
+BasicInterpreter >> visitMessageNode: aMessageNode
+
+	| rec args method res | 
+	self pushNewFrame.
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	
+	(aMessageNode selector = #value) 
+		ifTrue: [ res := rec value ]
+		ifFalse: [  
+		(aMessageNode methodNode isPrimitive "and: [ aMessageNode methodNode isValueMessage not ]")
+			ifTrue: [
+			res := rec 
+					tryPrimitive: (aMessageNode methodNode pragmas first argumentAt: 'primitive:') value 
+					withArgs: args ]
+			ifFalse: [ 	
+				method :=  aMessageNode receiver isSuper
+					ifTrue: [ self lookup: aMessageNode selector fromClass: rec class superclass ]
+					ifFalse: [ self lookup: aMessageNode selector fromClass: rec class ].
+				res := self execute: method withReceiver: rec andArguments: args]
+		].
+	self popFrame.
+	^ res 
+]]]
+
+
+
+
+
+
+
+
+
+
