@@ -493,7 +493,6 @@ BasicInterpreter >> visitAssignmentNode: anAssignmentNode
 
 [[[
 RBInstanceVariableNode >> store: anObject with: anInterpreter 
-	
 	anInterpreter receiver instVarNamed: name put: anObject
 ]]]
 
@@ -501,6 +500,58 @@ Now our tests should pass.
 
 
 
+
+!!! Handling Global Variables
+
+[[[
+CInterpretable >> returnGlobal
+
+	^ Global
+]]]
+
+[[[
+CHInterpreterTest >> testReturnGlobal
+
+	| globalObject |
+	globalObject := Object new.
+	interpreter globalEnvironmentAt: #Global put: globalObject. 
+	self assert: (self executeSelector: #returnGlobal) equals: globalObject  
+]]]
+
+
+[[[
+Object subclass: #CHInterpreter
+	instanceVariableNames: 'stack globalEnvironment'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+[[[
+CHInterpreter >> globalEnvironmentAt: aSymbol put: anObject 
+	globalEnvironment at: aSymbol put: anObject
+]]]
+
+[[[
+CHInterpreter >> initialize 
+	super initialize. 
+	stack := CTStack new.
+	globalEnvironment := Dictionary new.
+
+]]]
+
+
+
+[[[
+CHInterpreter >> visitGlobalNode: aRBGlobalNode 
+
+	^ self globalEnvironment at: aRBGlobalNode name 
+		ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
+]]]
+
+
+
+!! Messages 
 
 !!! Introducing Stack Management
 
@@ -535,7 +586,7 @@ CHInterpreter >> pushNewFrame
 
 We initialize the interpreter state by creating a new stack. 
 
-[[[
+[[[language=pharo
 CHInterpreter >> initialize 
 	super initialize. 
 	stack := CTStack new.
@@ -543,20 +594,20 @@ CHInterpreter >> initialize
 
 Accessing the receiver is just accessing the value of the key ==#self== of the current frame. 
 
-[[[
+[[[language=pharo
 CHInterpreter >> receiver
 	^ self topFrame at: #self
 ]]]
 
 We expose also the top frame to ease manipulation. 
-[[[
+[[[language=pharo
 CHInterpreter >> topFrame
 	^ stack top 
 ]]]
 
 We extend the ==executeMethod:withReceiver:== to create a new frame and define the receiver as value of the ==#self== key.
 
-[[[
+[[[language=pharo
 CHInterpreter >> executeMethod: anAST withReceiver: anObject
 	self pushNewFrame.
 	self topFrame at: #self  put: anObject.
@@ -570,7 +621,7 @@ Before implementing the interpretation of temporaries we want to show some parti
 Temporaries cannot shadow other temporaries.
 
 The following expression is rejected by the compiler because the second ==tmp== definition is illegal. 
-[[[
+[[[language=pharo
 [ 
 	| tmp |
 	tmp := 2. 
@@ -581,14 +632,14 @@ The following expression is rejected by the compiler because the second ==tmp== 
 
 Similarly a temporary cannot shadow a block or a method parameter.
 Therefore the following expression is not allowed.
-[[[
+[[[language=pharo
 [ :tmp |
 	| tmp |
 	tmp := 2]
 ]]]
 
 The following method is not valid either.
-[[[
+[[[language=pharo
 with: arg
 
 	| arg |
@@ -597,14 +648,14 @@ with: arg
 
 Finally parameters are read only. 
 Therefore the following method is not valid. 
-[[[
+[[[language=pharo
 with: arg
 	arg := 42	
 ]]]
 
 As well as the following expression
 
-[[[
+[[[language=pharo
 [ :tmp |
 	tmp := 2
 	 ]
@@ -683,55 +734,6 @@ BasicInterpreter1Test >> testAccessXInInstance
 	
 ]]]
 
-
-
-!!! Handling Global Variables
-
-[[[
-CInterpretable >> returnGlobal
-
-	^ Global
-]]]
-
-[[[
-CHInterpreterTest >> testReturnGlobal
-
-	| globalObject |
-	globalObject := Object new.
-	interpreter globalEnvironmentAt: #Global put: globalObject. 
-	self assert: (self executeSelector: #returnGlobal) equals: globalObject  
-]]]
-
-
-[[[
-Object subclass: #CHInterpreter
-	instanceVariableNames: 'stack globalEnvironment'
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Champollion-Core'
-]]]
-
-[[[
-CHInterpreter >> globalEnvironmentAt: aSymbol put: anObject 
-	globalEnvironment at: aSymbol put: anObject
-]]]
-
-[[[
-CHInterpreter >> initialize 
-	super initialize. 
-	stack := CTStack new.
-	globalEnvironment := Dictionary new.
-
-]]]
-
-
-
-[[[
-CHInterpreter >> visitGlobalNode: aRBGlobalNode 
-
-	^ self globalEnvironment at: aRBGlobalNode name 
-		ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
-]]]
 
 
 
