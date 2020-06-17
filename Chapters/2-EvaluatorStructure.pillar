@@ -46,11 +46,11 @@ CHInterpreterTest >> setUp
 !!! Hosting Code of be Tested
 We prefer to separate the code that we will use to test the behavior of our interpreter from the test class itself. It will give us more possibility to describe different situations in the future.
 
-The class ==Interpretable== is a class hosting the sample methods that we will execute. 
+The class ==CHInterpretable== is a class hosting the sample methods that we will execute. 
 
 
 [[[
-Object subclass: #CInterpretable
+Object subclass: #CHInterpretable
 	instanceVariableNames: ''
 	classVariableNames: ''
 	package: 'Champollion'
@@ -60,17 +60,17 @@ Here we define some simple methods that we would like to execute.
 For now we focus on returning simple literal objects such as booleans, float and integer. 
 
 [[[
-CInterpretable >> returnInteger
+CHInterpretable >> returnInteger
 	^ 5
 ]]]
 
 [[[
-CInterpretable >> returnFloat
+CHInterpretable >> returnFloat
 	^ 3.14
 ]]]
 
 [[[
-CInterpretable >> returnBoolean
+CHInterpretable >> returnBoolean
 	^ false
 ]]]
 
@@ -81,7 +81,6 @@ The method ==testReturnInteger== is the first test for specifying the behavior o
 
 [[[
 CHInterpreterTest >> testReturnInteger
-
 	| ast result |
 	ast := (Interpretable >> #returnInteger) ast.
 	result := self interpreter execute: ast. 
@@ -127,11 +126,11 @@ It just dispatches on ==visitMethodBodyNode:==.
 
 [[[
 CHInterpreter >> visitMethodNode: aMethodNode
-
 	^ self visitMethodBodyNode: aMethodNode body
 ]]]
 
 For now ==visitMethodBodyNode:== just visits the method body (an ==RBSequenceNode==).
+
 [[[
 CHInterpreter >> visitMethodBodyNode: aMethodBodyNode
 	^ self visitNode: aMethodBodyNode 
@@ -142,7 +141,6 @@ So we visit all the statements except the last one, and we return the value of t
 
 [[[
 CHInterpreter >> visitSequenceNode: aSequenceNode
-	
 	aSequenceNode statements allButLast 
 		do: [ :each | self visitNode: each ].
 	^ self visitNode: aSequenceNode statements last
@@ -152,7 +150,6 @@ Since we want to be able to access a return value, we define the ==visitReturnNo
 
 [[[
 CHInterpreter >> visitReturnNode: aReturnNode
-
 	^ self visitNode: aReturnNode value
 ]]]
 
@@ -161,7 +158,6 @@ So we redefine the method ==visitLiteralValueNode:== which is invoked on literal
 
 [[[
 CHInterpreter >> visitLiteralValueNode: aRBLiteralValueNode
-
 	^ aRBLiteralValueNode value
 ]]]
 
@@ -177,9 +173,8 @@ Since we will write many tests during this book, we exact some logic from our te
 We define the method ==executeSelector:==, it accesses the method, gets its AST and returns the value of the  execution of the ast.
 [[[
 CHInterpreterTest >> executeSelector: aSymbol
-
 	| ast |
-	ast := (CInterpretable >> aSymbol) ast.
+	ast := (CHInterpretable >> aSymbol) ast.
 	^ self interpreter executeMethod: ast
 	
 ]]]
@@ -224,12 +219,12 @@ We add support for Array.
 First we define some method returning an empty array and a literal array. 
 
 [[[
-CInterpretable >> returnEmptyArray
+CHInterpretable >> returnEmptyArray
 	^ #()
 ]]]
 
 [[[
-CInterpretable >> returnLiteralArray
+CHInterpretable >> returnLiteralArray
 	^ #(true 1 'ahah')
 ]]]
 
@@ -238,7 +233,6 @@ We add a test to cover case.
 
 [[[
 CHInterpreterTest >> testReturnEmptyArray
-
 	self 
 		assert: (self executeSelector: #returnEmptyArray) 
 		equals: #() 
@@ -247,7 +241,6 @@ CHInterpreterTest >> testReturnEmptyArray
 
 [[[
 CHInterpreterTest >> testReturnLiteralArray
-
 	self 
 		assert: (self executeSelector: #returnLiteralArray) 
 		equals: #(true 1 'ahah')
@@ -258,7 +251,6 @@ Here we return the values returned by the interpretation of the elements.
 
 [[[
 CHInterpreter >> visitLiteralArrayNode: aRBLiteralArrayNode 
-	
 	^ aRBLiteralArrayNode contents 
 			collect: [ :each | self visitNode: each ] 
 ]]]
@@ -292,7 +284,6 @@ We make sure that we can set the receiver when we launch the interpretation and 
 We will remove 
 [[[
 CHInterpreter >> execute: anAST withReceiver: anObject
-
 	receiver := anObject.
 	^ self visitNode: anAST
 ]]]
@@ -301,9 +292,8 @@ We redefine the method ==executeSelector:== to use this new method.
 
 [[[
 CHInterpreterTest >> executeSelector: aSymbol
-
 	| ast |
-	ast := (CInterpretable >> aSymbol) ast.
+	ast := (CHInterpretable >> aSymbol) ast.
 	^ self interpreter executeMethod: ast withReceiver: nil.
 ]]]
 
@@ -311,13 +301,12 @@ This way all our tests are still passing and we will be ready to handle the case
 
 
 [[[
-CInterpretable >> returnSelf
+CHInterpretable >> returnSelf
 	^ self 
 ]]]
 
 [[[
 CHInterpreterTest >> testReturnSelf
-
 	self 
 		assert: (self executeSelector: #returnSelf) 
 		equals: nil
@@ -327,7 +316,7 @@ The interpretation of ==self== is done in the method ==visitSelfNode:==.
 It is simple, it just returns the value of the receiver stored in the interpreter.
 
 [[[
-CInterpretable >> visitSelfNode: aRBSelfNode 
+CHInterpretable >> visitSelfNode: aRBSelfNode 
 	^ self receiver
 ]]]
 
@@ -337,13 +326,12 @@ Following the same logic as for ==self==, we improve the interpreter to support 
 We start by defining a method using ==super== and its companion test. 
 
 [[[
-CInterpretable >> returnSuper
+CHInterpretable >> returnSuper
 	^ super
 ]]]
 
 [[[
 CHInterpreterTest >> testReturnSuper
-
 	self 
 		assert: (self executeSelector: #returnSuper) 
 		equals: nil
@@ -376,23 +364,21 @@ In the ==setUp== we assign a new instance to the new instance variable.
 CHInterpreterTest >> setUp
 	super setUp.
 	interpreter := self interpreterClass new.
-	receiver := CInterpretable new
+	receiver := CHInterpretable new
 ]]]
 
 We then use the new instance variable in ==executeSelector:==.
 
 [[[
 CHInterpreterTest >> executeSelector: aSymbol
-
 	| ast |
-	ast := (CInterpretable >> aSymbol) ast.
+	ast := (CHInterpretable >> aSymbol) ast.
 	^ self interpreter executeMethod: ast withReceiver: receiver
 ]]]
 
 We rewrite the test methods ==testReturnSelf== and ==testReturnSuper==.
 [[[
 CHInterpreterTest >> testReturnSelf
-
 	self 
 		assert: (self executeSelector: #returnSelf) 
 		equals: receiver
@@ -400,12 +386,10 @@ CHInterpreterTest >> testReturnSelf
 
 [[[
 CHInterpreterTest >> testReturnSuper
-
 	self 
 		assert: (self executeSelector: #returnSuper) 
 		equals: receiver
 ]]]
-
 
 We are ready to work on more interesting points. 
 
@@ -421,12 +405,12 @@ Let us start with a test.
 We define a getter and setter to be able to control the value put in the instance variable of our instance.
 
 [[[
-CInterpretable >> returnX
+CHInterpretable >> returnX
 	^ x 
 ]]]
  
 [[[
-CInterpretable >> x: anInteger
+CHInterpretable >> x: anInteger
 	x := anInteger
 ]]]
 
@@ -434,7 +418,6 @@ We modify the receiver and when we interpret the accessor we should get the corr
 
 [[[
 CHInterpreterTest >> testReturnAccessInstanceVariable
-
 	receiver x: 100.
 	self assert: (self executeSelector: #returnX) equals: 100
 ]]]
@@ -456,12 +439,12 @@ We will add support for assignment in receiver's instance variables.
 
 We define a method doing an assignment into the instance variable ==x==.
 [[[
-CInterpretable >> store100IntoX
+CHInterpretable >> store100IntoX
 	x := 100.
 ]]]
 
 [[[
-Interpretable >> x
+CHInterpretable >> x
 	^ x 
 ]]]
 
@@ -469,7 +452,6 @@ The test ==testStore100IntoX== launches the interpretation of method ==store100I
 
 [[[
 CHInterpreterTest >> testStore100IntoX
-
 	receiver x: 17.
 	self executeSelector: #store100IntoX.
 	self assert: receiver x equals: 100
@@ -481,7 +463,7 @@ The implementation is straighforward. We define the method ==visitAssignmentNode
 Here since we expect to have other variable types in the future we define the storing behavior  (method == store:with:==) of the assigned variable node itself. 
 
 [[[
-BasicInterpreter >> visitAssignmentNode: anAssignmentNode
+CHInterpreter >> visitAssignmentNode: anAssignmentNode
 	" x := 100"
 	
 	| value | 
@@ -509,8 +491,7 @@ It also means that we can control the scope of our interpreter and setting diffe
 We first define the method ==returnGlobal== which accesses and returns the global named ==Global==.
 
 [[[
-CInterpretable >> returnGlobal
-
+CHInterpretable >> returnGlobal
 	^ Global
 ]]]
 
@@ -518,7 +499,6 @@ We define a test which specifies that the interpreter' environment has a binding
 
 [[[
 CHInterpreterTest >> testReturnGlobal
-
 	| globalObject |
 	globalObject := Object new.
 	interpreter globalEnvironmentAt: #Global put: globalObject. 
@@ -552,7 +532,6 @@ by returning the value associated with the key in the global environment.
 
 [[[
 CHInterpreter >> visitGlobalNode: aRBGlobalNode 
-
 	^ self globalEnvironment at: aRBGlobalNode name 
 		ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
 ]]]
