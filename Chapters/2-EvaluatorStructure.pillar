@@ -481,8 +481,6 @@ RBInstanceVariableNode >> store: anObject with: anInterpreter
 Now our tests should pass. 
 
 
-
-
 !!! Handling Global Variables
 We finish this chapter with the handling of global variables such as classes and globals. 
 We decided not to use the default Pharo environment so that we have to be more explicit about how to access globals.

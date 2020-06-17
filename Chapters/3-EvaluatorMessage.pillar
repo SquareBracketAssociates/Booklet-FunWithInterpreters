@@ -1,10 +1,15 @@
-
 !! Messages 
+
+While the previous chapter focused on basic element interpretation, this one will focus on the key abstraction in 
+object-oriented programming: message send.
+Introducing message send also means that we have to introduce a little infrastructure to manage the fact that each message can have a different receiver, temporaries and arguments. 
+Therefore we will cover: stack management, messages, temporaries, arguments and lookup.
+
 
 !!! Introducing Stack Management
 
 The way we managed the receiver is overly simplistic.
- Indeed, each time a program will send a message to another object,  we should change the receiver and when the computation ends, the previous receiver should be put back. Therefore we need a stack.
+Indeed, each time a program will send a message to another object,  we should change the receiver and when the computation ends, the previous receiver should be put back. Therefore we need a stack.
 In addition the same happens for handling methods arguments and temporaries. 
 We address this point now.
 
@@ -14,8 +19,7 @@ We add a stack instance and this stack will keep information about the current r
 Object subclass: #CHInterpreter
 	instanceVariableNames: 'stack'
 	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Champollion-Core'
+	package: 'Champollion-Core'
 ]]]
 
 The idea is that the stack will hold a ''frame''. A frame can be represented for now as a dictionary. 
@@ -61,6 +65,296 @@ CHInterpreter >> executeMethod: anAST withReceiver: anObject
 	self topFrame at: #self  put: anObject.
 	^ self visitNode: anAST
 ]]]
+
+We are ready to start. This is not totally correct and we will address this later. 
+
+Well not totally. When we will execute multiple sends the stack will only grow and when the execution of a message is finished, its execution context
+should be discarded from the stack. 
+
+
+!!! Sending a Message: Self-Sends
+
+As usual we start by defining a new method exhibiting the expected behavior. 
+Here we just define a method ==sendMessageReturnX== which invokes another one. 
+
+[[[language=pharo
+CHInterpretable >> sendMessageReturnX
+	^ self returnX
+]]]
+
+And we define a companion test.
+
+[[[language=pharo
+CHInterpreterTest >> testSelfSend
+	"
+	sendMessageReturnX
+		^ self returnX
+	"
+
+	receiver x: 100.
+	self 
+		assert: (self executeSelector: #sendMessageReturnX) 
+		equals: 100
+]]]
+
+We define the method ==visitMessageNode:== as follows: 
+First we visit the receiver node (which in the future may contain other message sends).
+Then we get the method ast from the class of the receiver.
+And we return the result of the execution of the method with the receiver.
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method | 
+	rec := self visitNode: aMessageNode receiver.
+	method := (rec class compiledMethodAt: aSymbol) ast.
+	^ self executeMethod: method withReceiver: rec
+]]]
+
+This is clearly limited since we do not implement method lookup. We will address it later. 
+
+
+
+!!! Balancing the Stack
+
+We mentioned earlier that the following method was not fully correct.
+
+[[[language=pharo
+CHInterpreter >> executeMethod: anAST withReceiver: anObject
+	self pushNewFrame.
+	self topFrame at: #self  put: anObject.
+	^ self visitNode: anAST
+]]]
+
+Indeed, when we will execute multiple sends the stack will only grow and when the execution of a message is finished, its execution context
+should be discarded from the stack. The current implementation clearly does not do it. 
+Let us write a test showing the problem.
+
+We add an extra instance variable to the class ==CInterpretable== with its companion accessors. This way we will be able to test that the correct object is set and passed around in future example.
+
+[[[
+Object subclass: #CHInterpretable
+	instanceVariableNames: 'x collaborator'
+	classVariableNames: ''
+	package: 'Champollion-Core'
+]]]
+
+[[[
+CHInterpreterTest >> collaborator
+	^ collaborator
+]]]
+
+[[[
+CHInterpreterTest >> collaborator: anObject
+	collaborator := anObject
+]]]
+
+We add another instance variable named ==collaborator== to the test class. 
+[[[
+TestCase subclass: #CHInterpreterTest
+	instanceVariableNames: 'interpreter receiver collaborator'
+	classVariableNames: ''
+	package: 'Champollion'
+]]]
+
+In the ==setUp== we assign a new object to the collaborator instance variable and in addition, we set the 
+new object as collaborator of the object we access via the ==receiver== instance variable.
+
+[[[
+CHInterpreterTest >> setUp
+	super setUp.
+	interpreter := self interpreterClass new.
+	receiver := CHInterpretable new.
+	collaborator := CHInterpretable new.
+	receiver collaborator: collaborator 
+]]]
+
+The following test ==testBalancingStack== execute the message ==setXAndMessage==.
+
+[[[
+CHInterpreterTest >> testBalancingStack
+	"
+	setXAndMessage
+
+		x := 1000.
+		collaborator returnX.
+		^ x
+	"
+	self assert: (self executeSelector: #setXAndMessage) equals: 1000
+]]]
+
+Executing this test breaks because the access to the instance variable ==x== access 
+
+[[[language=pharo
+CHInterpreter >> executeMethod: anAST withReceiver: anObject
+	self pushNewFrame.
+	self topFrame at: #self  put: anObject.
+	result := self visitNode: anAST.
+	self popFrame.
+	^ result
+]]]
+
+
+
+!!! Supporting Message Arguments
+
+We add support for message arguments so that we can start having more interesing examples.
+We introduce two little helper method to add and access new values in the current frame. 
+
+
+[[[
+CHInterpreter >> tempAt: aSymbol put: anInteger 
+	self topFrame at: aSymbol put: anInteger
+]]]
+
+[[[
+CHInterpreter >> tempAt: aSymbol
+	^ self topFrame at: aSymbol
+]]]
+
+
+Missing test here
+
+
+
+
+To manage arguments we should 
+- add their value to the frame at the beginning of the exection,
+- make sure that the arguments of a message are evaluated.
+
+This is what we do in the two follwing method.
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
+	self pushNewFrame.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
+	^ self visitNode: anAST
+]]]
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method args | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	method := self lookup: aMessageNode selector fromClass: rec class.
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]]]
+
+
+
+
+!!! Different Receiver of Messages
+
+[[[
+TestCase subclass: #CHInterpreterTest
+	instanceVariableNames: 'interpreter receiver collaborator'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Champollion-Core'
+]]]
+
+[[[
+CHInterpreterTest >> setUp
+	super setUp.
+	interpreter := self interpreterClass new.
+	receiver := CInterpretable new.
+	collaborator := CInterpretable new.
+	receiver collaborator: collaborator 
+]]]
+
+
+[[[
+CHInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSender
+	"
+	changeCollaboratorX
+		collaborator x: 200
+	"
+
+	receiver x: 100.
+	collaborator x: 300.
+	self assert: (self executeSelector: #changeCollaboratorX) equals: 200
+]]]
+
+[[[
+CInterpretable >> changeCollaboratorX
+
+	collaborator store100IntoX
+]]]
+
+
+
+
+
+
+
+
+
+!!! Lookup
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method | 
+	rec := self visitNode: aMessageNode receiver.
+	method := self lookup: aMessageNode selector fromClass: rec class.
+	^ self executeMethod: method withReceiver: rec
+]]]
+
+
+
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode
+
+	| rec method | 
+	rec := self visitNode: aMessageNode receiver.
+	method := self lookup: aMessageNode selector fromClass: rec class.
+	^ self executeMethod: method withReceiver: rec
+]]]
+
+
+[[[
+CHInterpreter >> lookup: aSymbol fromClass: aClass 
+	"Return the AST of a method or nil if none is found"
+
+	"If the class defines a method for the selector, return the AST corresponding to the method"
+	(aClass includesSelector: aSymbol)
+		ifTrue: [ ^ (aClass compiledMethodAt: aSymbol) ast ].
+
+	"Otherwise lookup recursively in the superclass.
+	If we reach the end of the hierarchy return nil"
+	^ aClass = ProtoObject 
+		ifTrue: [ nil ]
+		ifFalse: [ self lookup: aSymbol fromClass: aClass superclass ]
+]]]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 !!! Intermezzo -- About temporaries
@@ -114,7 +408,15 @@ We can say that inside a method the names of parameters, temporaries and instanc
 
 !!! Temporaries
 
-Here!
+
+
+
+
+
+
+
+
+
 
 
 [[[
@@ -181,6 +483,53 @@ BasicInterpreter1Test >> testAccessXInInstance
 	self assert: result equals: 100. 
 	
 ]]]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
