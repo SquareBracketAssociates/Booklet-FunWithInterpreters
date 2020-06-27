@@ -105,6 +105,8 @@ CHInterpreterTest >> testSelfSend [
 
 We define the method ==visitMessageNode:== as follows: 
 First we visit the receiver node (which in the future may contain other message sends).
+We can have an expression as receiver: as for example ==(anObject returnX)== in the more complex message ==(anObject returnX) returnArg: 12==.
+
 Then we get the method ast from the class of the receiver.
 And we return the result of the execution of the method with the receiver.
 
@@ -247,16 +249,31 @@ returnArg: arg
 
 The message ==anObject returnArg: 12== should return 12 while ==anObject returnArg: 24== should return 24.
 The question is how to pass the actual values of the parameters to the message interpretation. 
-This is where the current frame comes into play.
+This is where the current frame comes into play. 
+On message request for execution, we will add the value of actual parameter to the current frame and during the interpretation ]
+of a message/method we will be able to access such values.
 
-Handling arguments is two distinct actions: 
-- binding the values of the arguments to add their value to the frame at the beginning of the exection,
-- and during message interpretation, make sure that the arguments of a message are evaluated.
+Therefore handling arguments is two distinct actions: 
+- binding the values of the arguments in the current frame, and 
+- during message interpretation, access the arguments values.
+This is what we do in the following methods.
 
-This is what we do in the two following methods.
+First we define the method ==visitArgumentNode:== to look for the value of an argument in the current frame.
 
 [[[
-CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
+CHInterpreter >> visitArgumentNode: aRBArgumentNode [
+	^ self tempAt: aRBArgumentNode name
+]
+]]]
+
+We define a new method ==executeMethod:withReceiver:andArguments:== which has as extra argument a collection representing the 
+arguments of the method to be executed. 
+In addition to add the receiver to the new frame representing the execution, we add a binding for each parameters (called unfornately arguments in Pharo AST) 
+with their corresponding value in the argument collection. The use of the message ==with:do:== ensures that both the parameter list and actual arguments have the 
+same size.
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection [
 	| result |
 	self pushNewFrame.
 	self tempAt: #self put: anObject.
@@ -264,17 +281,42 @@ CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aColl
 	result := self visitNode: anAST.
 	self popFrame.
 	^ result
+]
 ]]]
 
+To avoid duplication logic, we revisit ==executeMethod:withReceiver:== to use the previous. 
 [[[
-CHInterpreter >> visitMessageNode: aMessageNode
+CHInterpreter >> executeMethod: anAST withReceiver: anObject [
+	 ^ self executeMethod: anAST withReceiver: anObject andArguments: #()
+]
+]]]
 
+Finally during the message interpretation, after computing the value of the receiver, we compute the value of the arguments
+by collecting their own recursive interpretation. This is such a treatment that ensures that argument expressions are recursively executed. 
+For example in the message ==anObject returnArg: 1+4== that the value of the argument is ==5==.
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode [
 	| rec method args | 
 	rec := self visitNode: aMessageNode receiver.
 	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
 	method := self lookup: aMessageNode selector fromClass: rec class.
 	^ self executeMethod: method withReceiver: rec andArguments: args
+]
 ]]]
+
+
+
+
+
+
+
+
+HERE HERE HERE
+
+
+
+
 
 
 
