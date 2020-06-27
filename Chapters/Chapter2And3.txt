@@ -2,90 +2,6 @@
 
 
 [[[
-CBasicInterpreterTest >> testReturnSelf
-	"
-	returnSelf
-
-		^ self
-	"
-	| ast result object |
-	ast := (CInterpretable >> #returnSelf) ast.
-	object := (CInterpretable new x: 100; yourself).
-	result := self interpreter execute: ast withReceiver: object.
-	self assert: result equals: object 
-	
-]]]
-
-[[[
-CHInterpreterTest >> testSelfSend
-	"
-	sendMessageReturnX
-
-		^ self returnX
-	"
-
-	receiver x: 100.
-	self assert: (self executeSelector: #sendMessageReturnX) equals: 100
-]]]
-
-[[[
-CHInterpreterTest >> testSelfSend
-	"
-	sendMessageReturnX
-
-		^ self returnX
-	"
-
-	receiver x: 100.
-	self assert: (self executeSelector: #sendMessageReturnX) equals: 100
-]]]
-
-[[[
-CHInterpreter >> visitMessageNode: aMessageNode
-
-	| rec args method res | 
-	rec := self visitNode: aMessageNode receiver.
-	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
-]]]
-
-[[[
-CHInterpreter >> visitMessageNode: aMessageNode
-
-	| rec method | 
-	rec := self visitNode: aMessageNode receiver.
-	method := self lookup: aMessageNode selector fromClass: rec class.
-	^ self execute: method withReceiver: rec
-]]]
-
-
-[[[
-CHInterpreter >> lookup: aSymbol fromClass: aClass 
-	"return the method ast or nil."
-	
-	^ (aClass includesSelector: aSymbol)
-			ifTrue: [ (aClass compiledMethodAt: aSymbol) ast ]
-			ifFalse: [
-				aClass = ProtoObject 
-					ifTrue: [ nil ]
-					ifFalse: [ self lookup: aSymbol fromClass: aClass superclass ]]
-]]]
-
-[[[
-CHInterpreter >> lookup: aSymbol fromClass: aClass 
-	"Return the AST of a method or nil if none is found"
-
-	"If the class defines a method for the selector, return the AST corresponding to the method"
-	(aClass includesSelector: aSymbol)
-		ifTrue: [ ^ (aClass compiledMethodAt: aSymbol) ast ].
-
-	"Otherwise lookup recursively in the superclass.
-	If we reach the end of the hierarchy return nil"
-	^ aClass = ProtoObject 
-		ifTrue: [ nil ]
-		ifFalse: [ self lookup: aSymbol fromClass: aClass superclass ]
-]]]
-
-[[[
 CHInterpreter >> execute: anAST withReceiver: anObject
 
 	self newFrame.
@@ -93,27 +9,12 @@ CHInterpreter >> execute: anAST withReceiver: anObject
 ]]]
 
 
-[[[
-CHInterpreter >> visitMessageNode: aMessageNode
-
-	| rec method | 
-	rec := self visitNode: aMessageNode receiver.
-	method := self lookup: aMessageNode selector fromClass: rec class.
-	^ self executeMethod: method withReceiver: rec
-]]]
 
 
-[[[
-CHInterpreterTest >> testInstanceVariableAccessInMethodActivationDoesNotEscape
-	"
-	sendMessageReturnX
 
-		^ self returnX
-	"
 
-	receiver x: 100.
-	self assert: (self executeSelector: #sendMessageReturnX) equals: 100
-]]]
+
+
 
 [[[
 TestCase subclass: #CHInterpreterTest
@@ -174,40 +75,6 @@ CHInterpreterTest >> collaborator: anObject
 
 
 [[[
-TestCase subclass: #CHInterpreterTest
-	instanceVariableNames: 'interpreter receiver'
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Champollion-Core'
-]]]
-
-[[[
-CInterpretable >> returnFalse
-
-	^ false
-]]]
-
-
-[[[
-CInterpretable >> returnFive
-
-	^ 5
-]]]
-
-
-[[[
-CInterpretable >> returnX
-
-	^ x 
-]]]
-
-[[[
-CInterpretable >> store100IntoX
-
-	x := 100.
-]]]
-
-[[[
 CInterpretable >> store100IntoXAndReturnX
 
 	x := 100.
@@ -217,30 +84,14 @@ CInterpretable >> store100IntoXAndReturnX
 
 
 
-[[[
-CInterpretable >> sendMessageReturnX
-
-	^ self returnX
-]]]
-
-[[[
-CInterpretable >> collaboratorX
-
-	^ collaborator x
-]]]
-
-[[[
-CInterpretable >> x
-
-	^ x
-]]]
 
 
-[[[
-CInterpretable >> x: anInteger
 
-	x := anInteger
-]]]
+
+
+
+
+
 
 [[[
 TestCase subclass: #CHInterpreterTest
@@ -284,23 +135,6 @@ CInterpretable >> changeCollaboratorX
 	collaborator x: 200
 ]]]
 
-[[[
-CHInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSender
-	"
-	changeCollaboratorX
-		collaborator x: 200
-	"
-
-	receiver x: 100.
-	collaborator x: 300.
-	self assert: (self executeSelector: #changeCollaboratorX) equals: 200
-]]]
-
-[[[
-CInterpretable >> changeCollaboratorX
-
-	collaborator store100IntoX
-]]]
 
 [[[
 CHInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSender
@@ -389,25 +223,7 @@ CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aColl
 	^ self visitNode: anAST
 ]]]
 
-[[[
-CHInterpreter >> tempAt: aSymbol put: anInteger 
 
-	self topFrame at: aSymbol put: anInteger
-]]]
-
-[[[
-CHInterpreter >> tempAt: aSymbol
-
-	^ self topFrame at: aSymbol
-]]]
-
-[[[
-CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
-	self pushNewFrame.
-	self tempAt: #self put: anObject.
-	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
-	^ self visitNode: anAST
-]]]
 
 [[[
 CHInterpreter >> visitArgumentNode: aRBArgumentNode
