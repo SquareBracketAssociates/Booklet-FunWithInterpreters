@@ -26,7 +26,7 @@ The idea is that the stack will hold a ''frame''. A frame can be represented for
 We define the method ==pushNewFrame==. This means that we add on the top of the stack a new dictionary instance. 
 
 [[[
-CHInterpreter >> pushNewFrame
+CHInterpreter >> pushNewFrame [
 	"Pushing a new scope consists in creating a new dictionary whose parent is the top of the stack
 	and pushing it as a new top. This way a variable not found in current scope will be looked up in previous scope."
 
@@ -34,40 +34,44 @@ CHInterpreter >> pushNewFrame
 	newTop := Dictionary new.
 	stack push: newTop.
 	^ newTop
+]
 ]]]
 
 We initialize the interpreter state by creating a new stack. 
 
 [[[language=pharo
-CHInterpreter >> initialize 
+CHInterpreter >> initialize [
 	super initialize. 
 	stack := CTStack new.
+]
 ]]]
 
 Accessing the receiver is just accessing the value of the key ==#self== of the current frame. 
 
 [[[language=pharo
-CHInterpreter >> receiver
+CHInterpreter >> receiver [
 	^ self topFrame at: #self
+]
 ]]]
 
 We expose also the top frame to ease manipulation. 
 [[[language=pharo
-CHInterpreter >> topFrame
-	^ stack top 
+CHInterpreter >> topFrame [
+	^ stack top
+]
 ]]]
 
 We extend the ==executeMethod:withReceiver:== to create a new frame and define the receiver as value of the ==#self== key.
 
 [[[language=pharo
-CHInterpreter >> executeMethod: anAST withReceiver: anObject
+CHInterpreter >> executeMethod: anAST withReceiver: anObject [
 	self pushNewFrame.
 	self topFrame at: #self  put: anObject.
 	^ self visitNode: anAST
+]
 ]]]
 
 We are ready to start. This is not totally correct and we will address this later. 
-
 Well not totally. When we will execute multiple sends the stack will only grow and when the execution of a message is finished, its execution context
 should be discarded from the stack. 
 
@@ -78,14 +82,15 @@ As usual we start by defining a new method exhibiting the expected behavior.
 Here we just define a method ==sendMessageReturnX== which invokes another one. 
 
 [[[language=pharo
-CHInterpretable >> sendMessageReturnX
+CHInterpretable >> sendMessageReturnX [
 	^ self returnX
+]
 ]]]
 
 And we define a companion test.
 
 [[[language=pharo
-CHInterpreterTest >> testSelfSend
+CHInterpreterTest >> testSelfSend [
 	"
 	sendMessageReturnX
 		^ self returnX
@@ -95,6 +100,7 @@ CHInterpreterTest >> testSelfSend
 	self 
 		assert: (self executeSelector: #sendMessageReturnX) 
 		equals: 100
+]
 ]]]
 
 We define the method ==visitMessageNode:== as follows: 
@@ -103,34 +109,37 @@ Then we get the method ast from the class of the receiver.
 And we return the result of the execution of the method with the receiver.
 
 [[[
-CHInterpreter >> visitMessageNode: aMessageNode
+CHInterpreter >> visitMessageNode: aMessageNode [
 
 	| rec method | 
 	rec := self visitNode: aMessageNode receiver.
 	method := (rec class compiledMethodAt: aSymbol) ast.
 	^ self executeMethod: method withReceiver: rec
+]
 ]]]
 
 This is clearly limited since we do not implement method lookup. We will address it later. 
-
+But so far so good.
 
 
 !!! Balancing the Stack
 
-We mentioned earlier that the following method was not fully correct.
+We mentioned earlier that the following method (==executeMethod:withReceiver: ==) was not fully correct.
 
 [[[language=pharo
-CHInterpreter >> executeMethod: anAST withReceiver: anObject
+CHInterpreter >> executeMethod: anAST withReceiver: anObject [
 	self pushNewFrame.
 	self topFrame at: #self  put: anObject.
 	^ self visitNode: anAST
+]
 ]]]
 
 Indeed, when we will execute multiple sends the stack will only grow and when the execution of a message is finished, its execution context
 should be discarded from the stack. The current implementation clearly does not do it. 
 Let us write a test showing the problem.
 
-We add an extra instance variable to the class ==CInterpretable== with its companion accessors. This way we will be able to test that the correct object is set and passed around in future example.
+We add an extra instance variable to the class ==CInterpretable== with its companion accessors. 
+This way we will be able to test that the correct object is set and passed around in future example.
 
 [[[
 Object subclass: #CHInterpretable
@@ -140,13 +149,15 @@ Object subclass: #CHInterpretable
 ]]]
 
 [[[
-CHInterpreterTest >> collaborator
+CHInterpreterTest >> collaborator [
 	^ collaborator
+]
 ]]]
 
 [[[
-CHInterpreterTest >> collaborator: anObject
+CHInterpreterTest >> collaborator: anObject [
 	collaborator := anObject
+]
 ]]]
 
 We add another instance variable named ==collaborator== to the test class. 
@@ -161,18 +172,21 @@ In the ==setUp== we assign a new object to the collaborator instance variable an
 new object as collaborator of the object we access via the ==receiver== instance variable.
 
 [[[
-CHInterpreterTest >> setUp
+CHInterpreterTest >> setUp [
 	super setUp.
 	interpreter := self interpreterClass new.
 	receiver := CHInterpretable new.
 	collaborator := CHInterpretable new.
-	receiver collaborator: collaborator 
+	receiver collaborator: collaborator
+]
 ]]]
 
 The following test ==testBalancingStack== execute the message ==setXAndMessage==.
+We assign the variable to ==x==, send the message ==returnX== to another (uninitialized object), 
+and return the value of ==x==.
 
 [[[
-CHInterpreterTest >> testBalancingStack
+CHInterpreterTest >> testBalancingStack [
 	"
 	setXAndMessage
 
@@ -181,9 +195,17 @@ CHInterpreterTest >> testBalancingStack
 		^ x
 	"
 	self assert: (self executeSelector: #setXAndMessage) equals: 1000
+	]
 ]]]
 
-Executing this test breaks because the access to the instance variable ==x== access 
+Executing this test breaks because the access to the instance variable ==x== returns nil. 
+This is due to the fact that the frame created by the execution of the message ==returnX== 
+has the uninitialized receiver (the object refered by ==collaborator== variable) and that 
+such frame is not pop out of the stack once the message is executed. 
+
+To solve this problem is relatively simple, we should pop the frame at the end of message send. 
+This way the stack is balanced. This is what the new implementation of ==executeMethod:withReceiver:==
+is doing.
 
 [[[language=pharo
 CHInterpreter >> executeMethod: anAST withReceiver: anObject
@@ -194,42 +216,54 @@ CHInterpreter >> executeMethod: anAST withReceiver: anObject
 	^ result
 ]]]
 
-
+We are ready our journey in message handling.
 
 !!! Supporting Message Arguments
 
-We add support for message arguments so that we can start having more interesing examples.
-We introduce two little helper method to add and access new values in the current frame. 
+We add support for message arguments so that we can start having more interesting examples.
+We introduce two little helper methods to add and access new values in the current frame. 
 
 
 [[[
-CHInterpreter >> tempAt: aSymbol put: anInteger 
+CHInterpreter >> tempAt: aSymbol put: anInteger [
 	self topFrame at: aSymbol put: anInteger
+]
 ]]]
 
 [[[
-CHInterpreter >> tempAt: aSymbol
+CHInterpreter >> tempAt: aSymbol [
 	^ self topFrame at: aSymbol
+]
 ]]]
 
+While interpreting a message, when we interpret an argument we need the return the value that such argument
+get for this specific message send. The same method ==returnArg: anArg== interpreted with two different message sends
+should return different value.
 
-Missing test here
+[[[
+returnArg: arg
+	^ arg
+]]]
 
+The message ==anObject returnArg: 12== should return 12 while ==anObject returnArg: 24== should return 24.
+The question is how to pass the actual values of the parameters to the message interpretation. 
+This is where the current frame comes into play.
 
+Handling arguments is two distinct actions: 
+- binding the values of the arguments to add their value to the frame at the beginning of the exection,
+- and during message interpretation, make sure that the arguments of a message are evaluated.
 
-
-To manage arguments we should 
-- add their value to the frame at the beginning of the exection,
-- make sure that the arguments of a message are evaluated.
-
-This is what we do in the two follwing method.
+This is what we do in the two following methods.
 
 [[[
 CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
+	| result |
 	self pushNewFrame.
 	self tempAt: #self put: anObject.
 	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
-	^ self visitNode: anAST
+	result := self visitNode: anAST.
+	self popFrame.
+	^ result
 ]]]
 
 [[[
