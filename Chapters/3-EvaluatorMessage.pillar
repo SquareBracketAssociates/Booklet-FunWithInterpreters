@@ -138,8 +138,8 @@ CHInterpreter >> executeMethod: anAST withReceiver: anObject [
 
 Indeed, when we will execute multiple sends the stack will only grow and when the execution of a message is finished, its execution context
 should be discarded from the stack. The current implementation clearly does not do it. 
-Let us write a test showing the problem.
 
+Let us write a test showing the problem.
 We add an extra instance variable to the class ==CInterpretable== with its companion accessors. 
 This way we will be able to test that the correct object is set and passed around in future example.
 
@@ -210,21 +210,83 @@ This way the stack is balanced. This is what the new implementation of ==execute
 is doing.
 
 [[[language=pharo
-CHInterpreter >> executeMethod: anAST withReceiver: anObject
+CHInterpreter >> executeMethod: anAST withReceiver: anObject [
 	self pushNewFrame.
 	self topFrame at: #self  put: anObject.
 	result := self visitNode: anAST.
 	self popFrame.
 	^ result
+]
 ]]]
+
+!!! Adding an Extra Test
+
+Since we not lose any opportunity to strenghten our trust in our implementation by adding a new 
+test, we take it. 
+We define a new method named ==changeCollaboratorX==.
+
+[[[
+CInterpretable >> changeCollaboratorX [
+	collaborator store100IntoX
+]
+]]]
+
+Then we test 
+[[[
+CHInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSender
+	"
+	changeCollaboratorX
+ 		collaborator store100IntoX
+	"
+
+	receiver x: 200.
+	collaborator x: 300.
+	self executeSelector: #changeCollaboratorX.
+	self assert: receiver x equals: 200.
+	self assert: collaborator x equals: 100
+]]]
+
+
 
 We are ready our journey in message handling.
 
 !!! Supporting Message Arguments
 
 We add support for message arguments so that we can start having more interesting examples.
-We introduce two little helper methods to add and access new values in the current frame. 
+Let us define some tests.
 
+!!!! A Test First
+
+We define a simple method ==changeCollaboratorWithArgument== which uses a setter.
+
+[[[language=smalltalk
+CInterpretable >> changeCollaboratorWithArgument [
+	collaborator x: 500
+]
+]]]
+
+Then we verify that the execution of the new method effectlvely modifies the collaborator object 
+as written in ==changeCollaboratorWithArgument==.
+
+[[[language=smalltalk
+testArgumentAccess [
+	"
+	changeCollaboratorWithArgument
+		collaborator x: 500
+	"
+
+	receiver x: 200.
+	collaborator x: 300.
+	self executeSelector: #changeCollaboratorWithArgument.
+	self assert: receiver x equals: 200.
+	self assert: collaborator x equals: 500
+]
+]]]
+
+Our test fails so we can start to work.
+
+!!!! Some Helpers
+We introduce two little helper methods to add and access new values in the current frame. 
 
 [[[
 CHInterpreter >> tempAt: aSymbol put: anInteger [
@@ -305,58 +367,114 @@ CHInterpreter >> visitMessageNode: aMessageNode [
 ]
 ]]]
 
+Our tests should all pass. 
 
 
 
 
+!!! New Set up for Method Lookup
 
+So far we have put aside the method lookup.
+We looked directly in the class and this is clearly not good.
 
+To test method lookup we introduce two superclasses as superclass of ==CHInterpretable==: 
+The class ==CHInterpretableSecondSuperclass== and its subclass ==CHInterpretableSuperclass==.
+With this setup we will be able to test all situations, even the ones which leads to infinite loops
+when following the definition of some books.
 
-HERE HERE HERE
-
-
-
-
-
-
-
-
-!!! Different Receiver of Messages
 
 [[[
-TestCase subclass: #CHInterpreterTest
-	instanceVariableNames: 'interpreter receiver collaborator'
+Object subclass: #CHInterpretableSecondSuperclass
+	instanceVariableNames: ''
 	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Champollion-Core'
+	package: 'Champollion-Core'
 ]]]
 
 [[[
-CHInterpreterTest >> setUp
-	super setUp.
-	interpreter := self interpreterClass new.
-	receiver := CInterpretable new.
-	collaborator := CInterpretable new.
-	receiver collaborator: collaborator 
+CHInterpretableSecondSuperclass subclass: #CHInterpretableSuperclass
+	instanceVariableNames: ''
+	classVariableNames: ''
+	package: 'Champollion-Core'
+]]]
+
+[[[
+CHInterpretableSuperclass subclass: #CHInterpretable
+	instanceVariableNames: 'x collaborator'
+	classVariableNames: ''
+	package: 'Champollion-Core'
+]]]
+
+[[[
+CHInterpretableSuperclass >> methodNotInSubclass [
+		^ 5
+]
 ]]]
 
 
+
 [[[
-CHInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSender
+testLookupMessageInSuperclass
 	"
-	changeCollaboratorX
-		collaborator x: 200
+	Subclass>>sendMessageInSuperclass
+		^ self methodNotInSubclass
+	
+	Superclass>>methodNotInSubclass
+		^ 5
 	"
 
-	receiver x: 100.
-	collaborator x: 300.
-	self assert: (self executeSelector: #changeCollaboratorX) equals: 200
+	self assert: (self executeSelector: #sendMessageInSuperclass) equals: 5
+]]]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+!!! The Case of Super
+
+[[[
+CHInterpretable >> redefinedMethod [
+	^ super redefinedMethod
+]
+]]]
+
+
+[[[
+CHInterpretableSuperClass >> redefinedMethod [
+		^ 5
+]
+]]]
+
+
+[[[
+]
 ]]]
 
 [[[
-CInterpretable >> changeCollaboratorX
-
-	collaborator store100IntoX
+]
 ]]]
 
 
@@ -366,8 +484,6 @@ CInterpretable >> changeCollaboratorX
 
 
 
-
-!!! Lookup
 
 [[[
 CHInterpreter >> visitMessageNode: aMessageNode
@@ -405,6 +521,20 @@ CHInterpreter >> lookup: aSymbol fromClass: aClass
 		ifTrue: [ nil ]
 		ifFalse: [ self lookup: aSymbol fromClass: aClass superclass ]
 ]]]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

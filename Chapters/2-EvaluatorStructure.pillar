@@ -391,7 +391,7 @@ TestCase subclass: #CHInterpreterTest
 	package: 'Champollion'
 ]]]
 
-In the ==setUp== we assign a new instance to the new instance variable.
+In the ==setUp== we assign a new instance to the new instance variable ==receiver==.
 
 [[[
 CHInterpreterTest >> setUp [
