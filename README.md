@@ -1,6 +1,6 @@
 # Booklet-FunWithInterpreters
 
-[![Build status]( https://travis-ci.com/SquareBracketAssociates/FunWithInterpreters.svg?branch=master)](https://travis-ci.com/SquareBracketAssociates/FunWithInterpreters)
+[![Build status]( https://travis-ci.com/SquareBracketAssociates/Booklet-FunWithInterpreters.svg?branch=master)](https://travis-ci.com/SquareBracketAssociates/Booklet-FunWithInterpreters)
 
 This repository contains the early draft of a book on building interpreters for Pharo in Pharo. 
 It follows a really simple steps by steps approach. 
