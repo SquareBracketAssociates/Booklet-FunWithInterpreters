@@ -1,4 +1,4 @@
-!! Messages 
+!! Interpreter1: Handling Messages 
 
 While the previous chapter focused on basic element interpretation, this one will focus on the key abstraction in 
 object-oriented programming: message send.
@@ -233,7 +233,7 @@ CInterpretable >> changeCollaboratorX [
 
 Then we test 
 [[[
-CHInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSender
+CHInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSender [
 	"
 	changeCollaboratorX
  		collaborator store100IntoX
@@ -244,6 +244,7 @@ CHInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSen
 	self executeSelector: #changeCollaboratorX.
 	self assert: receiver x equals: 200.
 	self assert: collaborator x equals: 100
+]
 ]]]
 
 
@@ -312,7 +313,7 @@ returnArg: arg
 The message ==anObject returnArg: 12== should return 12 while ==anObject returnArg: 24== should return 24.
 The question is how to pass the actual values of the parameters to the message interpretation. 
 This is where the current frame comes into play. 
-On message request for execution, we will add the value of actual parameter to the current frame and during the interpretation ]
+On message request for execution, we will add the value of actual parameter to the current frame and during the interpretation
 of a message/method we will be able to access such values.
 
 Therefore handling arguments is two distinct actions: 
@@ -359,18 +360,16 @@ For example in the message ==anObject returnArg: 1+4== that the value of the arg
 
 [[[
 CHInterpreter >> visitMessageNode: aMessageNode [
-	| rec method args | 
+
+	| rec method args |
 	rec := self visitNode: aMessageNode receiver.
 	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
-	method := self lookup: aMessageNode selector fromClass: rec class.
+	method := (rec class compiledMethodAt: aSymbol) ast.
 	^ self executeMethod: method withReceiver: rec andArguments: args
 ]
 ]]]
 
 Our tests should all pass. 
-
-
-
 
 !!! New Set up for Method Lookup
 
@@ -406,54 +405,64 @@ CHInterpretableSuperclass subclass: #CHInterpretable
 
 [[[
 CHInterpretableSuperclass >> methodNotInSubclass [
-		^ 5
+	^ 5
 ]
 ]]]
 
 
 
 [[[
-testLookupMessageInSuperclass
+CHInterpreterTest >> testLookupMessageInSuperclass [
 	"
 	Subclass>>sendMessageInSuperclass
 		^ self methodNotInSubclass
-	
 	Superclass>>methodNotInSubclass
 		^ 5
 	"
 
 	self assert: (self executeSelector: #sendMessageInSuperclass) equals: 5
+]
 ]]]
 
 
+The test should not work so we are ready to work. 
 
+[[[
+CHInterpreter >> lookup: aSymbol fromClass: aClass [
+	"Return the AST of a method or nil if none is found"
 
+	"If the class defines a method for the selector, return the AST corresponding to the method"
+	(aClass includesSelector: aSymbol)
+		ifTrue: [ ^ (aClass compiledMethodAt: aSymbol) ast ].
 
+	"Otherwise lookup recursively in the superclass.
+	If we reach the end of the hierarchy return nil"
+	^ aClass = ProtoObject 
+		ifTrue: [ nil ]
+		ifFalse: [ self lookup: aSymbol fromClass: aClass superclass ]
+]
+]]]
 
+Now we should call the method ==lookup:fromClass:== from the ==visitMessageNode:==
 
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode [
+	| rec method args | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	method := self lookup: aMessageNode selector fromClass: rec class.
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]
+]]]
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Now we are ready to work on the case of ==super==. 
 
 
 !!! The Case of Super
+
+Many people gets confused by super semantics even book authors. 
+ ==super== is the receiver of the message as we saw it in the first chapter.
+
 
 [[[
 CHInterpretable >> redefinedMethod [
@@ -469,31 +478,54 @@ CHInterpretableSuperClass >> redefinedMethod [
 ]]]
 
 
-[[[
+[[[testLookupSuperMessage
+	"
+	Subclass>>superMessageSend
+
+	^ super methodNotInSubclass
+	
+	Superclass>>methodNotInSubclass
+		^ 5
+	"
+
+	self assert: (self executeSelector: #superMessageSend) equals: 5
 ]
 ]]]
 
+
+
+!!! Overridden messsages
+
 [[[
+CHInterpreterTest >> testLookupRedefinedMethod [
+	"
+	Subclass>>redefinedMethod
+	^ super redefinedMethod
+	Superclass>>redefinedMethod
+		^ 5
+	"
+
+	self assert: (self executeSelector: #redefinedMethod) equals: 5
 ]
 ]]]
 
 
 
-
-
-
-
-
+!!! The correct semantics
 
 [[[
-CHInterpreter >> visitMessageNode: aMessageNode
+CHInterpreterTest >> testLookupSuperMessageNotInReceiverSuperclass [
+	"
+	This test tests that it does not loop!
 
-	| rec method | 
-	rec := self visitNode: aMessageNode receiver.
-	method := self lookup: aMessageNode selector fromClass: rec class.
-	^ self executeMethod: method withReceiver: rec
+	MiddleSuperclass>>redefinedMethodAtThreeLevels
+		^ super redefinedMethodAtThreeLevels
+	Superclass>>redefinedMethodAtThreeLevels
+		^ 5
+	"
+	self assert: (self executeSelector: #redefinedMethodAtThreeLevels) equals: 5
+	]
 ]]]
-
 
 
 
@@ -612,7 +644,7 @@ As well as the following expression
 We can say that inside a method the names of parameters, temporaries and instance variables are flattened and use a single namespace.
 
 
-!!! Temporaries
+!!! Handling Temporaries
 
 
 

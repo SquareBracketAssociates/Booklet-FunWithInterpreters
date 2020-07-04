@@ -1,4 +1,4 @@
-!! A First Interpreter: A Simple Evaluator
+!! Interpreter0: A Simple Evaluator
 
 In this chapter we will develop step by step a Pharo program interprerter.
 We will incrementally add support for language characteristics.
