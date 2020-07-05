@@ -403,13 +403,28 @@ CHInterpretableSuperclass subclass: #CHInterpretable
 	package: 'Champollion-Core'
 ]]]
 
+Since we may want to invoke method that are not directly defined in the class ==CHInterpretable==
+but its superclasses, we adapt the helper method ==executeSelector:== to perform a lookup instead of accessible
+only  ==CHInterpretable==.
+
+[[[
+CHInterpreterTest >> executeSelector: aSymbol [
+	| ast |
+	ast := (CInterpretable lookupSelector: aSymbol) ast.
+	^ self interpreter executeMethod: ast withReceiver: receiver
+]
+]]]
+
+In addition we define the method ==methodNotInSubclass== only the superclass of ==CHInterpretable==.
+
 [[[
 CHInterpretableSuperclass >> methodNotInSubclass [
 	^ 5
 ]
 ]]]
 
-
+Now we are ready to define a test to verify that the method lookup is climbing up the inheritance tree when a 
+method is not found. 
 
 [[[
 CHInterpreterTest >> testLookupMessageInSuperclass [
@@ -476,6 +491,8 @@ CHInterpretable >> superMessageSend [
 ]
 ]]]
 
+
+
 Once these methods defined, the following test 
 
 [[[
@@ -491,6 +508,38 @@ CHInterpreterTest >> testLookupSuperMessage [
 ]
 ]]]
 
+The lookup of the method that should be executed when the receiver is ==super== does not look in the
+class of the receiver but in the superclass of the class of the method containing the use of ==super==. 
+It implies that we need a way to identify the method currently executed (whose )
+
+
+We can store this information in the current frame. 
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection [
+	| result |
+	self pushNewFrame.
+	self tempAt: #___method put: anAST.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
+	result := self visitNode: anAST body.
+	self popFrame.
+	^ result
+]
+]]]
+
+We define the method ==currentMethod== to access this method. 
+[[[
+CHInterpretable >> currentMethod [
+	^ self tempAt: #___method
+]
+]]]
+
+Note that using the current to store the current method will work, even if we have several messages in sequence. 
+It will work since the stack is balanced: a new frame is pushed before any message is executed and popped after each message is executed.
+So the frame will be always about the message it executes.
+
+We redefine the ==visitMessageNode:== method to change class where to start looking for the method. 
 
 [[[
 CHInterpreterTest >> visitMessageNode: aMessageNode [
