@@ -371,7 +371,7 @@ CHInterpreter >> visitMessageNode: aMessageNode [
 
 Our tests should all pass. 
 
-!!! New Set up for Method Lookup
+!!! New Setup for Method Lookup
 
 So far we have put aside the method lookup.
 We looked directly in the class and this is clearly not good.
@@ -414,9 +414,9 @@ CHInterpretableSuperclass >> methodNotInSubclass [
 [[[
 CHInterpreterTest >> testLookupMessageInSuperclass [
 	"
-	Subclass>>sendMessageInSuperclass
+	CHInterpretable >> sendMessageInSuperclass
 		^ self methodNotInSubclass
-	Superclass>>methodNotInSubclass
+	CHInterpretableSuperclass >> methodNotInSubclass
 		^ 5
 	"
 
@@ -462,29 +462,28 @@ Now we are ready to work on the case of ==super==.
 
 Many people gets confused by super semantics even book authors. 
  ==super== is the receiver of the message as we saw it in the first chapter.
+ It means that since ==self== and ==super== are pointing to the same object that 
+ the difference should be elsewhere and it is in the lookup.
 
-
+ We define a method ==superMessageSend==. 
+ It is not really good since it uses ==super== while it is not needed. 
+ We will see with the handling of overridden messages better 
+ tests. 
+ 
 [[[
-CHInterpretable >> redefinedMethod [
-	^ super redefinedMethod
-]
-]]]
-
-
-[[[
-CHInterpretableSuperClass >> redefinedMethod [
-		^ 5
-]
-]]]
-
-
-[[[testLookupSuperMessage
-	"
-	Subclass>>superMessageSend
-
+CHInterpretable >> superMessageSend [
 	^ super methodNotInSubclass
-	
-	Superclass>>methodNotInSubclass
+]
+]]]
+
+Once these methods defined, the following test 
+
+[[[
+CHInterpreterTest >> testLookupSuperMessage [
+	"
+	CHInterpretable >> superMessageSend
+		^ super methodNotInSubclass
+	Superclass >> methodNotInSubclass
 		^ 5
 	"
 
@@ -493,8 +492,41 @@ CHInterpretableSuperClass >> redefinedMethod [
 ]]]
 
 
+[[[
+CHInterpreterTest >> visitMessageNode: aMessageNode [
+
+	| rec method args lookupClass pragma | 
+	rec := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	
+	lookupClass := aMessageNode receiver isSuper 
+		ifTrue: [ self currentMethod methodClass superclass ] 
+		ifFalse: [ rec class ].
+	method :=  self lookup: aMessageNode selector fromClass: lookupClass.	
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]
+]]]	
+
+
 
 !!! Overridden messsages
+
+
+Let us define some method for our future tests. 
+We define the method ==redefineMethod== in the subclass and the superclass.
+
+[[[
+CHInterpretable >> redefinedMethod [
+	^ super redefinedMethod
+]
+]]]
+
+[[[
+CHInterpretableSuperClass >> redefinedMethod [
+		^ 5
+]
+]]]
+
 
 [[[
 CHInterpreterTest >> testLookupRedefinedMethod [
