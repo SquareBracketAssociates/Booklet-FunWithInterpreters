@@ -424,7 +424,7 @@ CHInterpretableSuperclass >> methodNotInSubclass [
 ]]]
 
 Now we are ready to define a test to verify that the method lookup is climbing up the inheritance tree when a 
-method is not found. 
+method is not found.
 
 [[[
 CHInterpreterTest >> testLookupMessageInSuperclass [
@@ -441,6 +441,12 @@ CHInterpreterTest >> testLookupMessageInSuperclass [
 
 
 The test should not work so we are ready to work. 
+We define the method ==lookup:fromClass:==. 
+- It checks that the current class passed as argument defines the method. In such case it returns the corresponding method AST.
+- If the method is not defined in the current class and we are not on the top of the hierarchy we recursively lookup from the superclass.
+- Else when we are on top of the hierarchy the  ==lookup:fromClass:== returns nil. This indicates that no method were found. 
+
+The method ==lookup:fromClass:== does not raise an error because this way the visitMessageNode: method will be able to send the ==doesNotUnderstand:== message to the receiver.
 
 [[[
 CHInterpreter >> lookup: aSymbol fromClass: aClass [
@@ -452,13 +458,13 @@ CHInterpreter >> lookup: aSymbol fromClass: aClass [
 
 	"Otherwise lookup recursively in the superclass.
 	If we reach the end of the hierarchy return nil"
-	^ aClass = ProtoObject 
+	^ aClass = ProtoObject
 		ifTrue: [ nil ]
 		ifFalse: [ self lookup: aSymbol fromClass: aClass superclass ]
 ]
 ]]]
 
-Now we should call the method ==lookup:fromClass:== from the ==visitMessageNode:==
+We should call the method ==lookup:fromClass:== from the ==visitMessageNode:==
 
 [[[
 CHInterpreter >> visitMessageNode: aMessageNode [
