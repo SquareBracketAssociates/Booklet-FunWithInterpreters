@@ -519,8 +519,8 @@ class of the receiver but in the superclass of the class of the method containin
 It implies that we need a way to identify the method currently executed (whose )
 
 
-We can store this information in the current frame. 
-
+We can store this information in the current frame as we do it in the following method ==executeMethod:withReceiver:andArguments:==.
+By prefixing with ==\_\_\_==, we make sure that the key for the current method binding is unique. 
 [[[
 CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection [
 	| result |
@@ -534,7 +534,7 @@ CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aColl
 ]
 ]]]
 
-We define the method ==currentMethod== to access this method. 
+We define the method ==currentMethod== to access the current method stored in the current frame.
 [[[
 CHInterpretable >> currentMethod [
 	^ self tempAt: #___method
@@ -565,7 +565,8 @@ CHInterpreterTest >> visitMessageNode: aMessageNode [
 
 
 !!! Overridden messsages
-
+So far we made sure that sending a message using ==super== starts in the superclass of the class using the expression. 
+Now we would like to make sure that the lookup works even in presence of overridden methods. 
 
 Let us define some method for our future tests. 
 We define the method ==redefineMethod== in the subclass and the superclass.
@@ -582,13 +583,15 @@ CHInterpretableSuperClass >> redefinedMethod [
 ]
 ]]]
 
+We defined a test which sends a message to the subclass instance and verifies that the 
+method defined in the superclass is effectively executed. 
 
 [[[
 CHInterpreterTest >> testLookupRedefinedMethod [
 	"
-	Subclass>>redefinedMethod
-	^ super redefinedMethod
-	Superclass>>redefinedMethod
+	CHInterpretable>>redefinedMethod
+		^ super redefinedMethod
+	CHInterpretableSuperClass>>redefinedMethod
 		^ 5
 	"
 
@@ -596,9 +599,35 @@ CHInterpreterTest >> testLookupRedefinedMethod [
 ]
 ]]]
 
+This test should run. 
 
 
 !!! The correct semantics
+
+Some books define wrongly that ==super== looks up method starting from the superclass of the class of the receiver. 
+This is plain wrong and only works when the inheritance depth is limited to two: a class and its superclass.
+
+The setup to define a sitation showing that with the previous wrong semantics the system loops is rather simple. 
+We create an instance of the deepest subclass and define the method in its superclass to do a super call.  
+
+We define the method ==redefinedMethodAtThreeLevels== in the middle class. 
+[[[
+CHInterpretableSuperClass >> redefinedMethodAtThreeLevels [
+	^ super redefinedMethodAtThreeLevels
+	]
+]]]
+
+and redefine it in its superclass. 
+
+[[[
+CHInterpretableSecondSuperClass >> redefinedMethodAtThreeLevels [
+	^ 5
+]
+]]]
+
+@@todo Add figure 
+
+
 
 [[[
 CHInterpreterTest >> testLookupSuperMessageNotInReceiverSuperclass [
