@@ -564,7 +564,7 @@ CHInterpreterTest >> visitMessageNode: aMessageNode [
 
 
 
-!!! Overridden messsages
+!!! Overridden Messsages
 So far we made sure that sending a message using ==super== starts in the superclass of the class using the expression. 
 Now we would like to make sure that the lookup works even in presence of overridden methods. 
 
@@ -602,13 +602,13 @@ CHInterpreterTest >> testLookupRedefinedMethod [
 This test should run. 
 
 
-!!! The correct semantics
+!!! Checking Correct Semantics
 
 Some books define wrongly that ==super== looks up method starting from the superclass of the class of the receiver. 
 This is plain wrong and only works when the inheritance depth is limited to two: a class and its superclass.
 
 The setup to define a sitation showing that with the previous wrong semantics the system loops is rather simple. 
-We create an instance of the deepest subclass and define the method in its superclass to do a super call.  
+We create an instance of the deepest subclass and define the method in its superclass to do a super call as shown by Figure *@fighierarchyFull*.
 
 We define the method ==redefinedMethodAtThreeLevels== in the middle class. 
 [[[
@@ -625,7 +625,7 @@ CHInterpretableSecondSuperClass >> redefinedMethodAtThreeLevels [
 ]
 ]]]
 
-@@todo Add figure 
++The full hierarchy of setup tests.>file://figures/hierarchy.pdf|width=80|label=fighierarchyFull+
 
 
 
