@@ -627,7 +627,7 @@ CHInterpretableSecondSuperClass >> redefinedMethodAtThreeLevels [
 
 +The full hierarchy of setup tests.>file://figures/hierarchy.pdf|width=80|label=fighierarchyFull+
 
-
+The following test should pass. 
 
 [[[
 CHInterpreterTest >> testLookupSuperMessageNotInReceiverSuperclass [
@@ -644,72 +644,19 @@ CHInterpreterTest >> testLookupSuperMessageNotInReceiverSuperclass [
 ]]]
 
 
+You can reproduce the wrong semantics as follows. Just watch out that the previous test will loop forever. 
 
 [[[
-CHInterpreter >> visitMessageNode: aMessageNode
+CHInterpreter >> visitMessageNode: aMessageNode [
 
-	| rec method | 
+	| rec method args lookupClass | 
 	rec := self visitNode: aMessageNode receiver.
-	method := self lookup: aMessageNode selector fromClass: rec class.
-	^ self executeMethod: method withReceiver: rec
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	lookupClass := aMessageNode receiver isSuper ifTrue: [ rec class superclass ] ifFalse: [ rec class ].
+	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
+	^ self executeMethod: method withReceiver: rec andArguments: args
+]
 ]]]
-
-
-[[[
-CHInterpreter >> lookup: aSymbol fromClass: aClass 
-	"Return the AST of a method or nil if none is found"
-
-	"If the class defines a method for the selector, return the AST corresponding to the method"
-	(aClass includesSelector: aSymbol)
-		ifTrue: [ ^ (aClass compiledMethodAt: aSymbol) ast ].
-
-	"Otherwise lookup recursively in the superclass.
-	If we reach the end of the hierarchy return nil"
-	^ aClass = ProtoObject 
-		ifTrue: [ nil ]
-		ifFalse: [ self lookup: aSymbol fromClass: aClass superclass ]
-]]]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 !!! Intermezzo -- About temporaries
 
@@ -762,12 +709,7 @@ We can say that inside a method the names of parameters, temporaries and instanc
 
 !!! Handling Temporaries
 
-
-
-
-
-
-
+Here!
 
 
 
@@ -837,152 +779,6 @@ BasicInterpreter1Test >> testAccessXInInstance
 	self assert: result equals: 100. 
 	
 ]]]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-!!! Looking at Dynamic Features (OLD)
-
-The previous chapter presented the implementation of a simple interpreter for a limited subset of Pharo.
-This chapter will cover lexical closures. 
-
-
-
-!!! Simple blocks
-Simple blocks are blocks without arguments, and without references to anything except literal objects. 
-First the value of a block is the block itself.
-
-
-[[[
-BasicInterpreter >> testSimpleBlock
-	"
-	simpleBlock
-
-		^ [  5 ]
-	"
-	| ast result |
-	ast := (CInterpretable >> #simpleBlock) ast.
-	result := self interpreter execute: ast.
-	self assert: result class equals: CBlock
-
-]]]
-
-[[[
-Object subclass: #CBlock
-	instanceVariableNames: ' interpreter blockDefinition'
-	classVariableNames: ''
-	package: 'Champollion-Core'
-]]]
-
-[[[
-CBlock >> value
-
-	^ interpreter visitNode: blockDefinition body 
-
-]]]
-
-[[[
-BasicInterpreter >> visitBlockNode: aBlockNode 
-	^ CBlock new 	
-		blockDefinition: aBlockNode; 
-		interpreter: self; 
-		yourself
-]]]
-
-[[[
-BasicInterpreter >> visitMessageNode: aMessageNode
-
-	| rec args method res | 
-	self pushNewFrame.
-	rec := self visitNode: aMessageNode receiver.
-	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
-	
-	(aMessageNode selector = #value) 
-		ifTrue: [ res := rec value ]
-		ifFalse: [  
-		(aMessageNode methodNode isPrimitive "and: [ aMessageNode methodNode isValueMessage not ]")
-			ifTrue: [
-			res := rec 
-					tryPrimitive: (aMessageNode methodNode pragmas first argumentAt: 'primitive:') value 
-					withArgs: args ]
-			ifFalse: [ 	
-				method :=  aMessageNode receiver isSuper
-					ifTrue: [ self lookup: aMessageNode selector fromClass: rec class superclass ]
-					ifFalse: [ self lookup: aMessageNode selector fromClass: rec class ].
-				res := self execute: method withReceiver: rec andArguments: args]
-		].
-	self popFrame.
-	^ res 
-]]]
-
-
-
-
-
 
 
 
