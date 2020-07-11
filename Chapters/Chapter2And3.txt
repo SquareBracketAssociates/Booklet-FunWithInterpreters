@@ -1,991 +1,3 @@
-[[[
-CHInterpreterTest >> testInstanceVariableAccessInMethodActivationDoesNotEscape
-	"
-	collaboratorX
-
-		^ collaborator x
-	"
-
-	receiver x: 100.
-	collaborator x: 200.
-	self assert: (self executeSelector: #collaboratorX) equals: 200
-]]]
-
-[[[
-CInterpretable >> collaboratorX: anInteger
-
-	collaborator x: anInteger
-]]]
-
-[[[
-CInterpretable >> changeCollaboratorX
-
-	collaborator x: 200
-]]]
-
-
-[[[
-CHInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSender
-	"
-	changeCollaboratorX
- 		collaborator store100IntoX
-	"
-
-	receiver x: 200.
-	collaborator x: 300.
-	(self executeSelector: #changeCollaboratorX).
-	self assert: receiver x equals: 200.
-	self assert: collaborator x equals: 100
-]]]
-
-
-[[[
-CHInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSender
-	"
-	changeCollaboratorX
- 		collaborator store100IntoX
-	"
-
-	receiver x: 200.
-	collaborator x: 300.
-	self executeSelector: #changeCollaboratorX.
-	self assert: receiver x equals: 200.
-	self assert: collaborator x equals: 100
-]]]
-
-[[[
-CInterpretable >> cocollaboratorX: anInteger
-
-	self collaboratorX: anInteger
-
-	
-]]]
-
-[[[
-CInterpretable >> changeCollaboratorWithArgument
-
-	collaborator x: 500
-]]]
-
-[[[
-CHInterpreterTest >> testArgumentAccess
-	"
-	changeCollaboratorWithArgument
-		collaborator x: 500
-	"
-
-	receiver x: 200.
-	collaborator x: 300.
-	self executeSelector: #changeCollaboratorWithArgument.
-	self assert: receiver x equals: 200.
-	self assert: collaborator x equals: 500
-]]]
-
-[[[
-CHInterpreter >> visitMessageNode: aMessageNode
-
-	| rec method args | 
-	rec := self visitNode: aMessageNode receiver.
-	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
-	method := self lookup: aMessageNode selector fromClass: rec class.
-	^ self executeMethod: method withReceiver: rec andArguments: args
-]]]
-
-[[[
-CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
-	self pushNewFrame.
-	self topFrame at: #self  put: anObject.
-	^ self visitNode: anAST
-]]]
-
-[[[
-CHInterpreter >> executeMethod: anAST withReceiver: anObject
-	^ self executeMethod: anAST withReceiver: anObject andArguments: #()
-]]]
-
-[[[
-CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
-	self pushNewFrame.
-	self topFrame at: #self  put: anObject.
-	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
-	^ self visitNode: anAST
-]]]
-
-
-
-[[[
-CHInterpreter >> visitArgumentNode: aRBArgumentNode
-
-	^ self tempAt: aRBArgumentNode name
-]]]
-
-[[[
-CInterpretable >> collaboratorXIgnoringArgumentWithSameName: anInteger
-
-	collaborator x: 100
-]]]
-
-[[[
-CInterpretable >> collaboratorXIgnoringArgumentWithSameName: anInteger
-	"precondition: The argument of method x: has name anInteger too, and they should not collide"
-	collaborator x: 100
-]]]
-
-[[[
-CInterpretable >> changeCollaboratorXWithConflictingArgumentNAmes
-
-	collaborator collaboratorXIgnoringArgumentWithSameName: 1987
-]]]
-
-[[[
-CHInterpreterTest >> testArgumentAccessDoesNotEscapeItsDefinition
-	"
-	changeCollaboratorWithArgument
-		collaborator x: 500
-	"
-
-	receiver x: 200.
-	collaborator x: 300.
-
-	"Test precondition. Both methods have arguments with the same name.
-	Otherwise this test could be green but false."
-	self
-		assert: (CInterpretable >> #collaboratorXIgnoringArgumentWithSameName:) arguments
-		equals: (CInterpretable >> #x:) arguments.
-	
-	self executeSelector: #changeCollaboratorXWithConflictingArgumentNAmes.
-
-	self assert: receiver x equals: 200.
-	self assert: collaborator x equals: 100
-]]]
-
-[[[
-CHInterpreterTest >> testArgumentAccessDoesNotEscapeItsDefinition
-	"
-	changeCollaboratorWithArgument
-		collaborator x: 500
-	"
-
-	receiver x: 200.
-	collaborator x: 300.
-
-	"Test precondition. Both methods have arguments with the same name.
-	Otherwise this test could be green but false."
-	self
-		assert: (CInterpretable >> #collaboratorXIgnoringArgumentWithSameName:) argumentNames
-		equals: (CInterpretable >> #x:) argumentNames.
-	
-	self executeSelector: #changeCollaboratorXWithConflictingArgumentNAmes.
-
-	self assert: receiver x equals: 200.
-	self assert: collaborator x equals: 100
-]]]
-
-[[[
-CHInterpreterTest >> testArgumentAccessDoesNotEscapeItsDefinition
-	"
-	changeCollaboratorXWithConflictingArgumentNAmes
-		collaborator collaboratorXIgnoringArgumentWithSameName: 1987
-	"
-
-	receiver x: 200.
-	collaborator x: 300.
-
-	"Test precondition. Both methods have arguments with the same name.
-	Otherwise this test could be green but false."
-	self
-		assert: (CInterpretable >> #collaboratorXIgnoringArgumentWithSameName:) argumentNames
-		equals: (CInterpretable >> #x:) argumentNames.
-	
-	self executeSelector: #changeCollaboratorXWithConflictingArgumentNAmes.
-
-	self assert: receiver x equals: 200.
-	self assert: collaborator x equals: 100
-]]]
-
-
-[[[
-CInterpretable >> changeCollaboratorXWithConflictingArgumentNAmes
-
-	self collaboratorXIgnoringArgumentWithSameName: 1987
-]]]
-
-
-
-
-
-
-
-
-
-************************************************************************************
-[[[
-CInterpretable >> returnUnassignedTemp
-
-	| temp |
-	^ temp
-]]]
-
-[[[
-CHInterpreterTest >> testUnassignedTempHasNilValue
-	"
-	changeCollaboratorWithArgument
-		collaborator x: 500
-	"
-
-	self assert: (self executeSelector: #returnUnassignedTemp) equals: nil
-]]]
-
-[[[
-CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
-	self pushNewFrame.
-	self tempAt: #self put: anObject.
-	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
-	anAST temporaryNames do: [ :tempName | self tempAt: tempName name put: nil ]. 
-	^ self visitNode: anAST
-]]]
-
-
-
-
-
-
-[[[
-CInterpretable >> readCollaboratorTemporaryVariable
-
-	| temp |
-	temp := 17.
-	collaborator readTemporaryVariable.
-	^ temp
-]]]
-
-[[[
-CInterpretable >> readTemporaryVariable
-
-	| temp |
-	^ temp
-]]]
-
-[[[
-CInterpretable >> readCollaboratorTemporaryVariable
-
-	| temp |
-	temp := 17.
-	^ collaborator readTemporaryVariable
-]]]
-
-[[[
-CHInterpreterTest >> testReadTemporaryVariableDoesNotEscapeItsDefinition
-
-	self assert: (self executeSelector: #readCollaboratorTemporaryVariable) equals: nil
-]]]
-
-[[[
-CInterpretable >> writeCollaboratorTemporaryVariable
-
-	| temp |
-	temp := 17.
-	collaborator writeTemporaryVariable.
-	^ temp
-]]]
-
-[[[
-CInterpretable >> writeTemporaryVariable
-
-	| temp |
-	temp := 100.
-	^ temp
-]]]
-
-[[[
-CHInterpreterTest >> testWriteTemporaryVariableDoesNotEscapeItsDefinition
-
-	self assert: (self executeSelector: #writeCollaboratorTemporaryVariable) equals: 17
-]]]
-
-[[[
-CHInterpreterTest >> testWriteTemporaryVariableDoesNotEscapeItsDefinition
-	"writeCollaboratorTemporaryVariable
-
-		| temp |
-		temp := 17.
-		collaborator writeTemporaryVariable.
-		^ temp
-	
-	writeTemporaryVariable
-
-		| temp |
-		temp := 100.
-		^ temp
-	"
-	self assert: (self executeSelector: #writeCollaboratorTemporaryVariable) equals: 17
-]]]
-
-
-[[[
-CHInterpreterTest >> testWriteTemporaryVariableDoesNotEscapeItsDefinition
-	"writeCollaboratorTemporaryVariable
-
-		| temp |
-		temp := 17.
-		collaborator writeTemporaryVariable.
-		^ temp
-	
-	writeTemporaryVariable
-
-		| temp |
-		temp := 100.
-		^ temp
-	"
-	1halt.
-	self assert: (self executeSelector: #writeCollaboratorTemporaryVariable) equals: 17
-]]]
-
-[[[
-CHInterpreterTest >> testWriteTemporaryVariableDoesNotEscapeItsDefinition
-	"writeCollaboratorTemporaryVariable
-
-		| temp |
-		temp := 17.
-		collaborator writeTemporaryVariable.
-		^ temp
-	
-	writeTemporaryVariable
-
-		| temp |
-		temp := 100.
-		^ temp
-	"
-	self assert: (self executeSelector: #writeCollaboratorTemporaryVariable) equals: 17
-]]]
-
-[[[
-CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
-	| result |
-	self pushNewFrame.
-	self tempAt: #self put: anObject.
-	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
-	anAST temporaryNames do: [ :tempName | self tempAt: tempName put: nil ]. 
-	
-	result := self visitNode: anAST.
-	
-	self popFrame.
-	^ result
-]]]
-
-[[[
-CHInterpreter >> popFrame
-	
-	^ stack pop
-]]]
-
-[[[
-CHInterpreterTest >> testWriteTemp
-	"
-	returnUnassignedTemp
-		| temp |
-		^ temp
-	"
-
-	self assert: (self executeSelector: #returnUnassignedTemp) equals: nil
-]]]
-
-[[[
-CHInterpreterTest >> testUnassignedTempHasNilValue
-	"
-	creturnUnassignedTemp
-		| temp |
-		^ temp
-	"
-
-	self assert: (self executeSelector: #returnUnassignedTemp) equals: nil
-]]]
-
-[[[
-CHInterpreterTest >> testWriteTemp
-	"
-	returnUnassignedTemp
-		| temp |
-		^ temp
-	"
-
-	self assert: (self executeSelector: #returnUnassignedTemp) equals: nil
-]]]
-
-
-[[[
-CInterpretable >> readCollaboratorTemporaryVariable
-
-	| temp |
-	temp := 17.
-	^ collaborator returnUnassignedTemp
-]]]
-
-[[[
-CHInterpreterTest >> testReadTemporaryVariableDoesNotEscapeItsDefinition
-	"
-	readCollaboratorTemporaryVariable
-		| temp |
-		temp := 17.
-		^ collaborator returnUnassignedTemp
-	
-	returnUnassignedTemp
-		| temp |
-		^ temp
-	"
-	self assert: (self executeSelector: #readCollaboratorTemporaryVariable) equals: 17
-]]]
-
-[[[
-CHInterpreterTest >> testReadTemporaryVariableDoesNotEscapeItsDefinition
-	"
-	readCollaboratorTemporaryVariable
-		| temp |
-		temp := 17.
-		^ collaborator returnUnassignedTemp
-	
-	returnUnassignedTemp
-		| temp |
-		^ temp
-	"
-	self assert: (self executeSelector: #readCollaboratorTemporaryVariable) equals: nil
-]]]
-
-[[[
-CInterpretable >> readTemporaryVariableAfterMessageSend
-
-	| temp |
-	temp := 17.
-	collaborator returnUnassignedTemp.
-	^ temp
-]]]
-
-[[[
-CHInterpreterTest >> testReadTemporaryVariableAfterMessageSend
-	"
-	readTemporaryVariableAfterMessageSend
-		| temp |
-		temp := 17.
-		collaborator returnUnassignedTemp.
-		^ temp
-	
-	returnUnassignedTemp
-		| temp |
-		^ temp
-	"
-	self assert: (self executeSelector: #readCollaboratorTemporaryVariable) equals: 17
-]]]
-
-[[[
-CHInterpreterTest >> testReadTemporaryVariableAfterMessageSend
-	"
-	readTemporaryVariableAfterMessageSend
-		| temp |
-		temp := 17.
-		collaborator returnUnassignedTemp.
-		^ temp
-	
-	returnUnassignedTemp
-		| temp |
-		^ temp
-	"
-	self assert: (self executeSelector: #readTemporaryVariableAfterMessageSend) equals: 17
-]]]
-
-[[[
-CHInterpreterTest >> testReadInstanceVariableAfterMessageSend
-	"
-	readTemporaryVariableAfterMessageSend
-		collaborator returnUnassignedTemp.
-		^ x
-	
-	returnUnassignedTemp
-		| temp |
-		^ temp
-	"
-	receiver x: 1.
-	collaborator x: 2.
-	self assert: (self executeSelector: #readTemporaryVariableAfterMessageSend) equals: 1
-]]]
-
-[[[
-CInterpretable >> readTemporaryVariableAfterMessageSend
-
-	collaborator returnUnassignedTemp.
-	^ x
-]]]
-
-[[[
-CInterpretable >> readInstanceVariableAfterMessageSend
-
-	collaborator returnUnassignedTemp.
-	^ x
-]]]
-
-[[[
-CInterpretable >> readTemporaryVariableAfterMessageSend
-
-	| temp |
-	temp := 17.
-	collaborator returnUnassignedTemp.
-	^ temp
-]]]
-
-[[[
-CHInterpreterTest >> testReadInstanceVariableAfterMessageSend
-	"
-	readTemporaryVariableAfterMessageSend
-		collaborator returnUnassignedTemp.
-		^ x
-	
-	returnUnassignedTemp
-		| temp |
-		^ temp
-	"
-	receiver x: 1.
-	collaborator x: 2.
-	self assert: (self executeSelector: #testReadInstanceVariableAfterMessageSend) equals: 1
-]]]
-
-[[[
-CHInterpreterTest >> testReadInstanceVariableAfterMessageSend
-	"
-	readInstanceVariableAfterMessageSend
-		collaborator returnUnassignedTemp.
-		^ x
-	
-	returnUnassignedTemp
-		| temp |
-		^ temp
-	"
-	receiver x: 1.
-	collaborator x: 2.
-	self assert: (self executeSelector: #readInstanceVariableAfterMessageSend) equals: 1
-]]]
-
-
-[[[
-CHInterpreterTest >> testReadArgumentVariableAfterMessageSend
-	"
-	readArgumentVariableAfterMessageSend
-		^ self readArgumentVariableAfterMessageSend: 17
-	
-	readArgumentVariableAfterMessageSend: arg
-		collaborator returnUnassignedTemp.
-		^ arg
-	
-	returnUnassignedTemp
-		| temp |
-		^ temp
-	"
-	receiver x: 1.
-	collaborator x: 2.
-	self assert: (self executeSelector: #readArgumentVariableAfterMessageSend) equals: 1
-]]]
-
-[[[
-CInterpretable >> readArgumentVariableAfterMessageSend
-	^ self readArgumentVariableAfterMessageSend: 17
-]]]
-
-[[[
-CInterpretable >> readArgumentVariableAfterMessageSend
-	
-	^ self readArgumentVariableAfterMessageSend: 17
-]]]
-
-[[[
-CHInterpreterTest >> testReadArgumentVariableAfterMessageSend
-	"
-	readArgumentVariableAfterMessageSend
-		^ self readArgumentVariableAfterMessageSend: 17
-	
-	readArgumentVariableAfterMessageSend: arg
-		collaborator returnUnassignedTemp.
-		^ arg
-	
-	returnUnassignedTemp
-		| temp |
-		^ temp
-	"
-	receiver x: 1.
-	collaborator x: 2.
-	self assert: (self executeSelector: #readArgumentVariableAfterMessageSend) equals: 17
-]]]
-
-[[[
-CInterpretable >> readArgumentVariableAfterMessageSend: arg
-
-	collaborator returnUnassignedTemp.
-	^ arg
-]]]
-
-[[[
-CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
-	| result |
-	self pushNewFrame.
-	self tempAt: #self put: anObject.
-	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
-	anAST temporaryNames do: [ :tempName | self tempAt: tempName put: nil ]. 
-	
-	result := self visitNode: anAST.
-	
-	"self popFrame."
-	^ result
-]]]
-
-[[[
-CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
-	| result |
-	self pushNewFrame.
-	self tempAt: #self put: anObject.
-	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
-	anAST temporaryNames do: [ :tempName | self tempAt: tempName put: nil ]. 
-	
-	result := self visitNode: anAST.
-	
-	self popFrame.
-	^ result
-]]]
-
-
-
-
-
-
-[[[
-Object subclass: #CInterpretableSuperclass
-	instanceVariableNames: ''
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Champollion-Core'
-]]]
-
-[[[
-CInterpretableSuperclass subclass: #CInterpretable
-	instanceVariableNames: 'x collaborator'
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Champollion-Core'
-]]]
-
-[[[
-CInterpretableSuperclass >> methodNotInSubclass
-
-	^ 5
-]]]
-
-[[[
-CHInterpreterTest >> testLookupMessageInSuperclass
-	"
-	methodNotInSubclass
-		^ 5
-	"
-
-	self assert: (self executeSelector: #methodNotInSubclass) equals: 5
-]]]
-
-
-[[[
-CHInterpreterTest >> testLookupMessageInSuperclass
-	"
-	methodNotInSubclass
-		^ 5
-	"
-
-1halt
-	self assert: (self executeSelector: #methodNotInSubclass) equals: 5
-]]]
-
-[[[
-CHInterpreterTest >> executeSelector: aSymbol
-
-	| ast |
-	ast := (CInterpretable lookupSelector: aSymbol) ast.
-	^ self interpreter executeMethod: ast withReceiver: receiver. 
-	
-]]]
-
-[[[
-CHInterpreterTest >> testLookupMessageInSuperclass
-	"
-	methodNotInSubclass
-		^ 5
-	"
-
-	self assert: (self executeSelector: #methodNotInSubclass) equals: 5
-]]]
-
-[[[
-CHInterpreterTest >> executeSelector: aSymbol
-
-	| ast |
-	ast := (CInterpretable lookupSelector: aSymbol) ast.
-	^ self interpreter executeMethod: ast withReceiver: receiver. 
-	
-]]]
-
-[[[
-CHInterpreterTest >> executeSelector: aSymbol
-
-	| ast |
-	ast := (CInterpretable lookupSelector: aSymbol) ast.
-	^ self interpreter executeMethod: ast withReceiver: receiver
-]]]
-
-
-[[[
-CInterpretable >> sendMessageInSuperclass
-
-	^ self returnX
-]]]
-
-[[[
-CInterpretable >> superMessageSend
-
-	^ super methodNotInSubclass
-]]]
-
-[[[
-CInterpretable >> sendMessageInSuperclass
-
-	^ self methodNotInSubclass
-]]]
-
-[[[
-CHInterpreterTest >> testLookupMessageInSuperclass
-	"
-	Subclass>>sendMessageInSuperclass
-
-	^ self methodNotInSubclass
-	
-	Superclass>>methodNotInSubclass
-		^ 5
-	"
-
-	self assert: (self executeSelector: #sendMessageInSuperclass) equals: 5
-]]]
-
-[[[
-CHInterpreterTest >> testLookupSuperMessage
-	"
-	Subclass>>superMessageSend
-
-	^ super methodNotInSubclass
-	
-	Superclass>>methodNotInSubclass
-		^ 5
-	"
-
-	self assert: (self executeSelector: #sendMessageInSuperclass) equals: 5
-]]]
-
-[[[
-CHInterpreterTest >> testLookupSuperMessage
-	"
-	Subclass>>superMessageSend
-
-	^ super methodNotInSubclass
-	
-	Superclass>>methodNotInSubclass
-		^ 5
-	"
-
-	self assert: (self executeSelector: #superMessageSend) equals: 5
-]]]
-
-[[[
-CInterpretableSuperclass >> redefinedMethod
-
-	^ 5
-]]]
-
-[[[
-CInterpretable >> redefinedMethod
-
-	^ super redefinedMethod
-]]]
-
-[[[
-CHInterpreterTest >> testLookupRedefinedMethod
-	"
-	Subclass>>redefinedMethod
-
-	^ super redefinedMethod
-	
-	Superclass>>redefinedMethod
-		^ 5
-	"
-
-	self assert: (self executeSelector: #redefinedMethod) equals: 5
-]]]
-
-[[[
-CHInterpreter >> visitMessageNode: aMessageNode
-
-	| rec method args | 
-	rec := self visitNode: aMessageNode receiver.
-	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
-	1halt..
-	method := self lookup: aMessageNode selector fromClass: rec class.
-	^ self executeMethod: method withReceiver: rec andArguments: args
-]]]
-
-[[[
-CHInterpreter >> visitMessageNode: aMessageNode
-
-	| rec method args | 
-	rec := self visitNode: aMessageNode receiver.
-	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
-	1halt.
-	method := self lookup: aMessageNode selector fromClass: rec class.
-	^ self executeMethod: method withReceiver: rec andArguments: args
-]]]
-
-[[[
-CHInterpreter >> visitMessageNode: aMessageNode
-
-	| rec method args lookupClass | 
-	rec := self visitNode: aMessageNode receiver.
-	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
-	lookupClass := aMessageNode receiver isSuper ifTrue: [ self halt ] ifFalse: [ rec class ].
-	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
-	^ self executeMethod: method withReceiver: rec andArguments: args
-]]]
-
-[[[
-CHInterpreter >> visitMessageNode: aMessageNode
-
-	| rec method args lookupClass | 
-	rec := self visitNode: aMessageNode receiver.
-	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
-	lookupClass := aMessageNode receiver isSuper ifTrue: [ self currentMethod methodClass superclass ] ifFalse: [ rec class ].
-	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
-	^ self executeMethod: method withReceiver: rec andArguments: args
-]]]
-
-[[[
-CHInterpreter >> currentMethod
-	self shouldBeImplemented.
-]]]
-
-[[[
-CHInterpreter >> currentMethod
-	
-	^ self tempAt: #___method
-]]]
-
-[[[
-CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
-	| result |
-	self pushNewFrame.
-	self tempAt: #___method put: anAST.
-	self tempAt: #self put: anObject.
-	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
-	anAST temporaryNames do: [ :tempName | self tempAt: tempName put: nil ]. 
-	
-	result := self visitNode: anAST.
-	
-	self popFrame.
-	^ result
-]]]
-
-[[[
-CHInterpreter >> visitMessageNode: aMessageNode
-
-	| rec method args lookupClass | 
-	rec := self visitNode: aMessageNode receiver.
-	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
-	lookupClass := aMessageNode receiver isSuper ifTrue: [ rec class superclass ] ifFalse: [ rec class ].
-	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
-	^ self executeMethod: method withReceiver: rec andArguments: args
-]]]
-
-[[[
-Object subclass: #CInterpretableSecondSuperclass
-	instanceVariableNames: ''
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Champollion-Core'
-]]]
-
-[[[
-CInterpretableSecondSuperclass subclass: #CInterpretableSuperclass
-	instanceVariableNames: ''
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Champollion-Core'
-]]]
-
-[[[
-CInterpretableSecondSuperclass >> redefinedMethodAtThreeLevels
-
-	^ 5
-]]]
-
-[[[
-CInterpretable >> redefinedMethodAtThreeLevels
-
-	^ super redefinedMethodAtThreeLevels
-]]]
-
-[[[
-CInterpretableSuperclass >> redefinedMethodAtThreeLevels
-
-	^ super redefinedMethodAtThreeLevels
-]]]
-
-[[[
-CInterpretable >> redefinedMethodAtThreeLevels
-
-	^ super redefinedMethodAtThreeLevels
-]]]
-
-
-[[[
-CHInterpreterTest >> testLookupSuperMessageNotInReceiverSuperclass
-	"
-	This tests tests that it does not loop\
-	
-	MiddleSuperclass>>redefinedMethodAtThreeLevels
-
-	^ super redefinedMethodAtThreeLevels
-
-	Superclass>>redefinedMethodAtThreeLevels
-		^ 5
-	"
-
-	self assert: (self executeSelector: #superMessageSend) equals: 5
-]]]
-
-
-[[[
-CHInterpreterTest >> testLookupSuperMessageNotInReceiverSuperclass
-	"
-	This tests tests that it does not loop\
-	
-	MiddleSuperclass>>redefinedMethodAtThreeLevels
-
-	^ super redefinedMethodAtThreeLevels
-
-	Superclass>>redefinedMethodAtThreeLevels
-		^ 5
-	"
-
-	self assert: (self executeSelector: #redefinedMethodAtThreeLevels) equals: 5
-]]]
-
-[[[
-CHInterpreter >> visitMessageNode: aMessageNode
-
-	| rec method args lookupClass | 
-	rec := self visitNode: aMessageNode receiver.
-	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
-	lookupClass := aMessageNode receiver isSuper ifTrue: [ self currentMethod methodClass superclass ] ifFalse: [ rec class ].
-	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
-	^ self executeMethod: method withReceiver: rec andArguments: args
-]]]
-
 
 
 [[[
@@ -1001,417 +13,10 @@ CHInterpreterTest >> testBlockValueIsLastStatementValue
 ]]]
 
 
-[[[
-CInterpretable >> changeCollaboratorXWithConflictingArgumentNAmes
 
-	self collaboratorXIgnoringArgumentWithSameName: 1987
-]]]
 
-[[[
-CInterpretable >> sendMessageInSuperclass
 
-	^ self methodNotInSubclass
-]]]
 
-[[[
-CInterpretable >> readTemporaryVariableAfterMessageSend
-
-	| temp |
-	temp := 17.
-	collaborator returnUnassignedTemp.
-	^ temp
-]]]
-
-[[[
-CInterpretable >> redefinedMethod
-
-	^ super redefinedMethod
-]]]
-
-[[[
-CInterpretable >> readCollaboratorTemporaryVariable
-
-	| temp |
-	temp := 17.
-	^ collaborator returnUnassignedTemp
-]]]
-
-[[[
-CInterpretable >> returnUnassignedTemp
-
-	| temp |
-	^ temp
-]]]
-
-[[[
-CInterpretable >> superMessageSend
-
-	^ super methodNotInSubclass
-]]]
-
-[[[
-CInterpretable >> readInstanceVariableAfterMessageSend
-
-	collaborator returnUnassignedTemp.
-	^ x
-]]]
-
-[[[
-CInterpretable >> writeTemporaryVariable
-
-	| temp |
-	temp := 100.
-	^ temp
-]]]
-
-[[[
-CInterpretable >> writeCollaboratorTemporaryVariable
-
-	| temp |
-	temp := 17.
-	collaborator writeTemporaryVariable.
-	^ temp
-]]]
-
-[[[
-CInterpretable >> readArgumentVariableAfterMessageSend
-	
-	^ self readArgumentVariableAfterMessageSend: 17
-]]]
-
-[[[
-CInterpretable >> collaboratorX: anInteger
-
-	collaborator x: anInteger
-]]]
-
-[[[
-CInterpretable >> collaboratorXIgnoringArgumentWithSameName: anInteger
-	"precondition: The argument of method x: has name anInteger too, and they should not collide"
-	collaborator x: 100
-]]]
-
-[[[
-CInterpretable >> sendMessageReturnX
-
-	^ self returnX
-]]]
-
-[[[
-CInterpretable >> collaboratorX
-
-	^ collaborator x
-]]]
-
-[[[
-CInterpretable >> changeCollaboratorWithArgument
-
-	collaborator x: 500
-]]]
-
-[[[
-CInterpretable >> readTemporaryVariable
-
-	| temp |
-	^ temp
-]]]
-
-[[[
-CInterpretable >> cocollaboratorX: anInteger
-
-	self collaboratorX: anInteger
-
-	
-]]]
-
-[[[
-CInterpretable >> changeCollaboratorX
-
-	collaborator store100IntoX
-]]]
-
-
-[[[
-CInterpretable >> readArgumentVariableAfterMessageSend: arg
-
-	collaborator returnUnassignedTemp.
-	^ arg
-]]]
-
-[[[
-CInterpretable >> returnInteger
-
-	^ 5
-]]]
-
-[[[
-CInterpretable >> returnFloat
-
-	^ 3.14
-]]]
-
-[[[
-CInterpretable >> returnEmptyArray
-
-	^ #()
-]]]
-
-[[[
-CInterpretable >> returnX
-
-	^ x 
-]]]
-
-[[[
-CInterpretable >> store100IntoX
-
-	x := 100.
-]]]
-
-[[[
-CInterpretable >> returnLiteralArray
-
-	^ #(true 1 'ahah')
-]]]
-
-[[[
-CInterpretable >> returnSuper
-
-	^ super
-]]]
-
-[[[
-CInterpretable >> returnBoolean
-
-	^ false
-]]]
-
-[[[
-CInterpretable >> returnSelf
-
-	^ self
-]]]
-
-
-[[[
-CInterpretable >> returnGlobal
-
-	^ Global
-]]]
-
-[[[
-CInterpretable >> changeCollaboratorXWithConflictingArgumentNAmes
-
-	self collaboratorXIgnoringArgumentWithSameName: 1987
-]]]
-
-[[[
-CInterpretable >> sendMessageInSuperclass
-
-	^ self methodNotInSubclass
-]]]
-
-[[[
-CInterpretable >> readTemporaryVariableAfterMessageSend
-
-	| temp |
-	temp := 17.
-	collaborator returnUnassignedTemp.
-	^ temp
-]]]
-
-[[[
-CInterpretable >> redefinedMethod
-
-	^ super redefinedMethod
-]]]
-
-[[[
-CInterpretable >> readCollaboratorTemporaryVariable
-
-	| temp |
-	temp := 17.
-	^ collaborator returnUnassignedTemp
-]]]
-
-[[[
-CInterpretable >> returnUnassignedTemp
-
-	| temp |
-	^ temp
-]]]
-
-[[[
-CInterpretable >> superMessageSend
-
-	^ super methodNotInSubclass
-]]]
-
-[[[
-CInterpretable >> readInstanceVariableAfterMessageSend
-
-	collaborator returnUnassignedTemp.
-	^ x
-]]]
-
-[[[
-CInterpretable >> writeTemporaryVariable
-
-	| temp |
-	temp := 100.
-	^ temp
-]]]
-
-[[[
-CInterpretable >> writeCollaboratorTemporaryVariable
-
-	| temp |
-	temp := 17.
-	collaborator writeTemporaryVariable.
-	^ temp
-]]]
-
-[[[
-CInterpretable >> readArgumentVariableAfterMessageSend
-	
-	^ self readArgumentVariableAfterMessageSend: 17
-]]]
-
-[[[
-CInterpretable >> collaboratorX: anInteger
-
-	collaborator x: anInteger
-]]]
-
-[[[
-CInterpretable >> collaboratorXIgnoringArgumentWithSameName: anInteger
-	"precondition: The argument of method x: has name anInteger too, and they should not collide"
-	collaborator x: 100
-]]]
-
-[[[
-CInterpretable >> sendMessageReturnX
-
-	^ self returnX
-]]]
-
-[[[
-CInterpretable >> collaboratorX
-
-	^ collaborator x
-]]]
-
-[[[
-CInterpretable >> changeCollaboratorWithArgument
-
-	collaborator x: 500
-]]]
-
-[[[
-CInterpretable >> readTemporaryVariable
-
-	| temp |
-	^ temp
-]]]
-
-[[[
-CInterpretable >> cocollaboratorX: anInteger
-
-	self collaboratorX: anInteger
-
-	
-]]]
-
-[[[
-CInterpretable >> changeCollaboratorX
-
-	collaborator store100IntoX
-]]]
-
-
-[[[
-CInterpretable >> readArgumentVariableAfterMessageSend: arg
-
-	collaborator returnUnassignedTemp.
-	^ arg
-]]]
-
-[[[
-CInterpretable >> returnInteger
-
-	^ 5
-]]]
-
-[[[
-CInterpretable >> returnFloat
-
-	^ 3.14
-]]]
-
-[[[
-CInterpretable >> returnEmptyArray
-
-	^ #()
-]]]
-
-[[[
-CInterpretable >> returnX
-
-	^ x 
-]]]
-
-[[[
-CInterpretable >> store100IntoX
-
-	x := 100.
-]]]
-
-[[[
-CInterpretable >> returnLiteralArray
-
-	^ #(true 1 'ahah')
-]]]
-
-[[[
-CInterpretable >> returnSuper
-
-	^ super
-]]]
-
-[[[
-CInterpretable >> returnBoolean
-
-	^ false
-]]]
-
-[[[
-CInterpretable >> returnSelf
-
-	^ self
-]]]
-
-
-[[[
-CInterpretable >> returnGlobal
-
-	^ Global
-]]]
-
-[[[
-CInterpretable >> returnBlockValue
-		^ [ 1 . 5 ] value
-]]]
-
-[[[
-CInterpretable >> returnBlockValue
-	
-	^ [ 1 . 5 ] value
-]]]
-
-[[[
-CHInterpreter >> visitBlockNode: aRBBlockNode 
-	self shouldBeImplemented.
-]]]
 
 [[[
 Object subclass: #CHBlock
@@ -1768,7 +373,7 @@ CHInterpreterTest >> testReadBlockTemporaryVariable
 ]]]
 
 [[[
-CInterpretable >> readBlockTemporaryVariable
+CHInterpretable >> readBlockTemporaryVariable
 
 	^ [ | temp | temp := 100. temp ] value
 ]]]
@@ -1794,7 +399,7 @@ CHInterpreterTest >> testReadSelfInBlock
 ]]]
 
 [[[
-CInterpretable >> readSelfInBlock
+CHInterpretable >> readSelfInBlock
 
 	^ [ self ] value
 ]]]
@@ -1874,7 +479,7 @@ CHInterpreter >> visitMessageNode: aMessageNode
 ]]]
 
 [[[
-CInterpretable >> readSuperInBlock
+CHInterpretable >> readSuperInBlock
 
 	^ [ super ] value
 ]]]
@@ -1901,12 +506,12 @@ CHInterpreterTest >> testReadInstanceVariableInBlock
 ]]]
 
 [[[
-CInterpretable >> readInstanceVariableInBlock
+CHInterpretable >> readInstanceVariableInBlock
 		^ [ x := 17 ] value
 ]]]
 
 [[[
-CInterpretable >> readInstanceVariableInBlock
+CHInterpretable >> readInstanceVariableInBlock
 
 	^ [ x := 17 ] value
 ]]]
@@ -1923,25 +528,25 @@ CHInterpreterTest >> testWriteInstanceVariableInBlock
 ]]]
 
 [[[
-CInterpretable >> writeInstanceVariableInBlock
+CHInterpretable >> writeInstanceVariableInBlock
 
 	^ [ x := 17 ] value
 ]]]
 
 [[[
-CInterpretable >> writeInstanceVariableInBlock
+CHInterpretable >> writeInstanceVariableInBlock
 
 	^ [ x ] value
 ]]]
 
 [[[
-CInterpretable >> writeInstanceVariableInBlock
+CHInterpretable >> writeInstanceVariableInBlock
 
 	^ [ x := 17 ] value
 ]]]
 
 [[[
-CInterpretable >> readInstanceVariableInBlock
+CHInterpretable >> readInstanceVariableInBlock
 
 	^ [ x ] value
 ]]]
@@ -1957,7 +562,7 @@ CHInterpreterTest >> testReadInstanceVariableInBlock
 ]]]
 
 [[[
-CInterpretable >> readTemporaryVariableInBlock
+CHInterpretable >> readTemporaryVariableInBlock
 	
 	| temp |
 	temp := 17.
@@ -2228,25 +833,25 @@ CHInterpreterTest >> testReadOuterArgumentVariableInBlock
 ]]]
 
 [[[
-CInterpretable >> readOuterArgumentVariableInBlock
+CHInterpretable >> readOuterArgumentVariableInBlock
 
 	self readOuterArgumentVariableInBlock: 25
 ]]]
 
 [[[
-CInterpretable >> readOuterArgumentVariableInBlock
+CHInterpretable >> readOuterArgumentVariableInBlock
 
 	^ self readOuterArgumentVariableInBlock: 25
 ]]]
 
 [[[
-CInterpretable >> readOuterArgumentVariableInBlock: argument
+CHInterpretable >> readOuterArgumentVariableInBlock: argument
 
 		^ [ argument ] value
 ]]]
 
 [[[
-CInterpretable >> readOuterArgumentVariableInBlock: argument
+CHInterpretable >> readOuterArgumentVariableInBlock: argument
 
 	^ [ argument ] value
 ]]]
@@ -2290,14 +895,14 @@ CHInterpreterTest >> testReadHomeTemporaryVariableInBlock
 ]]]
 
 [[[
-CInterpretable >> readHomeTemporaryVariableInBlock
+CHInterpretable >> readHomeTemporaryVariableInBlock
 		| temp |
 		temp := 17.
 		^ [ [ temp ] value ] value
 ]]]
 
 [[[
-CInterpretable >> readHomeTemporaryVariableInBlock
+CHInterpretable >> readHomeTemporaryVariableInBlock
 	
 	| temp |
 	temp := 17.
@@ -2305,25 +910,25 @@ CInterpretable >> readHomeTemporaryVariableInBlock
 ]]]
 
 [[[
-CInterpretable >> readHomeArgumentVariableInBlock: argument
+CHInterpretable >> readHomeArgumentVariableInBlock: argument
 
 	^ [ [ argument ] argument ] value
 ]]]
 
 [[[
-CInterpretable >> readHomeOuterArgumentVariableInBlock
+CHInterpretable >> readHomeOuterArgumentVariableInBlock
 
 	^ self readHomeOuterArgumentVariableInBlock: 89
 ]]]
 
 [[[
-CInterpretable >> readHomeOuterArgumentVariableInBlock: argument
+CHInterpretable >> readHomeOuterArgumentVariableInBlock: argument
 
 	^ [ [ argument ] argument ] value
 ]]]
 
 [[[
-CInterpretable >> readHomeArgumentVariableInBlock: argument
+CHInterpretable >> readHomeArgumentVariableInBlock: argument
 
 	^ [ [ argument ] argument ] value
 ]]]
@@ -2345,7 +950,7 @@ CHInterpreterTest >> testReadHomeOuterArgumentVariableInBlock
 ]]]
 
 [[[
-CInterpretable >> readHomeOuterArgumentVariableInBlock: argument
+CHInterpretable >> readHomeOuterArgumentVariableInBlock: argument
 
 	^ [ [ argument ] value ] value
 ]]]
@@ -2401,7 +1006,7 @@ CHInterpreterTest >> testReadTwoLevelOuterArgumentVariableInBlock
 ]]]
 
 [[[
-CInterpretable >> readTwoLevelOuterArgumentVariableInBlock
+CHInterpretable >> readTwoLevelOuterArgumentVariableInBlock
 	
 	^ [ :argument | [ argument ] value ] value: 99
 ]]]
@@ -2438,7 +1043,7 @@ CHInterpreterTest >> testReadTwoLevelOuterTemporaryVariableInBlock
 ]]]
 
 [[[
-CInterpretable >> readTwoLevelOuterTemporaryVariableInBlock
+CHInterpretable >> readTwoLevelOuterTemporaryVariableInBlock
 	
 	^ [ | temp | temp := 88888. [ temp ] value ] value
 ]]]
@@ -2474,7 +1079,7 @@ CHInterpreterTest >> testReadHomeOuterArgumentVariableInBlockFromDistantCall
 ]]]
 
 [[[
-CInterpretable >> readHomeOuterArgumentVariableInBlockFromDistantCall
+CHInterpretable >> readHomeOuterArgumentVariableInBlockFromDistantCall
 
 		^ self readHomeOuterArgumentVariableInBlockFromDistantCall: 89
 	
@@ -2482,32 +1087,32 @@ CInterpretable >> readHomeOuterArgumentVariableInBlockFromDistantCall
 ]]]
 
 [[[
-CInterpretable >> readHomeOuterArgumentVariableInBlockFromDistantCall
+CHInterpretable >> readHomeOuterArgumentVariableInBlockFromDistantCall
 
 		^ self readHomeOuterArgumentVariableInBlockFromDistantCall: 89
 
 ]]]
 
 [[[
-CInterpretable >> readHomeOuterArgumentVariableInBlockFromDistantCall
+CHInterpretable >> readHomeOuterArgumentVariableInBlockFromDistantCall
 
 		^ self readHomeOuterArgumentVariableInBlockFromDistantCall: 89
 ]]]
 
 [[[
-CInterpretable >> readHomeOuterArgumentVariableInBlockFromDistantCall
+CHInterpretable >> readHomeOuterArgumentVariableInBlockFromDistantCall
 
 	^ self readHomeOuterArgumentVariableInBlockFromDistantCall: 89
 ]]]
 
 [[[
-CInterpretable >> readHomeOuterArgumentVariableInBlockFromDistantCall: argument
+CHInterpretable >> readHomeOuterArgumentVariableInBlockFromDistantCall: argument
 
 	^ self evaluateBlock: [ [ argument ] value ]
 ]]]
 
 [[[
-CInterpretable >> evaluateBlock: aBlock
+CHInterpretable >> evaluateBlock: aBlock
 
 	^ aBlock value
 ]]]
@@ -2555,7 +1160,7 @@ CHInterpreterTest >> testReadHomeOuterTemporaryVariableInBlockFromDistantCall
 ]]]
 
 [[[
-CInterpretable >> readHomeOuterTemporaryVariableInBlockFromDistantCall
+CHInterpretable >> readHomeOuterTemporaryVariableInBlockFromDistantCall
 
 	| temp block |
 	temp := 1.
@@ -2565,7 +1170,7 @@ CInterpretable >> readHomeOuterTemporaryVariableInBlockFromDistantCall
 ]]]
 
 [[[
-CInterpretable >> readHomeOuterTemporaryVariableInBlockFromDistantCall
+CHInterpretable >> readHomeOuterTemporaryVariableInBlockFromDistantCall
 
 	| temp block |
 	temp := 1.

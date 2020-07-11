@@ -1,4 +1,5 @@
 ${inputFile:path=Chapters/1-AstVisitors.pillar}$
 ${inputFile:path=Chapters/2-EvaluatorStructure.pillar}$
 ${inputFile:path=Chapters/3-EvaluatorMessage.pillar}$
+${inputFile:path=Chapters/4-EvaluatorBloc.pillar}$
 ${inputFile:path=Chapters/4-AbstractInterpretation.pillar}$
