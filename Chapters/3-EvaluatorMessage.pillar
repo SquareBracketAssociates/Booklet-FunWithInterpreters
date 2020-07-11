@@ -594,7 +594,6 @@ CHInterpreterTest >> testLookupRedefinedMethod [
 	CHInterpretableSuperClass>>redefinedMethod
 		^ 5
 	"
-
 	self assert: (self executeSelector: #redefinedMethod) equals: 5
 ]
 ]]]
@@ -644,7 +643,7 @@ CHInterpreterTest >> testLookupSuperMessageNotInReceiverSuperclass [
 ]]]
 
 
-You can reproduce the wrong semantics as follows. Just watch out that the previous test will loop forever. 
+The following method reproduces the wrong semantics. Just watch out that the previous test will loop forever.
 
 [[[
 CHInterpreter >> visitMessageNode: aMessageNode [
@@ -658,7 +657,9 @@ CHInterpreter >> visitMessageNode: aMessageNode [
 ]
 ]]]
 
-!!! Intermezzo -- About temporaries
+We are ready to introduce temporaries.
+
+!!! Intermezzo -- About Temporaries
 
 Before implementing the interpretation of temporaries we want to show some particularities of Pharo semantics.
 Temporaries cannot shadow other temporaries.
@@ -675,6 +676,7 @@ The following expression is rejected by the compiler because the second ==tmp== 
 
 Similarly a temporary cannot shadow a block or a method parameter.
 Therefore the following expression is not allowed.
+
 [[[language=pharo
 [ :tmp |
 	| tmp |
@@ -689,11 +691,12 @@ with: arg
 	^ arg
 ]]]	
 
+!!!! Parameters are Read Only
 Finally parameters are read only. 
-Therefore the following method is not valid. 
+Therefore the following method is not valid.
 [[[language=pharo
 with: arg
-	arg := 42	
+	arg := 42
 ]]]
 
 As well as the following expression
@@ -704,83 +707,194 @@ As well as the following expression
 	 ]
 ]]]
 
-We can say that inside a method the names of parameters, temporaries and instance variables are flattened and use a single namespace.
 
 
 !!! Handling Temporaries
 
-Here!
+Inside a method, the names of parameters, temporaries and instance variables are flattened and use a single namespace.
+We will manage temporaries the same way as parameters.
 
-
-
-
+We start by defining a method just defining and not assigning any value to a temporary variable.
 
 [[[
-CHInterpreter >> visitAssignmentNode: anAssignmentNode
-	"| x y |
-	x := y := 10.
-	x
-	>>> 10"
+CHInterpretable >> returnUnassignedTemp [
+	| temp |
+	^ temp
+]
+]]]
+
+The companion test verifies that the value of a uninitialized temporary is ==nil==.
+[[[
+CHInterpreterTest >> testUnassignedTempHasNilValue [
+	self assert: (self executeSelector: #returnUnassignedTemp) equals: nil
+]
+]]]
+
+The current subset of Pharo that we interpret does not contain blocks and their local/temporary variables.
+Therefore the temporary variable management is rather simple.
+We modify the == executeMethod:withReceiver:andArguments:== to define the temporaries needed.
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection [
+	| result |
+	self pushNewFrame.
+	self tempAt: #___method put: anAST.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ].
+	anAST temporaryNames do: [ :tempName | self tempAt: tempName name put: nil ].
+	result := self visitNode: anAST body.
+	self popFrame.
+	^ result
+]
+]]]
+
+The value of a temporary variable is simply to return the value associated to the variable name in the current frame.
+[[[
+CHInterpreter >> visitTemporaryNode: aRBTemporaryNode [
+	^ self tempAt: aRBTemporaryNode name
+]
+]]]
+
+The test should be pass.
+
+!!! Checking Temporary Writing
+We test also that writing to a temporary variable is working.
+We define the simple method ==writeTemporaryVariable==.
+
+[[[
+CHInterpretable >> writeTemporaryVariable [
+		| temp |
+		temp := 100.
+		^ temp
+]
+]]]
+
+Its companion test should pass.
+
+[[[
+CHInterpreterTest >> testWriteTemporaryVariable [
+	"writeTemporaryVariable
+		| temp |
+		temp := 100.
+		^ temp
+	"
+	self assert: (self executeSelector: #writeTemporaryVariable) equals: 100
+]
+]]]	
+
+!!! Extended Read Temp Tests
+
+We take the time to make sure that our implementation is correct. For example, temporaries should correctly
+work when sending another message. 
+The method ==readCollaboratorTemporaryVariable== defines locally a variable with the same name than ==returnUnassignedTemp==.
+Within ==readCollaboratorTemporaryVariable== we assign the temp.
+[[[
+CHInterpretable >> readCollaboratorTemporaryVariable [
+	| temp |
+	temp := 17.
+	^ collaborator returnUnassignedTemp
+]
+]]]
+
+The companion test verifies that the assignment in one method does not affect the other.
+[[[
+CHInterpreterTest >> testReadTemporaryVariableDoesNotEscapeItsDefinition [
+	"
+	readCollaboratorTemporaryVariable
+		| temp |
+		temp := 17.
+		^ collaborator returnUnassignedTemp
 	
-	| value | 
-	value := (self visitNode: anAssignmentNode value).
-	anAssignmentNode variable store: value with: self.
-	^ value
+	returnUnassignedTemp
+		| temp |
+		^ temp
+	"
+	self assert: (self executeSelector: #readCollaboratorTemporaryVariable) equals: nil
+]
 ]]]
 
 
 [[[
-CBasicInterpreterTest >> testTempsAccessShouldNotEscapeMethods
-
-	| ast result |
-	ast := (CInterpretable >> #methodWithTemp) ast.
-	result := self interpreter execute: ast withReceiver: CInterpretable new. 
-	self assert: result equals: nil 
-]]]
-
-
-[[[
-CBasicInterpreterTest >> testTempsShouldNotEscapeMethods
-
-	| ast result |
-	ast := (CInterpretable >> #methodWithTemp) ast.
-	result := self interpreter execute: ast withReceiver: CInterpretable new. 
-	self assert: result equals: nil 
-]]]
-
-[[[
-CBasicInterpreterTest >> testTempsWritingShouldNotEscapeMethods
-
-	| ast result |
-	ast := (CInterpretable >> #methodCallingModifyingTemp) ast.
-	result := self interpreter execute: ast withReceiver: CInterpretable new. 
-	self assert: result equals: 7
-]]]
-
-
-[[[
-BasicInterpreter1Test >> testAccessInstanceVariable
-
-	| ast result |
-	ast := (CInterpretable >> #returnX) ast.
-	result := self interpreter execute: ast withReceiver: (CInterpretable new x: 100).
-	self assert: result equals: 100. 
+CHInterpreterTest >> testReadTemporaryVariableAfterMessageSend [
+	"
+	readTemporaryVariableAfterMessageSend
+		| temp |
+		temp := 17.
+		collaborator returnUnassignedTemp.
+		^ temp
 	
+	returnUnassignedTemp
+		| temp |
+		^ temp
+	"
+	self assert: (self executeSelector: #readTemporaryVariableAfterMessageSend) equals: 17
+]
 ]]]
 
 
+
+
+
+!!! Extended write temp tests
 
 [[[
-BasicInterpreter1Test >> testAccessXInInstance
+CHInterpreterTest >> testWriteTemporaryVariableDoesNotEscapeItsDefinition [
+	"writeCollaboratorTemporaryVariable
 
-	| ast result |
-	ast := (CInterpretable >> #returnX) ast.
-	result := self interpreter execute: ast withReceiver: (CInterpretable new x: 100).
-	self assert: result equals: 100. 
+		| temp |
+		temp := 17.
+		collaborator writeTemporaryVariable.
+		^ temp
 	
+	writeTemporaryVariable
+
+		| temp |
+		temp := 100.
+		^ temp
+	"
+	self assert: (self executeSelector: #writeCollaboratorTemporaryVariable) equals: 17
+]
 ]]]
 
 
 
 
+!!! Extra tests
 
+[[[
+testArgumentAccess [
+	"
+	changeCollaboratorWithArgument
+		collaborator x: 500
+	"
+
+	receiver x: 200.
+	collaborator x: 300.
+	self executeSelector: #changeCollaboratorWithArgument.
+	self assert: receiver x equals: 200.
+	self assert: collaborator x equals: 500
+]
+]]]
+	
+[[[
+testArgumentAccessDoesNotEscapeItsDefinition [
+	"
+	changeCollaboratorXWithConflictingArgumentNAmes
+		collaborator collaboratorXIgnoringArgumentWithSameName: 1987
+	"
+
+	receiver x: 200.
+	collaborator x: 300.
+
+	"Test precondition. Both methods have arguments with the same name.
+	Otherwise this test could be green but false."
+	self
+		assert: (C#Interpretable >> #collaboratorXIgnoringArgumentWithSameName:) argumentNames
+		equals: (C#Interpretable >> #x:) argumentNames.
+
+	self executeSelector: #changeCollaboratorXWithConflictingArgumentNAmes.
+
+	self assert: receiver x equals: 200.
+	self assert: collaborator x equals: 100
+]
+]]]

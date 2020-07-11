@@ -210,6 +210,15 @@ CInterpretable >> changeCollaboratorXWithConflictingArgumentNAmes
 	self collaboratorXIgnoringArgumentWithSameName: 1987
 ]]]
 
+
+
+
+
+
+
+
+
+************************************************************************************
 [[[
 CInterpretable >> returnUnassignedTemp
 
@@ -236,25 +245,10 @@ CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aColl
 	^ self visitNode: anAST
 ]]]
 
-[[[
-CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
-	self pushNewFrame.
-	self tempAt: #self put: anObject.
-	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
-	anAST temporaryNames do: [ :tempName | self tempAt: tempName put: nil ]. 
-	^ self visitNode: anAST
-]]]
 
-[[[
-CHInterpreter >> visitTemporaryNode: aRBTemporaryNode 
-	self shouldBeImplemented.
-]]]
 
-[[[
-CHInterpreter >> visitTemporaryNode: aRBTemporaryNode 
-	
-	^ self tempAt: aRBTemporaryNode name
-]]]
+
+
 
 [[[
 CInterpretable >> readCollaboratorTemporaryVariable
