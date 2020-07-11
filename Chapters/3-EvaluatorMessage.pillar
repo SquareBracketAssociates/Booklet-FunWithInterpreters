@@ -29,7 +29,6 @@ We define the method ==pushNewFrame==. This means that we add on the top of the 
 CHInterpreter >> pushNewFrame [
 	"Pushing a new scope consists in creating a new dictionary whose parent is the top of the stack
 	and pushing it as a new top. This way a variable not found in current scope will be looked up in previous scope."
-
 	| newTop |
 	newTop := Dictionary new.
 	stack push: newTop.
@@ -91,11 +90,9 @@ And we define a companion test.
 
 [[[language=pharo
 CHInterpreterTest >> testSelfSend [
-	"
-	sendMessageReturnX
+	"sendMessageReturnX
 		^ self returnX
 	"
-
 	receiver x: 100.
 	self 
 		assert: (self executeSelector: #sendMessageReturnX) 
@@ -112,7 +109,6 @@ And we return the result of the execution of the method with the receiver.
 
 [[[
 CHInterpreter >> visitMessageNode: aMessageNode [
-
 	| rec method | 
 	rec := self visitNode: aMessageNode receiver.
 	method := (rec class compiledMethodAt: aSymbol) ast.
@@ -125,7 +121,6 @@ But so far so good.
 
 
 !!! Balancing the Stack
-
 We mentioned earlier that the following method (==executeMethod:withReceiver: ==) was not fully correct.
 
 [[[language=pharo
@@ -189,21 +184,19 @@ and return the value of ==x==.
 
 [[[
 CHInterpreterTest >> testBalancingStack [
-	"
-	setXAndMessage
-
+	"setXAndMessage
 		x := 1000.
 		collaborator returnX.
 		^ x
 	"
 	self assert: (self executeSelector: #setXAndMessage) equals: 1000
-	]
+]
 ]]]
 
 Executing this test breaks because the access to the instance variable ==x== returns nil. 
 This is due to the fact that the frame created by the execution of the message ==returnX== 
 has the uninitialized receiver (the object refered by ==collaborator== variable) and that 
-such frame is not pop out of the stack once the message is executed. 
+such frame is not pop out of the stack once the message is executed.
 
 To solve this problem is relatively simple, we should pop the frame at the end of message send. 
 This way the stack is balanced. This is what the new implementation of ==executeMethod:withReceiver:==
@@ -234,11 +227,9 @@ CInterpretable >> changeCollaboratorX [
 Then we test 
 [[[
 CHInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSender [
+	"changeCollaboratorX
+		collaborator store100IntoX
 	"
-	changeCollaboratorX
- 		collaborator store100IntoX
-	"
-
 	receiver x: 200.
 	collaborator x: 300.
 	self executeSelector: #changeCollaboratorX.
@@ -246,8 +237,6 @@ CHInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSen
 	self assert: collaborator x equals: 100
 ]
 ]]]
-
-
 
 We are ready our journey in message handling.
 
@@ -271,11 +260,9 @@ as written in ==changeCollaboratorWithArgument==.
 
 [[[language=smalltalk
 testArgumentAccess [
-	"
-	changeCollaboratorWithArgument
+	"changeCollaboratorWithArgument
 		collaborator x: 500
 	"
-
 	receiver x: 200.
 	collaborator x: 300.
 	self executeSelector: #changeCollaboratorWithArgument.
@@ -360,7 +347,6 @@ For example in the message ==anObject returnArg: 1+4== that the value of the arg
 
 [[[
 CHInterpreter >> visitMessageNode: aMessageNode [
-
 	| rec method args |
 	rec := self visitNode: aMessageNode receiver.
 	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
@@ -428,13 +414,11 @@ method is not found.
 
 [[[
 CHInterpreterTest >> testLookupMessageInSuperclass [
-	"
-	CHInterpretable >> sendMessageInSuperclass
+	"CHInterpretable >> sendMessageInSuperclass
 		^ self methodNotInSubclass
 	CHInterpretableSuperclass >> methodNotInSubclass
 		^ 5
 	"
-
 	self assert: (self executeSelector: #sendMessageInSuperclass) equals: 5
 ]
 ]]]
@@ -503,13 +487,11 @@ Once these methods defined, the following test
 
 [[[
 CHInterpreterTest >> testLookupSuperMessage [
-	"
-	CHInterpretable >> superMessageSend
+	"CHInterpretable >> superMessageSend
 		^ super methodNotInSubclass
 	Superclass >> methodNotInSubclass
 		^ 5
 	"
-
 	self assert: (self executeSelector: #superMessageSend) equals: 5
 ]
 ]]]
@@ -588,10 +570,9 @@ method defined in the superclass is effectively executed.
 
 [[[
 CHInterpreterTest >> testLookupRedefinedMethod [
-	"
-	CHInterpretable>>redefinedMethod
+	"CHInterpretable >> redefinedMethod
 		^ super redefinedMethod
-	CHInterpretableSuperClass>>redefinedMethod
+	CHInterpretableSuperClass >> redefinedMethod
 		^ 5
 	"
 	self assert: (self executeSelector: #redefinedMethod) equals: 5
@@ -678,9 +659,9 @@ Similarly a temporary cannot shadow a block or a method parameter.
 Therefore the following expression is not allowed.
 
 [[[language=pharo
-[ :tmp |
-	| tmp |
-	tmp := 2]
+	[ :tmp |
+		| tmp |
+		tmp := 2 ]
 ]]]
 
 The following method is not valid either.
@@ -702,9 +683,8 @@ with: arg
 As well as the following expression
 
 [[[language=pharo
-[ :tmp |
-	tmp := 2
-	 ]
+	[ :tmp |
+		tmp := 2 ]
 ]]]
 
 
@@ -763,9 +743,9 @@ We define the simple method ==writeTemporaryVariable==.
 
 [[[
 CHInterpretable >> writeTemporaryVariable [
-		| temp |
-		temp := 100.
-		^ temp
+	| temp |
+	temp := 100.
+	^ temp
 ]
 ]]]
 
@@ -799,8 +779,7 @@ CHInterpretable >> readCollaboratorTemporaryVariable [
 The companion test verifies that the assignment in one method does not affect the other.
 [[[
 CHInterpreterTest >> testReadTemporaryVariableDoesNotEscapeItsDefinition [
-	"
-	readCollaboratorTemporaryVariable
+	"readCollaboratorTemporaryVariable
 		| temp |
 		temp := 17.
 		^ collaborator returnUnassignedTemp
@@ -813,11 +792,21 @@ CHInterpreterTest >> testReadTemporaryVariableDoesNotEscapeItsDefinition [
 ]
 ]]]
 
+We verifies the same situation after a message send by define the method ==readTemporaryVariableAfterMessageSend==
+and a companion test.
+
+[[[
+CHInterpreterTest >> readTemporaryVariableAfterMessageSend [
+	| temp |
+	temp := 17.
+	collaborator returnUnassignedTemp.
+	^ temp
+]
+]]]
 
 [[[
 CHInterpreterTest >> testReadTemporaryVariableAfterMessageSend [
-	"
-	readTemporaryVariableAfterMessageSend
+	"readTemporaryVariableAfterMessageSend
 		| temp |
 		temp := 17.
 		collaborator returnUnassignedTemp.
@@ -830,9 +819,6 @@ CHInterpreterTest >> testReadTemporaryVariableAfterMessageSend [
 	self assert: (self executeSelector: #readTemporaryVariableAfterMessageSend) equals: 17
 ]
 ]]]
-
-
-
 
 
 !!! Extended write temp tests
