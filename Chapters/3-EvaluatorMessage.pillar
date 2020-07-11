@@ -879,6 +879,8 @@ CHInterpretable >> writeCollaboratorTemporaryVariable [
 ]
 ]]]
 
+The test verifies that the semantics is correctly handled: a temporary access or store is only working on the associate
+frame -- frame that is correctly push and pop on the stack. 
 [[[
 CHInterpreterTest >> testWriteTemporaryVariableDoesNotEscapeItsDefinition [
 	"writeCollaboratorTemporaryVariable
@@ -898,6 +900,9 @@ CHInterpreterTest >> testWriteTemporaryVariableDoesNotEscapeItsDefinition [
 ]
 ]]]
 
+!!! Conclusion
 
+In this chapter we extended the interpreter to handle message arguments, method temporaries and method lookup.
+We revisited the semantics of ==self== and ==super==.
 
 
