@@ -135,7 +135,7 @@ Indeed, when we will execute multiple sends the stack will only grow and when th
 should be discarded from the stack. The current implementation clearly does not do it. 
 
 Let us write a test showing the problem.
-We add an extra instance variable to the class ==CInterpretable== with its companion accessors. 
+We add an extra instance variable to the class ==CHInterpretable== with its companion accessors. 
 This way we will be able to test that the correct object is set and passed around in future example.
 
 [[[
@@ -219,7 +219,7 @@ test, we take it.
 We define a new method named ==changeCollaboratorX==.
 
 [[[
-CInterpretable >> changeCollaboratorX [
+CHInterpretable >> changeCollaboratorX [
 	collaborator store100IntoX
 ]
 ]]]
@@ -250,7 +250,7 @@ Let us define some tests.
 We define a simple method ==changeCollaboratorWithArgument== which uses a setter.
 
 [[[language=smalltalk
-CInterpretable >> changeCollaboratorWithArgument [
+CHInterpretable >> changeCollaboratorWithArgument [
 	collaborator x: 500
 ]
 ]]]
@@ -357,6 +357,48 @@ CHInterpreter >> visitMessageNode: aMessageNode [
 
 Our tests should all pass. 
 
+!!! Verifying Argument Access
+
+We take some time to verify that the interpreter handles correctly argument. 
+
+We define the method ==collaboratorXIgnoringArgumentWithSameName:== that does not use its parameter.
+
+[[[
+CHinterpretable >> collaboratorXIgnoringArgumentWithSameName: anInteger [
+	collaborator x: 100 
+]
+]]]
+
+We define the method ==changeCollaboratorXWithConflictingArgumentNames==.
+
+[[[
+CHinterpretable >> changeCollaboratorXWithConflictingArgumentNames
+	collaborator collaboratorXIgnoringArgumentWithSameName: 1987
+]]]
+
+In the following test method, we set some state, then send a message to the method ==changeCollaboratorXWithConflictingArgumentNames==
+that invokes the method ==collaboratorXIgnoringArgumentWithSameName:== whose argument has the same name that the method ==x:==
+and it verifies that argument values did not interacted.
+[[[
+testArgumentAccessDoesNotEscapeItsDefinition [
+	" changeCollaboratorXWithConflictingArgumentNames
+		collaborator collaboratorXIgnoringArgumentWithSameName: 1987
+	"
+	receiver x: 200.
+	collaborator x: 300.
+	"Test precondition. Both methods have arguments with the same name.
+	Otherwise this test could be green but false."
+	self
+		assert: (CHInterpretable >> #collaboratorXIgnoringArgumentWithSameName:) argumentNames
+		equals: (CHInterpretable >> #x:) argumentNames.
+
+	self executeSelector: #changeCollaboratorXWithConflictingArgumentNames.
+	self assert: receiver x equals: 200.
+	self assert: collaborator x equals: 100
+]
+]]]
+
+
 !!! New Setup for Method Lookup
 
 So far we have put aside the method lookup.
@@ -396,7 +438,7 @@ only  ==CHInterpretable==.
 [[[
 CHInterpreterTest >> executeSelector: aSymbol [
 	| ast |
-	ast := (CInterpretable lookupSelector: aSymbol) ast.
+	ast := (CHInterpretable lookupSelector: aSymbol) ast.
 	^ self interpreter executeMethod: ast withReceiver: receiver
 ]
 ]]]
@@ -804,6 +846,9 @@ CHInterpreterTest >> readTemporaryVariableAfterMessageSend [
 ]
 ]]]
 
+The test ==testReadTemporaryVariableAfterMessageSend== verifies that the vale of the variable ==temp==
+is not changed by the message ==returnUnassignedTemp== that creates a new variable with the same name.
+
 [[[
 CHInterpreterTest >> testReadTemporaryVariableAfterMessageSend [
 	"readTemporaryVariableAfterMessageSend
@@ -821,7 +866,18 @@ CHInterpreterTest >> testReadTemporaryVariableAfterMessageSend [
 ]]]
 
 
-!!! Extended write temp tests
+!!! Extended Write Temp Tests
+We write some extra tests to verify that values get assigned to the correct temporaries. 
+We define a new simple method ==writeCollaboratorTemporaryVariable== that sets a value to a temporary
+with the same name as the ones defined in method ==writeTemporaryVariable==.
+[[[
+CHInterpretable >> writeCollaboratorTemporaryVariable [
+	| temp |
+	temp := 17.
+	collaborator writeTemporaryVariable.
+	^ temp
+]
+]]]
 
 [[[
 CHInterpreterTest >> testWriteTemporaryVariableDoesNotEscapeItsDefinition [
@@ -845,42 +901,3 @@ CHInterpreterTest >> testWriteTemporaryVariableDoesNotEscapeItsDefinition [
 
 
 
-!!! Extra tests
-
-[[[
-testArgumentAccess [
-	"
-	changeCollaboratorWithArgument
-		collaborator x: 500
-	"
-
-	receiver x: 200.
-	collaborator x: 300.
-	self executeSelector: #changeCollaboratorWithArgument.
-	self assert: receiver x equals: 200.
-	self assert: collaborator x equals: 500
-]
-]]]
-	
-[[[
-testArgumentAccessDoesNotEscapeItsDefinition [
-	"
-	changeCollaboratorXWithConflictingArgumentNAmes
-		collaborator collaboratorXIgnoringArgumentWithSameName: 1987
-	"
-
-	receiver x: 200.
-	collaborator x: 300.
-
-	"Test precondition. Both methods have arguments with the same name.
-	Otherwise this test could be green but false."
-	self
-		assert: (C#Interpretable >> #collaboratorXIgnoringArgumentWithSameName:) argumentNames
-		equals: (C#Interpretable >> #x:) argumentNames.
-
-	self executeSelector: #changeCollaboratorXWithConflictingArgumentNAmes.
-
-	self assert: receiver x equals: 200.
-	self assert: collaborator x equals: 100
-]
-]]]
