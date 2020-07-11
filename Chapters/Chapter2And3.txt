@@ -1,43 +1,6 @@
 
 
-[[[
-CHInterpreterTest >> testBlockValueIsLastStatementValue
-	"
-	This tests tests that it does not loop\
-	
-	returnBlockValue
-		^ [ 1 . 5 ] value
-	"
 
-	self assert: (self executeSelector: #returnBlockValue) equals: 5
-]]]
-
-
-
-
-
-
-
-[[[
-Object subclass: #CHBlock
-	instanceVariableNames: 'code'
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'Champollion-Core'
-]]]
-
-[[[
-CHInterpreter >> visitBlockNode: aRBBlockNode 
-	
-	^ CHBlock new
-		code: aRBBlockNode;
-		yourself
-]]]
-
-[[[
-CHBlock >> code: aRBBlockNode 
-	code := aRBBlockNode
-]]]
 
 [[[
 CHInterpreter >> visitMessageNode: aMessageNode
@@ -82,10 +45,7 @@ CHBlock >> value
 	self halt.
 ]]]
 
-[[[
-CHBlock >> code
-	^ code
-]]]
+
 
 [[[
 CHInterpreter >> visitMessageNode: aMessageNode

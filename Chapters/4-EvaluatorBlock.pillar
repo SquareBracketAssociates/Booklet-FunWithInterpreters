@@ -5,13 +5,117 @@ In Pharo closures are used to expression all the control-flow instructions.
 In this chapter we will extend interper to handle a first version of closures. 
 Later on we will add support for non-local return in Block.
 
-!!! Getting Started
+!!! Representing a Closure
+The interpretation of a closure is different from the interpretation of its execution. 
+The interpretation of a closure is the closure itself (the object that represents it).
+The interpretation of the execution is the execution of the closure body.
+
+It means that we need a way to represent a closure.
+A closure is similar in a way to a method, except that it does not have a name, and can be defined in a method or another block.
+
+We define a class, ==CHBlock== to represent a block. It has an instance variable ==code== to hold an AST represeting the block body.
+
+@@todo need a test
+
 
 [[[
-CHInterpretable >> returnBlockValue
-	^ [ 1 . 5 ] value
+Object subclass: #CHBlock
+	instanceVariableNames: 'code'
+	classVariableNames: ''
+	package: 'Champollion'
 ]]]
 
+[[[
+CHBlock >> code: aRBBlockNode 
+	code := aRBBlockNode
+]]]
+
+[[[
+CHBlock >> code
+	^ code
+]]]
+
+
+[[[
+CHInterpretable >> returnBlockValue [
+	^ [ 1 . 5 ] value
+]
+]]]
+
+
+[[[
+CHInterpreterTest >> testBlockValueIsLastStatementValue
+	"returnBlockValue
+		^ [ 1 . 5 ] value
+	"
+	self assert: (self executeSelector: #returnBlockValue) equals: 5
+]]]
+
+
+!!! About value
+
+[[[
+CHBlock >> value [
+
+	"AST interpreter primitive.
+	This will call"
+	<astInterpreterPrimitive: #value>
+	
+	"If there "
+	self halt.
+]
+]]]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+!!! Self in Block
+
+[[[
+CHInterpretable >> readSelfInBlock [
+	^ [ self ] value
+]
+]]]
+
+[[[
+CHInterpreterTest >> testReadSelfInBlock [
+	"readSelfInBlock
+		^ [ self ] value
+	"
+	self assert: (self executeSelector: #readSelfInBlock) equals: receiver
+]
+]]]
+
+
+!!! Instance Variable Store
+
+[[[
+CHInterpretable >> writeInstanceVariableInBlock
+	[ x := 17 ] value
+]]]
+
+
+[[[
+CHInterpreterTest >> testWriteInstanceVariableInBlock [
+	"
+	writeInstanceVariableInBlock
+		[ x := 17 ] value
+	"
+	self executeSelector: #writeInstanceVariableInBlock.
+	self assert: receiver x equals: 17
+]
+]]]
 
 
 !!! Conclusion
