@@ -17,6 +17,23 @@ We define a class, ==CHBlock== to represent a block. It has an instance variable
 
 @@todo need a test
 
+[[[
+CHInterpretable >> returnBlock [
+	^ [ 1 . 5 ]
+]
+]]]
+
+[[[
+CHInterpreterTest >> testBlock [
+	"returnBlock
+		^ [ 1 . 5 ]
+	"
+	| bk1 |
+	bk1 := (self executeSelector: #returnBlock).
+	self assert: bk1 code body isSequence
+]
+]]]
+
 
 [[[
 Object subclass: #CHBlock
@@ -97,6 +114,16 @@ CHInterpreterTest >> testReadSelfInBlock [
 ]
 ]]]
 
+!!! Instance Variable Access
+
+[[[
+CHInterpreterTest >> testReadInstanceVariableInBlock
+	"
+	readInstanceVariableInBlock
+		^ [ x ] value
+	"
+	self assert: (self executeSelector: #readInstanceVariableInBlock) equals: receiver x
+]]]
 
 !!! Instance Variable Store
 
