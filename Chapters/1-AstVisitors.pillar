@@ -79,7 +79,9 @@ expression formattedCode
 >>> 17.
 ]]]
 
+Figure *@NodeHierarchy* show the node inheritance hierarchy of Pharo.
 
++Overview of the method node hierarchy.>file://figures/RBNodeHierarchy.pdf|label=NodeHierarchy|width=80+
 
 !!!Literal Nodes
 
@@ -114,7 +116,7 @@ arrayExpression contents first
 >>> RBLiteralValueNode(1).
 ]]]
 
-!!!! The Variable Node, self and super nodes
+!!!! The Variable Node, Self and Super Nodes
 
 Variable nodes in the AST tree are used when variables are used or assigned to.
 Variables are instances of ==RBVariableNode== and know their ==name==.
@@ -306,7 +308,7 @@ We will introduce later two more instructions that can be included as part of a 
 Block nodes are expressions that are syntactically and thus structurally similar to methods.
 Return nodes, representing the return instruction ==\^==, are instruction nodes but not expression nodes, i.e., they can only be children of sequence nodes.
 
-@@note for guille I have the impressions that using statements is better than instruction. It would be nice also to have a diagram of the inheritance tree. 
+@@note for guille I have the impression that using statements is better than instruction. It would be nice also to have a diagram of the inheritance tree. 
 
 If we take the example from before, we can access the sequence node body of our method with the ==body== message.
 

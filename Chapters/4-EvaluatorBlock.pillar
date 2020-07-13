@@ -14,8 +14,11 @@ It means that we need a way to represent a closure.
 A closure is similar in a way to a method, except that it does not have a name, and can be defined in a method or another block.
 
 We define a class, ==CHBlock== to represent a block. It has an instance variable ==code== to hold an AST represeting the block body.
+The Pharo compiler represents a block as an instance of the ==RBBlockNode== class.
+It body is then an instance of the ==RBSequenceNode==.
 
-@@todo need a test
+We write a test for this. 
+The method ==returnBlock== just returns a block without executing it. 
 
 [[[
 CHInterpretable >> returnBlock [
@@ -23,13 +26,16 @@ CHInterpretable >> returnBlock [
 ]
 ]]]
 
+The test verifies that 
 [[[
 CHInterpreterTest >> testBlock [
-	"returnBlock
-		^ [ 1 . 5 ]
+	"
+	returnBlock
+		^ [ 1 . 5 ] 
 	"
 	| bk1 |
 	bk1 := (self executeSelector: #returnBlock).
+	self assert: bk1 code isBlock.
 	self assert: bk1 code body isSequence
 ]
 ]]]
