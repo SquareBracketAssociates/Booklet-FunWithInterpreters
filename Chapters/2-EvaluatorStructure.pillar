@@ -144,7 +144,7 @@ CHInterpreter >> visitLiteralValueNode: aRBLiteralValueNode [
 
 Our first test is now green and we are ready to continue our journey.
 
-!!! Evaluating Literal: Floats and Booleans
+!!! Evaluating Literals: Floats and Booleans
 
 For completeness, let's implement in our evaluator support for literal floats and booleans.
 Since we already have integer constants working, let's consider next a method returning a float literal.
@@ -238,7 +238,7 @@ If everything went ok, this test will be automatically green, without the need f
 This is because booleans are represented in the AST with literal value nodes, which we have already implemented.
 
 
-!!! Evaluating Literal Arrays
+!!! Evaluating Literals: Arrays
 
 Now that we support simple literals such as booleans and numbers, let's introduce literal arrays.
 Literal arrays are arrays that are defined inline in methods with all their elements being other literals.
@@ -451,7 +451,7 @@ Our test is failing so we are ready to make it work: we define ==visitInstanceVa
 
 [[[
 CHInterpreter >> visitInstanceVariableNode: aVariableNode [
-	^ receiver instVarNamed: aVariableNode name
+	^ self receiver instVarNamed: aVariableNode name
 ]	
 ]]]
 

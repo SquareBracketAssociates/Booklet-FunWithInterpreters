@@ -1,34 +1,56 @@
-!! Interpreter1: Handling Messages 
+!! Evaluating Message-sends
 
-While the previous chapter focused on basic element interpretation, this one will focus on the key abstraction in 
-object-oriented programming: message send.
-Introducing message send also means that we have to introduce a little infrastructure to manage the fact that each message can have a different receiver, temporaries and arguments. 
-Therefore we will cover: stack management, messages, temporaries, arguments and lookup.
+In the previous chapter we focused on structural evaluation: reading literal objects and reading and writing values from objects and globals. However, the key abstraction in object-oriented programming and in Pharo in particular are message-sends. The work we did in the previous chapter is nevertheless important to set up the stage: we know have a better taste of the visitor pattern, we started a first testing infrastructure, and eventually message-sends need to carry out some work by using literal objects or reading and writing variables.
 
+In this chapter we will introduce message-sends. Message-sends deserve a chapter on their own because they introduce many different concerns. On the one hand, each message-send is resolved in two steps: first the method-lookup searches in the receiver's hierarchy the method to be executed, and second that method is applied on the receiver. The method-lookup algorithm needs to support normal message-sends as well as `super` message-sends.  On the other hand, each method application needs to set up an execution context to store the receiver, arguments and temporary variables for that method execution. These execution contexts form the execution stack or call-stack. Sending a message pushes a new context in the call-stack, returning from a method pops a context from the call-stack.
 
-!!! Introducing Stack Management
+!!! Introduction to Stack Management
 
-The way we managed the receiver is overly simplistic.
-Indeed, each time a program will send a message to another object,  we should change the receiver and when the computation ends, the previous receiver should be put back. Therefore we need a stack.
-In addition the same happens for handling methods arguments and temporaries. 
-We address this point now.
+The way we managed the receiver so far is overly simplistic.
+Indeed, each time a program will send a message to another object, we should change the receiver and when the computation ends, the previous receiver should be put back. Moreover, the same happens with method arguments and temporaries. Therefore to introduce the notion of message-send we need a stack. And each element in the stack needs to capture all the execution state require to come back to it later on when a message-send will return. Each element in the call-stack is usually named a stack frame, an activation record, or in Pharo's terminology a context. For the rest of this book we will refer to them as frames, for shortness, and to distinguish them from the reified contexts from Pharo.
 
-We add a stack instance and this stack will keep information about the current receiver, as well as temporaries and arguments as we will see later. 
+A first step to introduce stack management without breaking all our previous tests is to replace the single ==receiver== instance variable with a stack that will be initialized when the evaluator is created. The top of the stack will represent the current execution, and thus we will take the current receiver at each moment from the stack top. Moreover, each time we tell our interpreter to execute something we need to initialize our stack with a single frame.
 
 [[[
+"Replace the receiver instance variable by a stack"
 Object subclass: #CHInterpreter
 	instanceVariableNames: 'stack'
 	classVariableNames: ''
 	package: 'Champollion-Core'
+
+CHInterpreter >> initialize [
+	super initialize. 
+	stack := CTStack new.
+]
 ]]]
 
-The idea is that the stack will hold a ''frame''. A frame can be represented for now as a dictionary. 
-We define the method ==pushNewFrame==. This means that we add on the top of the stack a new dictionary instance. 
+With this new schema, we can now rewrite the access to the receiver to just access the value of ==#self== of the top frame. 
+
+[[[language=pharo
+CHInterpreter >> receiver [
+	^ self topFrame at: #self
+]
+
+CHInterpreter >> topFrame [
+	^ stack top
+]
+]]]
+
+The final step is to set up a frame when the execution starts, which happened so far in our method ==execute:withReceiver:==. We extend the ==execute:withReceiver:== to create a new frame and define the receiver as ==#self== in the top frames before start the evaluation.
+
+[[[language=pharo
+CHInterpreter >> execute: anAST withReceiver: anObject [
+	self pushNewFrame.
+	self topFrame at: #self  put: anObject.
+	^ self visitNode: anAST
+]
+]]]
+
+The last piece in the puzzle is the method ==pushNewFrame==, which creates a new frame and pushes it on the top of the stack. 
+For now, let's represent a frame as a dictionary that will store key-value pairs representing the variables defined in the current method execution: ==self==, and later the arguments and temporaries.
 
 [[[
 CHInterpreter >> pushNewFrame [
-	"Pushing a new scope consists in creating a new dictionary whose parent is the top of the stack
-	and pushing it as a new top. This way a variable not found in current scope will be looked up in previous scope."
 	| newTop |
 	newTop := Dictionary new.
 	stack push: newTop.
@@ -36,49 +58,16 @@ CHInterpreter >> pushNewFrame [
 ]
 ]]]
 
-We initialize the interpreter state by creating a new stack. 
+This refactor kept all our test green, and opened the path to introduce message-sends.
+As the reader may have observed, this stack can only grow.
+We will take care of popping frames from the stack later when we revisit method returns.
 
-[[[language=pharo
-CHInterpreter >> initialize [
-	super initialize. 
-	stack := CTStack new.
-]
-]]]
+!!! Evaluating a First Message Send
 
-Accessing the receiver is just accessing the value of the key ==#self== of the current frame. 
+Let's start as usual by defining a new method exhibiting the scenario we want to work on.
+In this case, we want to start by extending our evaluator to correctly evaluate message sends to their return values. Our scenario method ==sendMessageReturnX== does a self message-send and returns the value returned by this message send. On the one hand, we want that in our scenario the receiver of both messages is the same. On the other hand, we want that the message send is correctly evaluated to the return value of the activated method.
 
-[[[language=pharo
-CHInterpreter >> receiver [
-	^ self topFrame at: #self
-]
-]]]
-
-We expose also the top frame to ease manipulation. 
-[[[language=pharo
-CHInterpreter >> topFrame [
-	^ stack top
-]
-]]]
-
-We extend the ==executeMethod:withReceiver:== to create a new frame and define the receiver as value of the ==#self== key.
-
-[[[language=pharo
-CHInterpreter >> executeMethod: anAST withReceiver: anObject [
-	self pushNewFrame.
-	self topFrame at: #self  put: anObject.
-	^ self visitNode: anAST
-]
-]]]
-
-We are ready to start. This is not totally correct and we will address this later. 
-Well not totally. When we will execute multiple sends the stack will only grow and when the execution of a message is finished, its execution context
-should be discarded from the stack. 
-
-
-!!! Sending a Message: Self-Sends
-
-As usual we start by defining a new method exhibiting the expected behavior. 
-Here we just define a method ==sendMessageReturnX== which invokes another one. 
+Notice that our method ==sendMessageReturnX== and the implementation of the message it sends ==returnX== live in the same class. This means that in this first scenario we can concentrate on the stack management and return value of the message sends, without caring too much about the details of the method lookup algorithm. For this first version we will define a simple and incomplete yet useful method lookup algorithm.
 
 [[[language=pharo
 CHInterpretable >> sendMessageReturnX [
@@ -86,13 +75,10 @@ CHInterpretable >> sendMessageReturnX [
 ]
 ]]]
 
-And we define a companion test.
+In our test we want to ensure that in a ==self== message-send, the receiver of both called and callee methods is the same. One way to do that is to mutate the receiver of the first message-send, and access one of its instance variables in the method that is activated by the second message-send.
 
 [[[language=pharo
 CHInterpreterTest >> testSelfSend [
-	"sendMessageReturnX
-		^ self returnX
-	"
 	receiver x: 100.
 	self 
 		assert: (self executeSelector: #sendMessageReturnX) 
@@ -100,28 +86,23 @@ CHInterpreterTest >> testSelfSend [
 ]
 ]]]
 
-We define the method ==visitMessageNode:== as follows: 
-First we visit the receiver node (which in the future may contain other message sends).
-We can have an expression as receiver: as for example ==(anObject returnX)== in the more complex message ==(anObject returnX) returnArg: 12==.
-
-Then we get the method ast from the class of the receiver.
-And we return the result of the execution of the method with the receiver.
+To make this test green, we need to implement the method ==visitMessageNode:==.
+Evaluation a message node requires that we recursively evaluate the receiver node, which may be a literal node or a complex expression such as another message-send. From such evaluation we obtain the actual receiver object. Starting from the receiver, we will lookup the method with the same selector as the message-send. In our first implementation we will just fetch the desired method's AST from the receiver's class. Finally, we can activate this method with the receiver using ==execute:withReceiver:== the activation will push a new frame to the call-stack with the given receiver, evaluate the method, and eventually return with a value.
 
 [[[
 CHInterpreter >> visitMessageNode: aMessageNode [
-	| rec method | 
-	rec := self visitNode: aMessageNode receiver.
-	method := (rec class compiledMethodAt: aSymbol) ast.
-	^ self executeMethod: method withReceiver: rec
+	| newReceiver method | 
+	newReceiver := self visitNode: aMessageNode receiver.
+	method := (newReceiver class compiledMethodAt: aMessageNode selector) ast.
+	^ self execute: method withReceiver: newReceiver
 ]
 ]]]
 
-This is clearly limited since we do not implement method lookup. We will address it later. 
-But so far so good.
-
 
 !!! Balancing the Stack
-We mentioned earlier that the following method (==executeMethod:withReceiver: ==) was not fully correct.
+
+We mentioned earlier that when the execution of a method is finished and the execution returns to its caller method, its frame should be also discarded from the stack. The current implementation clearly does not do it.
+Indeed, we also said that our initial implementation of the stack only grows, our code never pops frames from the stack.
 
 [[[language=pharo
 CHInterpreter >> executeMethod: anAST withReceiver: anObject [
@@ -131,74 +112,63 @@ CHInterpreter >> executeMethod: anAST withReceiver: anObject [
 ]
 ]]]
 
-Indeed, when we will execute multiple sends the stack will only grow and when the execution of a message is finished, its execution context
-should be discarded from the stack. The current implementation clearly does not do it. 
+To solve this issue, let us write a test showing the problem first.
+The idea of this test is that upon return, the frame of the caller method should be restored and with it its receiver. If we make that the caller and callee methods have different receiver instances, then this test can be expressed as some expression executed after a message-send returns. The following code snippet shows an scenario that fulfills these requirements: it sets an instance variable with some value, sends a message to an object other than ==self== and upon its return it accesses its instance variable again before returning it. Assuming the collaborator object does not modify ==self==, then the result of evaluating this message should be that 1000 is returned.
 
-Let us write a test showing the problem.
-We add an extra instance variable to the class ==CHInterpretable== with its companion accessors. 
-This way we will be able to test that the correct object is set and passed around in future example.
+[[[
+CHInterpretable >> setXAndMessage [
+
+		x := 1000.
+		collaborator returnX.
+		^ x
+]
+]]]
+
+Our test ==testBalancingStack== executes the message ==setXAndMessage== that should return 1000.
+
+[[[
+CHInterpreterTest >> testBalancingStack [
+
+	self
+    assert: (self executeSelector: #setXAndMessage)
+    equals: 1000
+]
+]]]
+
+We then finish our set-up by extending ==CHInterpretable== to support delegating to a collaborator object.
+We add a ==collaborator== instance variable to the class ==CHInterpretable== with its companion accessors. 
+This way we will be able to test that the correct object is set and passed around in the example.
 
 [[[
 Object subclass: #CHInterpretable
 	instanceVariableNames: 'x collaborator'
 	classVariableNames: ''
 	package: 'Champollion-Core'
-]]]
 
-[[[
-CHInterpreterTest >> collaborator [
+CHInterpretable >> collaborator [
 	^ collaborator
 ]
-]]]
 
-[[[
-CHInterpreterTest >> collaborator: anObject [
+CHInterpretable >> collaborator: anObject [
 	collaborator := anObject
 ]
 ]]]
 
-We add another instance variable named ==collaborator== to the test class. 
-[[[
-TestCase subclass: #CHInterpreterTest
-	instanceVariableNames: 'interpreter receiver collaborator'
-	classVariableNames: ''
-	package: 'Champollion'
-]]]
-
-In the ==setUp== we assign a new object to the collaborator instance variable and in addition, we set the 
-new object as collaborator of the object we access via the ==receiver== instance variable.
+And in the ==setUp== method we give a collaborator to our initial receiver.
 
 [[[
 CHInterpreterTest >> setUp [
 	super setUp.
-	interpreter := self interpreterClass new.
 	receiver := CHInterpretable new.
-	collaborator := CHInterpretable new.
-	receiver collaborator: collaborator
+	receiver collaborator: CHInterpretable new
 ]
 ]]]
 
-The following test ==testBalancingStack== execute the message ==setXAndMessage==.
-We assign the variable to ==x==, send the message ==returnX== to another (uninitialized object), 
-and return the value of ==x==.
+!!!! Making the test pass
 
-[[[
-CHInterpreterTest >> testBalancingStack [
-	"setXAndMessage
-		x := 1000.
-		collaborator returnX.
-		^ x
-	"
-	self assert: (self executeSelector: #setXAndMessage) equals: 1000
-]
-]]]
+Executing this test breaks because the access to the instance variable ==x== returns nil, showing the limits of our current implementation.  This is due to the fact that evaluating message send ==returnX== creates a new frame with the collaborator as receiver, and since that frame is not popped from of the stack, when the method returns, the access to the ==x== instance variable accesses the one of the uninitialized collaborator instead of our receiver object.
 
-Executing this test breaks because the access to the instance variable ==x== returns nil. 
-This is due to the fact that the frame created by the execution of the message ==returnX== 
-has the uninitialized receiver (the object refered by ==collaborator== variable) and that 
-such frame is not pop out of the stack once the message is executed.
-
-To solve this problem is relatively simple, we should pop the frame at the end of message send. 
+To solve this problem, we should pop the frame when a method activation finishes. 
 This way the stack is balanced. This is what the new implementation of ==executeMethod:withReceiver:==
 is doing.
 
@@ -210,13 +180,18 @@ CHInterpreter >> executeMethod: anAST withReceiver: anObject [
 	self popFrame.
 	^ result
 ]
+
+CHInterpreter >> popFrame [
+	stack pop
+]
 ]]]
 
-!!! Adding an Extra Test
+!!!! Ensuring the receiver is correctly set: an Extra Test
 
-Since we not lose any opportunity to strenghten our trust in our implementation by adding a new 
-test, we take it. 
-We define a new method named ==changeCollaboratorX==.
+Our previous tests did ensure that messages return the correct value, activate the correct methods, and that the stack grows and shrinks. However, we did not ensure yet that the receiver changes correctly on a message send, and since we do not lose any opportunity to strenghten our trust in our implementation with a new 
+test, let's write a test for it.
+
+The scenario, illustrated in ==changeCollaboratorX== will ask the collaborator to ==store100IntoX==, implemented previosly. In this scenario, we must ensure that the state of the receiver and the collaborator  are indeed separate and that changing the collaborator will not affect the initial receiver's state.
 
 [[[
 CHInterpretable >> changeCollaboratorX [
@@ -224,30 +199,50 @@ CHInterpretable >> changeCollaboratorX [
 ]
 ]]]
 
-Then we test 
+Our test for this scenario is as follows. If we give some value to the receiver and collaborator, executing our method should change the collaborator but not the initial receiver.
+
 [[[
 CHInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSender [
-	"changeCollaboratorX
-		collaborator store100IntoX
-	"
 	receiver x: 200.
 	collaborator x: 300.
+
+  "changeCollaboratorX will replace collaborator's x but not the receiver's"
 	self executeSelector: #changeCollaboratorX.
+
 	self assert: receiver x equals: 200.
 	self assert: collaborator x equals: 100
 ]
 ]]]
 
-We are ready our journey in message handling.
+To make our test run, we will store as a convenience the collaborator object in an instance variable of the test too.
+
+[[[
+TestCase subclass: #CHInterpreterTest
+	instanceVariableNames: 'receiver collaborator'
+	classVariableNames: ''
+	package: 'Champollion-Tests'
+
+CHInterpreterTest >> setUp [
+	super setUp.
+	receiver := CHInterpretable new.
+  collaborator := CHInterpretable new.
+	receiver collaborator: collaborator
+]
+]]]
+
+This test runs green, meaning that our implementation already covered correctly this case.
+We are ready to continue our journey in message-sends.
 
 !!! Supporting Message Arguments
 
-We add support for message arguments so that we can start having more interesting examples.
-Let us define some tests.
+So far we have worked only with unary messages. Unary messages have no arguments, so the number of programs we can express with them only is rather limited. The next step towards having a full-blown interpreter is to support message arguments, which will open us the door to support binary and keyword messages. From the evaluator point of view, as well as from the AST point of view, we will not distinguish between unary, binary and keyword messages. The parser already takes care about distinguishing them and handling their precedence. Indeed, message nodes in the AST are the same for all kind of messages, they have a selector and a collection of argument nodes. Precedence is then modelled as relationships between the AST nodes.
 
-!!!! A Test First
 
-We define a simple method ==changeCollaboratorWithArgument== which uses a setter.
+In addition of simply passing the arguments, from an evaluator point of view, we need to care about evaluation order too. This is particularly important because Pharo is an imperative language where messages can trigger side effects. Evaluating two messages in one order may not have the same result as evaluating them in a different order. Arguments in Pharo are evaluated eagerly after evaluating the receiver expression, but before evaluating the message, from left to right. Once all expressions are evaluated, the resulting objects are send as part of the message-send.
+
+!!!! Initial Argument Support
+
+To implement some initial support for arguments, our first scenario is to simply send a message with an argument. For our scenario we already count with one message with an argument: the ==x:== setter. We can then define a method ==changeCollaboratorWithArgument== which uses a it.
 
 [[[language=smalltalk
 CHInterpretable >> changeCollaboratorWithArgument [
@@ -255,107 +250,208 @@ CHInterpretable >> changeCollaboratorWithArgument [
 ]
 ]]]
 
-Then we verify that the execution of the new method effectlvely modifies the collaborator object 
-as written in ==changeCollaboratorWithArgument==.
+In our test, we verify that the method evaluation effectively modifies the collaborator object 
+as written in ==changeCollaboratorWithArgument==, and not the initial receiver object.
 
 [[[language=smalltalk
-testArgumentAccess [
-	"changeCollaboratorWithArgument
-		collaborator x: 500
-	"
+CHInterpreterTest >> testArgumentAccess [
+
 	receiver x: 200.
 	collaborator x: 300.
+
 	self executeSelector: #changeCollaboratorWithArgument.
+
 	self assert: receiver x equals: 200.
 	self assert: collaborator x equals: 500
 ]
 ]]]
 
-Our test fails so we can start to work.
+Since we have not implemented any support for arguments yet, this test should fail.
 
-!!!! Some Helpers
-We introduce two little helper methods to add and access new values in the current frame. 
+Implementing argument support requires two main changes. On the caller side, we need to evaluate the arguments in the context of the caller method and then store those values in the new frame. On the callee side, when an argument access is evaluated, those accesses will not re-evaluate the expressions in the caller. Instead, argument access will just read the variables pre-stored in the current frame.
+
+Let's start by defining the method ==visitArgumentNode:== to implement how a method accesses an argument. We implement this as a look-up in the current frame using the name of the argument.
 
 [[[
-CHInterpreter >> tempAt: aSymbol put: anInteger [
-	self topFrame at: aSymbol put: anInteger
+CHInterpreter >> visitTemporaryNode: aRBArgumentNode [
+	^ self topFrame at: aRBArgumentNode name
 ]
 ]]]
 
+Then we need to update ==visitMessageNode:== to compute the arguments by doing a recursive evaluation, and then use those values during the new method activation.
+
 [[[
-CHInterpreter >> tempAt: aSymbol [
-	^ self topFrame at: aSymbol
+CHInterpreter >> visitMessageNode: aMessageNode [
+	| newReceiver method args |
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	newReceiver := self visitNode: aMessageNode receiver.
+	method := (newReceiver class compiledMethodAt: aMessageNode selector) ast.
+	^ self executeMethod: method withReceiver: newReceiver andArguments: args
 ]
 ]]]
 
-While interpreting a message, when we interpret an argument we need the return the value that such argument
-get for this specific message send. The same method ==returnArg: anArg== interpreted with two different message sends
-should return different value.
+To include arguments in the method activation, let's add a new ==arguments== parameter to our method ==execute:withReceiver:== to get ==execute:withReceiver:withArguments:==. 
+In addition to add the receiver to the new frame representing the execution, we add a binding for each parameter (called unfornately arguments in Pharo AST) with their corresponding value in the argument collection. We use the message ==with:do:== to iterate both the parameter list and actual arguments as pairs.
 
 [[[
-returnArg: arg
-	^ arg
-]]]
-
-The message ==anObject returnArg: 12== should return 12 while ==anObject returnArg: 24== should return 24.
-The question is how to pass the actual values of the parameters to the message interpretation. 
-This is where the current frame comes into play. 
-On message request for execution, we will add the value of actual parameter to the current frame and during the interpretation
-of a message/method we will be able to access such values.
-
-Therefore handling arguments is two distinct actions: 
-- binding the values of the arguments in the current frame, and 
-- during message interpretation, access the arguments values.
-This is what we do in the following methods.
-
-First we define the method ==visitArgumentNode:== to look for the value of an argument in the current frame.
-
-[[[
-CHInterpreter >> visitArgumentNode: aRBArgumentNode [
-	^ self tempAt: aRBArgumentNode name
-]
-]]]
-
-We define a new method ==executeMethod:withReceiver:andArguments:== which has as extra argument a collection representing the 
-arguments of the method to be executed. 
-In addition to add the receiver to the new frame representing the execution, we add a binding for each parameters (called unfornately arguments in Pharo AST) 
-with their corresponding value in the argument collection. The use of the message ==with:do:== ensures that both the parameter list and actual arguments have the 
-same size.
-
-[[[
-CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection [
+CHInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection [
 	| result |
 	self pushNewFrame.
 	self tempAt: #self put: anObject.
-	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
+	anAST arguments with: aCollection
+    do: [ :arg :value | self topFrame at: arg name put: value ]. 
 	result := self visitNode: anAST.
 	self popFrame.
 	^ result
 ]
 ]]]
 
-To avoid duplication logic, we revisit ==executeMethod:withReceiver:== to use the previous. 
+Instead of just removing the old ==executeMethod:withReceiver:== method, we redefine it calling the new one with a default empty collection of arguments. This method was used as part of our public API so keeping it will avoid migrating extra code and an empty collection of arguments seems like a sensible and practical default.
+ 
 [[[
 CHInterpreter >> executeMethod: anAST withReceiver: anObject [
 	 ^ self executeMethod: anAST withReceiver: anObject andArguments: #()
 ]
 ]]]
 
-Finally during the message interpretation, after computing the value of the receiver, we compute the value of the arguments
-by collecting their own recursive interpretation. This is such a treatment that ensures that argument expressions are recursively executed. 
-For example in the message ==anObject returnArg: 1+4== that the value of the argument is ==5==.
+Our tests should all pass now.
+
+!!!! Refactoring the Terrain
+
+Let's now refactor a bit the existing code to clean it up and expose some existing but hidden functionality. Let us extract the code that accesses ==self== and the frame parameters into two other methods that make more intention revealing that we are accessing values in the current frame.
 
 [[[
-CHInterpreter >> visitMessageNode: aMessageNode [
-	| rec method args |
-	rec := self visitNode: aMessageNode receiver.
-	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
-	method := (rec class compiledMethodAt: aSymbol) ast.
-	^ self executeMethod: method withReceiver: rec andArguments: args
+CHInterpreter >> tempAt: aSymbol [
+	^ self topFrame at: aSymbol
+]
+
+CHInterpreter >> tempAt: aSymbol put: anInteger [
+	self topFrame at: aSymbol put: anInteger
+]
+
+CHInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection [
+	| result |
+	self pushNewFrame.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection
+    do: [ :arg :value | self tempAt: arg name put: value ]. 
+	result := self visitNode: anAST.
+	self popFrame.
+	^ result
+]
+
+CHInterpreter >> receiver [
+
+	^ self tempAt: #self
+]
+
+CHInterpreter >> visitTemporaryNode: aRBTemporaryNode [
+
+	^ self tempAt: aRBTemporaryNode name
 ]
 ]]]
 
-Our tests should all pass. 
+!!!! Evaluation Order
+
+The last thing we need to make sure is that arguments are evaluated in the correct order.
+The evaluation order in Pharo goes as follows: before evaluating a message, the receiver and all arguments are evaluated. The receiver is evaluated before the arguments. Arguments are evaluated in left-to-right order.
+
+Testing the evaluation order in a black-box fashion as we were doing so far is rather challenging with our current evaluator. Indeed, our evaluator does not yet handle arithmetics, allocations nor other kind of primitive. A simple approach to test is to make a counter out of *Peano Axioms>https://en.wikipedia.org/wiki/Peano_axioms*. The main idea is to implement numbers as sets, where the empty set is the zero, the set that contains the zero is one, the set that contains a one is a two, and so on. The only support we need for this is to extend our literal support for dynamic array literals. The code illustrating the idea follows.
+
+[[[
+CHInterpretable >> initialize [
+  super initialize.
+  current := { "empty" }.
+]
+
+CHInterpretable >> next [
+  | next |
+  "Implement a stream as an increment in terms of Peano axioms.
+  See https://en.wikipedia.org/wiki/Peano_axioms"
+  next := current.
+  current := { current }.
+  ^ next
+]
+
+CHInterpreterTests >> peanoToInt: aPeanoNumber [
+  "Helper method to transform a peano number to a normal Pharo integer"
+  ^ aPeanoNumber
+    ifEmpty: [ 0 ]
+    ifNonEmpty: [ 1 + (self peanoToInt: aPeanoNumber first) ]
+]
+]]]
+
+Using this support, we can express our evaluation order scenario and test as follows.
+We will add a new instance variable to ==CHInterpretable== to store its evaluation order.
+Then, we are going to send a message with many arguments, evaluating for each argument ==self next==.
+The message receiving the many arguments will then receive as argument the three generated peano values, that we will return as dynamic literal array. If evaluation order is right, the evaluation order of the receiver should be 0, the evaluation of the first argument should be 1, and so on.
+
+[[[
+Object subclass: #CHInterpretable
+	instanceVariableNames: 'x collaborator evaluationOrder'
+	classVariableNames: ''
+	package: 'Champollion-Core'
+
+CHInterpretable >> evaluationOrder [
+
+  ^ evaluationOrder
+]
+
+CHInterpretable >> returnEvaluationOrder [
+
+  ^ self evaluateReceiver
+      messageArg1: self next
+      arg2: self next
+      arg3: self next
+]
+
+CHInterpretable >> evaluateReceiver [
+
+  evaluationOrder := self next.
+  ^ self
+]
+
+CHInterpretable >> messageArg1: arg1 arg2: arg2 arg3: arg3 [
+
+  ^ {arg1. arg2. arg3}
+]
+
+CHInterpreterTests >> testEvaluationOrder [
+  | argumentEvaluationOrder |
+  argumentEvaluationOrder := self executeSelector: #returnEvaluationOrder.
+
+  self assert: (self peanoToInt: receiver evaluationOrder) equals: 0.
+  self
+    assert: (argumentEvaluationOrder collect: [ :peano | self peanoToInt: peano])
+    equals: #(1 2 3)
+]
+]]]
+
+To make this test green we need to implement previously some new support in our interpreter: writing to temporary variables and dynamic literal arrays.
+
+@@note OK, writing to temporaries is broken in P9. We should do it with an extension method? This is the same problem as before with name resolution...
+
+[[[
+CHInterpreter >> visitArrayNode: aRBArrayNode [
+	
+	^ aRBArrayNode statements collect: [ :e | self visitNode: e ] as: Array
+]
+]]]
+
+At this point our test will fail because the evaluation order is wrong! The receiver was evaluated 4th, after all arguments. This is solved by changing the order of evaluation in ==visitMessageNode:==.
+
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode [
+	| newReceiver method args |
+  "Evaluation Order:
+    The receiver is evaluated before the arguments.
+    Arguments are evaluated in left-to-right order."
+	newReceiver := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	method := (newReceiver class compiledMethodAt: aMessageNode selector) ast.
+	^ self executeMethod: method withReceiver: newReceiver andArguments: args
+]
+]]]
 
 !!! Verifying Argument Access
 
@@ -494,11 +590,11 @@ We should call the method ==lookup:fromClass:== from the ==visitMessageNode:==
 
 [[[
 CHInterpreter >> visitMessageNode: aMessageNode [
-	| rec method args | 
-	rec := self visitNode: aMessageNode receiver.
+	| newReceiver method args | 
+	newReceiver := self visitNode: aMessageNode receiver.
 	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
-	method := self lookup: aMessageNode selector fromClass: rec class.
-	^ self executeMethod: method withReceiver: rec andArguments: args
+	method := self lookup: aMessageNode selector fromClass: newReceiver class.
+	^ self executeMethod: method withReceiver: newReceiver andArguments: args
 ]
 ]]]
 
@@ -574,15 +670,15 @@ We redefine the ==visitMessageNode:== method to change class where to start look
 [[[
 CHInterpreterTest >> visitMessageNode: aMessageNode [
 
-	| rec method args lookupClass pragma | 
-	rec := self visitNode: aMessageNode receiver.
+	| newReceiver method args lookupClass pragma | 
+	newReceiver := self visitNode: aMessageNode receiver.
 	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
 	
 	lookupClass := aMessageNode receiver isSuper 
 		ifTrue: [ self currentMethod methodClass superclass ] 
-		ifFalse: [ rec class ].
+		ifFalse: [ newReceiver class ].
 	method :=  self lookup: aMessageNode selector fromClass: lookupClass.	
-	^ self executeMethod: method withReceiver: rec andArguments: args
+	^ self executeMethod: method withReceiver: newReceiver andArguments: args
 ]
 ]]]	
 
@@ -671,12 +767,12 @@ The following method reproduces the wrong semantics. Just watch out that the pre
 [[[
 CHInterpreter >> visitMessageNode: aMessageNode [
 
-	| rec method args lookupClass | 
-	rec := self visitNode: aMessageNode receiver.
+	| newReceiver method args lookupClass | 
+	newReceiver := self visitNode: aMessageNode receiver.
 	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
-	lookupClass := aMessageNode receiver isSuper ifTrue: [ rec class superclass ] ifFalse: [ rec class ].
+	lookupClass := aMessageNode receiver isSuper ifTrue: [ newReceiver class superclass ] ifFalse: [ newReceiver class ].
 	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
-	^ self executeMethod: method withReceiver: rec andArguments: args
+	^ self executeMethod: method withReceiver: newReceiver andArguments: args
 ]
 ]]]
 
