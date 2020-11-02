@@ -1,66 +1,49 @@
-!! Interpreter0: A Simple Evaluator
+!! Implementing a Structural Evaluator
 
-In this chapter we will develop step by step a Pharo program interprerter.
-We will incrementally add support for language characteristics.
-Here is the progression: returning constants, accessing receiver state, instance variable assignment, simple temporaries, self messages, ....
+An evaluator is kind of interpreter that executes a program. For example a Pharo evaluator is an interpreter that takes as input a Pharo program and executes each of the statements of such input program, returning finally the result of the execution. In this and the following chapters we will implement a Pharo evaluator as an AST interpreter, using the visitor pattern we have seen before, meaning that the input of our evaluator will be AST nodes of a program to evaluate.
 
+For presentation purposes, we will develop the evaluator in several stages, each in a different chapter.
+First, in this chapter, we will show how to implement a structural evaluator, i.e., an evaluator that reads and writes the structures of objects, starting the presentation from constant values.
+Later chapters will incrementally add support for other language features that deserve a chapter for themselves such as messages and blocks.
 
+The presentation of this chapter is done in a somehow-relaxed TDD (test driven development) style.
+For each new feature we first define the scenario we want to cover. Since we are developing an evaluator, each scenario will be some code to execute and an expected result. We then define a test for the scenario and we make it pass. Before going to the next scenario, we do some refactorings to enhance the quality of our code.
 
-For each of the steps we will start by defining a method illustrating the situation, then we define a test and 
-we implement the features. 
-
-Doing so we will define and refine a visitor. 
+During this process we will define and refine an AST visitor.
 Note that we will write the visitor from scratch but we will reuse the node of the Pharo AST and their functionalities.
 
-!!! Setting the Stage
+!!! Setting Up the Stage
 
-The tests that we will define are hosted in the class ==CHInterpreterTest==.
+To start writing our Pharo evaluator in TDD style, we will start by creating out test class ==CHInterpreterTest==.
 
 [[[
 TestCase subclass: #CHInterpreterTest
-	instanceVariableNames: 'interpreter'
+	instanceVariableNames: ''
 	classVariableNames: ''
-	package: 'Champollion-Core'
+	package: 'Champollion-Tests'
 ]]]
 
-We define two helper methods: ==interpreter== and ==interpreterClass== as follows: 
+This class will, until a change is imperative, host all our test methods.
 
-[[[
-CHInterpreterTest >> interpreter [
-	^ interpreter
-]
-]]]
+!!!! Preparing the Scenarii
 
+Our scenarios, made out of classes and methods to be interpreted, need to be written somewhere too.
+We could store those scenarios in strings in our test class, that we will then need to parse and give to our interpreter as input. However, for simplicity, and because in this book we do not want to center ourselves in parsing issues, we will write our scenarii as normal Pharo code, in normal Pharo classes. This solution is simple enough and versatile to support more complex situations in the future.
 
-[[[
-CHInterpreterTest >> interpreterClass [
-	^ CHInterpreter
-]
-]]]
-
-
-[[[
-CHInterpreterTest >> setUp [
-	super setUp.
-	interpreter := self interpreterClass new
-]
-]]]
-
-!!! Hosting Code of be Tested
-We prefer to separate the code that we will use to test the behavior of our interpreter from the test class itself. It will give us more possibility to describe different situations in the future.
-
-The class ==CHInterpretable== is a class hosting the sample methods that we will execute. 
-
+We will host our first scenarios as methods in a new class named ==CHInterpretable==.
 
 [[[
 Object subclass: #CHInterpretable
 	instanceVariableNames: ''
 	classVariableNames: ''
-	package: 'Champollion'
+	package: 'Champollion-Test'
 ]]]
 
-Here we define some simple methods that we would like to execute.
-For now we focus on returning simple literal objects such as booleans, float and integer. 
+
+!!! Evaluating Literals: Integers
+
+Testing our evaluator requires that we test and assert some observable behavior.
+In Pharo there are two main observable behaviors: either side-effects through assignments or results of methods through return statements. We have chosen to use return statements, to introduce variables and assignments later. To start, our first scenario is a method returning an integer, as in the code below:
 
 [[[
 CHInterpretable >> returnInteger [
@@ -68,53 +51,45 @@ CHInterpretable >> returnInteger [
 ]
 ]]]
 
-[[[
-CHInterpretable >> returnFloat [
-	^ 3.14
-]
-]]]
+Executing such a method should return an integer with value 5.
+
+!!!! Writing a Red Test
+
+Our first test will implement what our scenario defined above: executing our method should return 5.
+This first test specifies not only part of the behaviour of our interpreter, but also helps us in defining the part of its API: we want our interpreter to be able to start executing starting from some method's AST.
+Below we define a first test for it: ==testReturnInteger==.
 
 [[[
-CHInterpretable >> returnBoolean [
-	^ false
-]
-]]]
-
-
-!!! A First Test
-
-The method ==testReturnInteger== is the first test for specifying the behavior of simple interpreter. 
-
-[[[
-CHInterpreterTest >> testReturnInteger
+CHInterpreterTest >> testReturnInteger [
 	| ast result |
-	ast := (Interpretable >> #returnInteger) ast.
+	ast := (CHInterpretable >> #returnInteger) ast.
 	result := self interpreter execute: ast. 
 	self assert: result equals: 5
+]
 ]]]
 
-Our first test is worth one comment: 
-- we access the AST of the method that we want to execute
-- then we instantiate our interpreter and 
-- ask it to execute the ast.
-And we check that we get the expected result. 
+Our first test is worth one comment: since our evaluator is an AST interpreter, it requires an AST as input.
+In other words, we need to get the AST of the ==returnInteger== method.
+Instead of invoking the parser to get an AST from source code, we will use Pharo's reflective API to get the AST of an already existing method.
 
-!!! Building a Minimal Constant Evaluator
+!!!! Making the test pass: a First Literal Evaluator
 
-We are ready to define our interpreter. 
-We define the class ==CHInterpreter==. 
-We will implement it as a Visitor over the Pharo method AST. 
+Executing our first test will fail first because our test does not understand ==interpreter==, meaning we need to implement a method for it in our test class. We implement it as a factory method in our test class, returning a new instance of ==CHInterpreter==, and we define the class ==CHInterpreter== as follows.
 
 [[[
+CHInterpreterTest >> interpreter [
+	^ CHInterpreter new
+]
+
 Object subclass: #CHInterpreter
 	instanceVariableNames: ''
 	classVariableNames: ''
-	package: 'Champollion'
+	package: 'Champollion-Core'
 ]]]
 
-Note that we do not inherit from the default Pharo AST Visitor so that we build it step by step. 
-Nevertheless we follow the same API and use the node ==accept:== visit methods.
-The method ==execute:== simply calls the visitor main entry point (method ==visitNode:==).
+The class ==CHInterpreter== will be the main entry point for our evaluator, and it will implement a visitor pattern over the Pharo method ASTs.  Note that we do not inherit from the default Pharo AST Visitor. The Pharo AST visitor implements already generic versions of the ==visitXXX:=== methods that will do nothing instead of failing. Not inheriting from it allows us to get problems as does not understand exceptions that we will implement step by step in the debugger. We nevertheless follow the same API as the default AST visitor and we use the nodes' ==accept:== visiting methods.
+
+At this point, re-executing the test fails with a new error: our ==CHInterpreter== instance does not understand the message ==execute:==. We imeplement ==execute:== to call the visitor main entry point, i.e., the method ==visitNode:==.
 
 [[[
 CHInterpreter >> execute: anAST [
@@ -128,36 +103,28 @@ CHInterpreter >> visitNode: aNode [
 ]
 ]]]
 
-Since the AST we will interpret is an AST of method, 
-The first visitor method of interest is the method ==visitMethodNode:==.
-It just dispatches on ==visitMethodBodyNode:==.
+Since the AST we will evaluate is the AST of a method, restarting the test the execution halts because of the missing ==visitMethodNode:==. A first implementation for this method simply continues the visit on the body of the method.
 
 [[[
 CHInterpreter >> visitMethodNode: aMethodNode [
-	^ self visitMethodBodyNode: aMethodNode body
+	^ self visitNode: aMethodNode body
 ]
 ]]]
 
-For now ==visitMethodBodyNode:== just visits the method body (an ==RBSequenceNode==).
-
-[[[
-CHInterpreter >> visitMethodBodyNode: aMethodBodyNode [
-	^ self visitNode: aMethodBodyNode
-]
-]]]
-
-The first version of ==visitSequenceNode:== ignores possible temporary declarations and handles all the statements paying attention that the last statement value should be returned.
-So we visit all the statements except the last one, and we return the value of the last statement. 
+Execution then arrives to a missing ==visitSequenceNode:==. Indeed, the body of a method is a sequence node containing a list of temporary variable definitions and a list of statements. Since our scenario has only a single statement with no temporary variables, a first version of ==visitSequenceNode:== ignores temporary declarations and handles all the statements paying attention that the last statement value should be returned. So we visit all the statements except the last one, and we then visit the last one and return its result. 
 
 [[[
 CHInterpreter >> visitSequenceNode: aSequenceNode [
+  "Visit all but the last statement without caring about the result"
 	aSequenceNode statements allButLast 
 		do: [ :each | self visitNode: each ].
+  "Return the result of visiting the last statement"
 	^ self visitNode: aSequenceNode statements last
 ]	
 ]]]
 
-Since we want to be able to access a return value, we define the ==visitReturnNode:== to handle. This method simply returns the value (invoking recursively the visitor) of the expression that is returned.
+The visitor will then visit the return node, for which we define the ==visitReturnNode:== method.
+This method simply visits the contents of the return node (invoking recursively the visitor) and returns the obtained value.
 
 [[[
 CHInterpreter >> visitReturnNode: aReturnNode [
@@ -165,8 +132,9 @@ CHInterpreter >> visitReturnNode: aReturnNode [
 ]
 ]]]
 
-For now we only manage literal object such as number, booleans, ...
-So we redefine the method ==visitLiteralValueNode:== which is invoked on literal values. 
+Finally, the contents of the return node, the integer ==5== is represented as a literal value node.
+To handle this node we define the method ==visitLiteralValueNode:== in our visitor.
+The implementation just returns the value of the node, which will be the integer we were looking for.
 
 [[[
 CHInterpreter >> visitLiteralValueNode: aRBLiteralValueNode [
@@ -174,16 +142,45 @@ CHInterpreter >> visitLiteralValueNode: aRBLiteralValueNode [
 ]
 ]]]
 
-Our first test passes. 
-And we are ready to continue our journey.
+Our first test is now green and we are ready to continue our journey.
+
+!!! Evaluating Literals: Floats and Booleans
+
+For completeness, let's implement in our evaluator support for literal floats and booleans.
+Since we already have integer constants working, let's consider next a method returning a float literal.
+We can see such scenario in the code below:
+
+[[[
+CHInterpretable >> returnFloat [
+	^ 3.14
+]
+]]]
+
+Executing such method should return ==3.14==.
+
+!!!! Writing a Test
+
+Testing this case is straight forward, we should test that evaluating our method should return 5.
+We already defined that our interpreter understands the ==execute:==  message, so this test can follow the implementation of our previous test.
+
+[[[
+CHInterpreterTest >> testReturnFloat [
+	| ast result |
+	ast := (CHInterpretable >> #returnFloat) ast.
+	result := self interpreter execute: ast. 
+	self assert: result equals: 3.14
+]
+]]]
+
+Two discussions come from writing this test. First, this test is already green, because the case of floating point constants and integer constants exercise the same code, so nothing is to be done on this side. Second, some would argue that this test is somehow repeating code from the previous scenario: we will take care of this during our refactoring step.
 
 
+!!!! Refactor: Improving the Test Infrastructure
 
-!!! Improving the Test Infrastructure
+Since we will write many tests with similar structure during this book, it comes handy to share some logic between them. The two tests we wrote so far show a good candidate of logic to share as repeated code we can extract.
 
-Since we will write many tests during this book, we exact some logic from our test method, it will help future evolution. 
+The method ==executeSelector:== extracts some common logic that will make our tests easier to read and understand: it obtains the AST of a method from its selector, evaluates it, and returns the value of the  execution.
 
-We define the method ==executeSelector:==, it accesses the method, gets its AST and returns the value of the  execution of the ast.
 [[[
 CHInterpreterTest >> executeSelector: aSymbol [
 	| ast |
@@ -192,7 +189,7 @@ CHInterpreterTest >> executeSelector: aSymbol [
 ]
 ]]]
 
-Now we rewrite our first test as follows: 
+And we can now proceed to rewrite our first two tests as follows: 
 
 [[[
 CHInterpreterTest >> testReturnInteger [
@@ -203,99 +200,145 @@ CHInterpreterTest >> testReturnInteger [
 ]
 ]]]
 
+[[[
+CHInterpreterTest >> testReturnFloat [
+
+	self
+    assert: (self executeSelector: #returnFloat)
+    equals: 3.14
+]
+]]]
+
 We are ready to efficiently write tests for the other constants. 
 
-!!! More Tests for Constant
+!!!! Evaluating booleans
 
-It is straigth forward to write new tests. 
-We define a test for booleans, here we do not use ==deny:== to make the result explicit.
-Note that we include the method definition ofthe interpreted method to ease understanding. 
+Boolean literals are the objects ==false== and ==true==, typically used for conditionals and control flow statements. In the previous sections we implemented support for numbers, in this section we will introduce support for returning boolean values as follows:
+
+[[[
+CHInterpretable >> returnBoolean [
+	^ false
+]
+]]]
+
+Evaluating such method should return ==false==.
+We define a test for our boolean scenario.
+Note that here we do not use ==deny:==, because we want to make the result explicit for the reader of the test.
 
 [[[
 CHInterpreterTest >> testReturnBoolean [
-	"returnBoolean
-		^ false"
-		
-	self assert: (self executeSelector: #returnBoolean) equals: false
+  "Do not use deny: to make explicit that we expect the value false"
+	self
+    assert: (self executeSelector: #returnBoolean)
+    equals: false
 ]
 ]]]
 
-[[[
-CHInterpreterTest >> testReturnFloat [
-	"returnFloat
-		^ 3.14"
-	self assert: (self executeSelector: #returnFloat) equals: 3.14
-]
-]]]
+If everything went ok, this test will be automatically green, without the need for implementing anything.
+This is because booleans are represented in the AST with literal value nodes, which we have already implemented.
 
 
-!!! Literal Array
+!!! Evaluating Literals: Arrays
 
-We add support for Array. 
-First we define some method returning an empty array and a literal array. 
+Now that we support simple literals such as booleans and numbers, let's introduce literal arrays.
+Literal arrays are arrays that are defined inline in methods with all their elements being other literals.
+For this scenario, let's define two different test scenarii: an empty literal array and a literal array that has elements.
 
 [[[
-CHInterpretable >> returnEmptyArray [
+CHInterpretable >> returnEmptyLiteralArray [
+
 	^ #()
 ]
-]]]
 
-[[[
-CHInterpretable >> returnLiteralArray [
-	^ #(true 1 'ahah')
+CHInterpretable >> returnRecursiveLiteralArray [
+
+	^ #(true 1 #('ahah'))
 ]
 ]]]
 
-We add a test to cover case.
+These two methods should return the respective arrays.
 
+!!!! Writing a Red Test
+
+Writing tests to cover these two scenarios is again straight forward:
 
 [[[
-CHInterpreterTest >> testReturnEmptyArray [
+CHInterpreterTest >> testReturnEmptyLiteralArray [
+
 	self 
-		assert: (self executeSelector: #returnEmptyArray) 
+		assert: (self executeSelector: #returnEmptyLiteralArray) 
 		equals: #()
 ]
-]]]
 
+CHInterpreterTest >> testReturnRecursiveLiteralArray [
 
-[[[
-CHInterpreterTest >> testReturnLiteralArray [
 	self 
-		assert: (self executeSelector: #returnLiteralArray) 
-		equals: #(true 1 'ahah')
+		assert: (self executeSelector: #returnRecursiveLiteralArray) 
+		equals: #(true 1 #('ahah'))
 ]
 ]]]
 
-We now have to implement the method ==visitLiteralArrayNode:== to handle arrays.
+!!!! Making the test pass: visiting literal array nodes
+
+We now have to implement the method ==visitLiteralArrayNode:== to visit literal arrays.
+Literal arrays contain an array of literal nodes, representing the elements inside the literal array.
+To make our test green, we need to evaluate a literal array node to an array where each element is the value of its corresponding literal node. Moreoverl, literal arrays are recursive structures: an array can contain other arrays. In other words, we should handle the visit of literal arrays recursively.
 Here we return the values returned by the interpretation of the elements. 
 
 [[[
 CHInterpreter >> visitLiteralArrayNode: aRBLiteralArrayNode [
 	^ aRBLiteralArrayNode contents 
-			collect: [ :each | self visitNode: each ]
+			collect: [ :literalNode | self visitNode: literalNode ]
+      as: Array
 ]
 ]]]
 
-The tests are green.
+This makes our tests green, and so far there is no much to refactor or clean.
 Up until now we did not consider that any form of variable and we should handle such case.
 
+!!! Evaluating Variables: ==self== and ==super==
 
-!!! Handling Self 
-The first kind of variable that we handle is ==self== that represents the receiver of the message. 
-THe first things we need to do is to make sure that we can specify the receiver of a message
+Variables in Pharo are of different kinds: ==self== and ==super== represent the evaluated message receiver, instance variables represent variable stored in the evaluated message receiver, temporaries and arguments are variables visible only within a particular method evaluation, shared variables and global variables are variables that are in the global scope and independent of the receiver.
 
+To start working with variables, we will begin with a method returning ==self== as the one below.
+There is now a big difference between this scenario and the previous ones. Previous scenarii did always evaluate to the same value regardless when or how they were executed. In this case, however, evaluating this method will return a different object if the the receiver of the message changes.
 
-Since we need to have access to the receiver for now we add an instance variable called ==receiver==.
-This is a super naive way to handle it since we will need a way to automatically manage receiver and arguments.
+[[[
+CHInterpretable >> returnSelf [
+	^ self
+]
+]]]
+
+!!!! Writing a Red Test
+
+To properly test how ==self== behaves we will need specify a receiver object, and then assert that the returned object is that same object with an identity check. For this purpose we use as receiver a new object instance of ==Object==, which will implement equality as identity, guaranteeing that the object will be not only equals, but also the same.
+
+[[[
+CHInterpreterTest >> testReturnSelf [
+  | receiver |
+  receiver := Object new.
+	self 
+		assert: (self executeSelector: #returnSelf withReceiver: receiver) == receiver
+]
+]]]
+
+!!!! Introducing Support to Specify an Evaluation Receiver
+
+In this section we will implement a first version of an execution context to introduce a receiver objects.
+This first support will get us up and running to implement initial variable support, but it will run short to properly implement message sends. In the following sections we will extend this support to message sends and block temporaries.
+
+Our initial support requires that our evaluator knows the receiver object of the current method evaluation.
+For now we add an instance variable in our evaluator called ==receiver==.
 
 [[[
 Object subclass: #CHInterpreter
 	instanceVariableNames: 'receiver'
 	classVariableNames: ''
-	package: 'Champollion'
+	package: 'Champollion-Core'
 ]]]
 
-We define an accessor so that we can easily adapt when we will introduce a better way representation later. 
+We define an accessor so that we can easily adapt when we will introduce a better way representation later.
+This instance variable will then be hidden behind this accessor, allowing us to change later on the implementation without breaking users.
 
 [[[
 CHInterpreter >> receiver [
@@ -303,8 +346,8 @@ CHInterpreter >> receiver [
 ]
 ]]]
 
-We make sure that we can set the receiver when we launch the interpretation and we introduce a new method ==execute:with:== for this. 
-We will remove 
+
+Then we will replace the existing implementation of ==execute:== in ==CHInterpreter== by ==execute:withReceiver:== which will allow us to specify the receiver.
 
 [[[
 CHInterpreter >> execute: anAST withReceiver: anObject [
@@ -313,35 +356,28 @@ CHInterpreter >> execute: anAST withReceiver: anObject [
 ]
 ]]]
 
-We redefine the method ==executeSelector:== to use this new method.
+And finally, since that change break all our tests, we will create a new helper method in our tests ==executeSelector:withReceiver:== and then redefine the method ==executeSelector:== to use this new method with a default receiver.
 
 [[[
 CHInterpreterTest >> executeSelector: aSymbol [
+
+  ^ self executeSelector: aSymbol withReceiver: nil
+]
+
+CHInterpreterTest >> executeSelector: aSymbol withReceiver: aReceiver [
 	| ast |
 	ast := (CHInterpretable >> aSymbol) ast.
-	^ self interpreter executeMethod: ast withReceiver: nil
+	^ self interpreter executeMethod: ast withReceiver: aReceiver
 ]
 ]]]
 
-This way all our tests are still passing and we will be ready to handle the case of ==self== and ==super==.
+Now we have refactored our existing code, introduced the possibility to specify a message receiver, and still keep all our previous tests passing. Our new test is still red, but we are now ready to make it pass.
 
-
-[[[
-CHInterpretable >> returnSelf [
-	^ self
-]
-]]]
-
-[[[
-CHInterpreterTest >> testReturnSelf [
-	self 
-		assert: (self executeSelector: #returnSelf) 
-		equals: nil
-]
-]]]
+!!!! Making the test pass: visiting self nodes
 
 The interpretation of ==self== is done in the method ==visitSelfNode:==.
 It is simple, it just returns the value of the receiver stored in the interpreter.
+Note that this method does not access the ==receiver== variable directly, but uses instead the accessor, leaving us the possibility of redefining that method without breaking the visit.
 
 [[[
 CHInterpretable >> visitSelfNode: aRBSelfNode [
@@ -349,27 +385,26 @@ CHInterpretable >> visitSelfNode: aRBSelfNode [
 ]
 ]]]
 
-!!! Handling Super
-Following the same logic as for ==self==, we improve the interpreter to support ==super==.
+!!!! Introducing ==super==
 
+Following the same logic as for ==self==, we improve our evaluator to support ==super==.
 We start by defining a method using ==super== and its companion test. 
 
 [[[
 CHInterpretable >> returnSuper [
 	^ super
 ]
-]]]
 
-[[[
 CHInterpreterTest >> testReturnSuper [
+  | receiver |
+  receiver := Object new.
 	self 
-		assert: (self executeSelector: #returnSuper) 
-		equals: nil
+		assert: (self executeSelector: #returnSuper withReceiver: receiver) 
+		equals: receiver
 ]
 ]]]
 
-What is interesting is that the interpretation of ==super== is that this variable is also the receiver of the message. 
-So contrary to a common and wrong believe, ==super== is not the superclass or an instance of the superclass. It is just the receiver.
+What is interesting is that the interpretation of ==super== is that this variable is also the receiver of the message. So contrary to a common and wrong believe, ==super== is not the superclass or an instance of the superclass. It is just the receiver:
 
 [[[
 CHInterpreter >> visitSuperNode: aRBSelfNode [
@@ -377,134 +412,143 @@ CHInterpreter >> visitSuperNode: aRBSelfNode [
 ]
 ]]]
 
-The logic of the tests is not really satisfactory, so we improve it. 
 
-!!! Improving the Logic of setUp
+!!! Evaluating Variables: Instance Variable Reads
 
-We want to have a better way to handle receiver in test.
-We add an instance variable to the ==CHInterpreterTest== that will hold the receiver.
+The next step is to support instance variable reads.
+Since variables are evaluated in the context of the receiver object, we need a receiver instance of a class with an instance variable. We already had such a class: ==CHInterprretable==.
+We then define an instance variable and a getter and setter for it, to be able to control the values in that instance variable.
+
+[[[
+Object subclass: #CHInterpretable
+  instanceVariableNames: 'x'
+  classVariableNames: ''
+  package: 'Champollion-Tests'
+
+CHInterpretable >> returnX [
+	^ x
+]
+
+CHInterpretable >> x: anInteger [
+	x := anInteger
+]
+]]]
+
+To test the evaluation of the instance variable read, we now need to check that the getter evaluates to the value in the instance variable, which we can previously set.
+
+[[[
+CHInterpreterTest >> testReturnInstanceVariableRead [
+  | receiver |
+  receiver := CHInterpretable new.
+	receiver x: 100.
+	self
+    assert: (self executeSelector: #returnX withReceiver: receiver)
+    equals: 100
+]
+]]]
+
+Our test is failing so we are ready to make it work: we define ==visitInstanceVariableNode:== to reflectively access the state of receiver. Note that in this implementation we are presuming that ASTs have pre-computed semantic information about the program: in other words, the AST knows that ==x== is an instance variable, beacause this was inferred at parse-time.
+
+[[[
+CHInterpreter >> visitInstanceVariableNode: aVariableNode [
+	^ self receiver instVarNamed: aVariableNode name
+]	
+]]]
+
+All our test should now pass!
+
+
+!!!! Refactor: Improving our Tests ==setUp==
+
+Let's simplify how receivers are managed in our tests.
+Instead of having to explicitly create and manage a receiver object, we add the receiver as an instance variable to the ==CHInterpreterTest==.
 
 [[[
 TestCase subclass: #CHInterpreterTest
 	instanceVariableNames: 'interpreter receiver'
 	classVariableNames: ''
-	package: 'Champollion'
+	package: 'Champollion-Tests'
 ]]]
 
-In the ==setUp== we assign a new instance to the new instance variable ==receiver==.
+We can then redefin the ==setUp== method to create a new instance of ==CHInterpretable== to the variable ==receiver==.
 
 [[[
 CHInterpreterTest >> setUp [
 	super setUp.
-	interpreter := self interpreterClass new.
 	receiver := CHInterpretable new
 ]
 ]]]
 
-We then use the new instance variable in ==executeSelector:==.
+And now we can proceed to use this new instance variable in ==executeSelector:== as the default receiver instead of ==nil==.
 
 [[[
 CHInterpreterTest >> executeSelector: aSymbol [
-	| ast |
-	ast := (CHInterpretable >> aSymbol) ast.
-	^ self interpreter executeMethod: ast withReceiver: receiver
+  ^ self executeSelector: selector withReceiver: receiver
 ]
 ]]]
 
-We rewrite the test methods ==testReturnSelf== and ==testReturnSuper==.
+And finally we can rewrite all our test methods using an explicit receiver:
+
 [[[
 CHInterpreterTest >> testReturnSelf [
 	self 
 		assert: (self executeSelector: #returnSelf) 
 		equals: receiver
 ]
-]]]
 
-[[[
 CHInterpreterTest >> testReturnSuper [
 	self 
 		assert: (self executeSelector: #returnSuper) 
 		equals: receiver
 ]
-]]]
 
-We are ready to work on more interesting points. 
-
-
-
-!!! Receiver State Access
-
-We can work on support instance variable access. 
-Let us start with a test.
-
-!!!!! Fixture and Test
-
-We define a getter and setter to be able to control the value put in the instance variable of our instance.
-
-[[[
-CHInterpretable >> returnX [
-	^ x
-]
-]]]
- 
-[[[
-CHInterpretable >> x: anInteger [
-	x := anInteger
-]
-]]]
-
-We modify the receiver and when we interpret the accessor we should get the correct value.
-
-[[[
-CHInterpreterTest >> testReturnAccessInstanceVariable [
+CHInterpreterTest >> testReturnInstanceVariableRead [
 	receiver x: 100.
-	self assert: (self executeSelector: #returnX) equals: 100
+	self
+    assert: (self executeSelector: #returnX)
+    equals: 100
 ]
 ]]]
 
+!!! Evaluating Variables: Instance Variable Writes
 
-Our test is failing so we are ready to work.  And now we can define the method ==visitInstanceVariableNode:== to reflectivity access the state of receiver. Note that this implementation does not take into account the fact that an instance variable can be defined in a superclass and still be accessible in the subclass method. 
+Now that we have support for instance variable reads, we can keep on going with instance variable writes.
+In our scenario, a method writes a literal integer into an instance variable ==x== and then returns the value of the assignment. This scenario has two observable behaviors that we will test separately.
+First, such an assignment should be observable from the outside by reading that variable.
+Second, an assignment is an expression whose value is the assigned value, thus the return value should be also the assigned value.
 
-[[[
-CHInterpreter >> visitInstanceVariableNode: aVariableNode [
-	^ receiver instVarNamed: aVariableNode name
-]	
-]]]
-
-Our test should pass!
-
-!!! Receiver State Assignment
-We will add support for assignment in receiver's instance variables.
-
-!!!!! Fixture and Tests
-
-We define a method doing an assignment into the instance variable ==x==.
 [[[
 CHInterpretable >> store100IntoX [
-	x := 100
+	^ x := 100
 ]	
 ]]]
 
-[[[
-CHInterpretable >> x [
-	^ x
-]
-]]]
-
-The test ==testStore100IntoX== launches the interpretation of method ==store100IntoX==.
+To test this behavior, we evaluate the method above and then we validate that effectively the instance variable was mutated. To make sure the value was modified, we set an initial value to the variable before the evaluation. After the evaluation we should not keep that value. The case of the return is similar to our previous tests.
 
 [[[
 CHInterpreterTest >> testStore100IntoX [
+
 	receiver x: 17.
 	self executeSelector: #store100IntoX.
 	self assert: receiver x equals: 100
 ]
+
+CHInterpreterTest >> testAssignmentReturnsAssignedValue [
+
+	self
+    assert: (self executeSelector: #store100IntoX)
+    equals: 100
+]
 ]]]
 
-!!!!! Implementation
+!!!! Making the test pass: visiting assignment nodes
 
-The implementation is straighforward. We define the method ==visitAssignmentNode:==.
-Here since we expect to have other variable types in the future we define the storing behavior  (method == store:with:==) of the assigned variable node itself. 
+To make this test pass, we need to define the method ==visitAssignmentNode:==.
+Evaluating an assignment node with the form `variable := expression` requires that we evaluate the `expression` and then set that value to the left-side variable. Notice that the variable we are assigning into does not need to be evaluated/visited: the evaluation of a variable is equivalent to reading its value. And in the left part of an assignment, we do not care about the value of the variable, but about the location of the variable.
+
+@@note Guille: I don't like to use store:with: (nor nodes that are already semantically analysed), because it hides name resolution... We should explain name resolution at some point, I believe this is an important topic, that also is needed for compilation. Also name resolution to me it's not a parser responsibility, so we should have at least a section to talk about this. Because what we have now is an optimization. Anyways, for later :)
+
+Our visit method then looks as follows: we recursively visit the right-side of the assignment (got through the `value` accessor), we set that value to the variable, and we finally return the stored value
 
 [[[
 CHInterpreter >> visitAssignmentNode: anAssignmentNode [
@@ -517,6 +561,7 @@ CHInterpreter >> visitAssignmentNode: anAssignmentNode [
 ]
 ]]]
 
+To set the value to the variable, we delegate the storing to the variable node itself. Again, since our RB AST nodes contain semantic information and know when a variable is an instance variable, the variable in this case will be an ==RBInstanceVariableNode==. Mirroring the instance variable read, an instance variable write will reflectively write the value to the object using ==instVarNamed:put:==.
 
 [[[
 RBInstanceVariableNode >> store: anObject with: anInterpreter [
@@ -524,15 +569,24 @@ RBInstanceVariableNode >> store: anObject with: anInterpreter [
 ]
 ]]]
 
-Now our tests should pass. 
+And finally, to make our tests green, we implement a getter for the ==x== variable.
+This getter is used to extract the value during our assertion.
+
+[[[
+CHInterpretable >> x [
+	^ x
+]
+]]]
+
+Now our tests should pass.
 
 
-!!! Handling Global Variables
-We finish this chapter with the handling of global variables such as classes and globals. 
-We decided not to use the default Pharo environment so that we have to be more explicit about how to access globals.
-It also means that we can control the scope of our interpreter and setting different environments.
+!!! Evaluating Variables: Global Reads
 
-We first define the method ==returnGlobal== which accesses and returns the global named ==Global==.
+We finish this chapter with the reading of global variables, which cover two cases: proper global variables, and the access to classes. To better control our testing environment, we decided to not use the Pharo environment by default. Instead, the interpreter will know its global environment in an instance variable and lookup globals in it using a simple API, making it possible to use the system's global environment instead if we wanted to. Also, we leave outside of the scope of this chapter the writing to global variables.
+The case of global variable writing is similar to the instance variable assignment, and it would require only to redefine ==store:with:== in the corresponding node for global variables.
+
+Our first testing scenario, similar to the previous ones, is as follows: a method ==returnGlobal== which reads and returns the global named ==Global==.
 
 [[[
 CHInterpretable >> returnGlobal [
@@ -551,11 +605,11 @@ CHInterpreterTest >> testReturnGlobal [
 ]
 ]]]
 
-We introduce a new instance variable named ==gloabEnvironment== and we initialize it to a new dictionary.
+We introduce a new instance variable named ==gloabEnvironment== in our class ==CHInterpreter== and we initialize it to an empty dictionary.
 
 [[[
 Object subclass: #CHInterpreter
-	instanceVariableNames: 'stack globalEnvironment'
+	instanceVariableNames: 'globalEnvironment'
 	classVariableNames: ''
 	category: 'Champollion-Core'
 ]]]
@@ -563,7 +617,6 @@ Object subclass: #CHInterpreter
 [[[
 CHInterpreter >> initialize [
 	super initialize. 
-	stack := CTStack new.
 	globalEnvironment := Dictionary new
 ]
 ]]]
@@ -576,18 +629,21 @@ CHInterpreter >> globalEnvironmentAt: aSymbol put: anObject [
 ]]]
 
 Finally we simply define a new method ==visitGlobalNode:== that will return the value of a global node
-by returning the value associated with the key in the global environment.
+by returning the value associated with the key in the global environment. We decided that trying to access a global that is not defined will raise an error in the interpreter and halt the interpretation. An alternative design would have returned a default value instead such as ==nil==. A more complex design would have been to throw an exception in the interpreted program. For the moment, halting the interpreter with an error suffices for our job.
 
 [[[
 CHInterpreter >> visitGlobalNode: aRBGlobalNode [
-	^ self globalEnvironment at: aRBGlobalNode name 
-		ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
+	^ self globalEnvironment
+      at: aRBGlobalNode name 
+		  ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
 ]
 ]]]
 
 
 !!! Conclusion
-This interpreter is basic. It does not cover arguments, temporaries or messages. 
-This is what we will cover in the following chapter.
-Then we will cover blocks and their specific semantics in subsequent chapters.
 
+In this chapter we have used the visitor pattern over AST nodes to implement a first version of an structural evaluator. This evaluator covers literal integers, floats, booleans and arrays, instance variables and global variables. Althought we have not talked about it explicitly, we also implemented a first version of the visit of statements and return nodes.
+
+This first evaluator serves as basis for implementing the execution of the main operations in Pharo: messages. The following chapters will start by decomposing message resolution into method-lookup and apply operations, introduce the execution stack, the management of temporary variables and argument, and `super` message-sends.
+
+We leave for the reader the exercise of extending this prototype with support for dynamic arrays (e.g., `{ self expression. 1+1 }`), class variables reads and writes, and global variable writes. We further invite the reader to explore changing the language semantics by modifying this simple evaluator: How could we implement read-only objects? Log all variable reads and writes? Wrap all literals to do taint analysis?
