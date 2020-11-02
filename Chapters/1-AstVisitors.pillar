@@ -553,7 +553,7 @@ However, more complex manipulations do require more than an iteration and a cond
 When an different operation is required for each kind of node in the AST, potentially with special cases depending on how nodes are composed, one object-oriented alternative is to implement it using the visitor design pattern.
 In this section we start reviewing the visitor pattern, and we then apply it for a single task: searching a string inside the tree.
 
-!!!! The Visitor Pattern
+!!! The Visitor Pattern
 
 The visitor pattern is one of the original design patterns from Gamma et Al.
 The main purpose of the visitor pattern is to externalize an operation from a data structure.
@@ -621,7 +621,7 @@ RBASTs are already extensible through visitors: its nodes implement ==acceptVisi
 This means we can introduce operations on the AST that were not foreseen by the original developers.
 In such cases, it is up to us to implement a visitor object with the correct ==visitXXX:== methods.
 
-!!!! Introducing AST visitors: measuring the depth of the tree
+!!! Introducing AST visitors: measuring the depth of the tree
 
 To introduce how to implement an AST visitor on RBASTs, let's implement a visitor that returns the max depth of the tree. That is, a tree with a single node has a depth of 1. A node with children node has a depth of 1 + the maximum depth amongst all its children.
 Let's call that visitor ==DepthCalculatorVisitor==.
@@ -637,7 +637,7 @@ RBAST nodes implement already the visitor pattern.
 They have an ==acceptVisitor:== method that will dispatch to the visitor with corresponding visit methods.
 This means we can already use our visitor, which will break on a visit.
 
-!!!!! Visiting message nodes
+!!!! Visiting message nodes
 
 Let's start by calculating the depth of the expression ==1+1==.
 This expression is made of a message node, and two literal nodes.
@@ -659,7 +659,7 @@ DepthCalculatorVisitor >> visitMessageNode: aRBMessageNode [
 ]
 ]]]
 
-!!!!! Visiting literal nodes
+!!!! Visiting literal nodes
 
 As soon as we restart the example, it will stop again with an exception again, but this time because our visitor does not know how to visit literal nodes.
 We know that literal nodes have no children, so we can implement the visit method as just returning one.
@@ -670,7 +670,7 @@ DepthCalculatorVisitor >> visitLiteralValueNode: aRBLiteralValueNode [
 ]
 ]]]
 
-!!!!! Calculating the depth of a method
+!!!! Calculating the depth of a method
 
 A method node contains a set of statements.
 Statements are either expressions or return statements.
@@ -707,7 +707,7 @@ DepthCalculatorVisitor >> visitSelfNode: aSelfNode [
 ]
 ]]]
 
-!!!!! Refactoring the implementation
+!!! Refactoring the implementation
 
 This simple AST visitor does not actually require different implementation for each of its nodes.
 We have seen above that we can differentiate the nodes between two kinds: leaf nodes that do not have children, and internal nodes that have children.
@@ -784,7 +784,7 @@ DepthCalculatorVisitor >> visitLiteralValueNode: aRBLiteralValueNode [
 ]
 ]]]
 
-!!!!! A common visitor superclass
+!!! A common visitor superclass
 
 If we take a look at our visitor above, we see a common structure has appeared.
 We have a lot of little visit methods per kind of node were we could do specific per-node treatments.
@@ -852,7 +852,7 @@ BaseASTVisitor >> visitVariableNode: aRBVariableNode [
 
 Fortunately for us, RBASTs already provide ==RBProgramNodeVisitor== a base class for our visitors, with many hooks to override in our specific subclasses.
 
-!!!! Searching the AST for a Token
+!!! Searching the AST for a Token
 
 Calculating the depth of an AST is a pretty naïve example for a visitor because we do not need special treatment per node. It is however a nice example to introduce the concepts, learn some common patterns, and it furthermore forced us to do some refactoring and understanding a complex visitor structure. Moreover, it was a good introduction for the ==RBProgramNodeVisitor== class.
 
@@ -879,7 +879,7 @@ SearchVisitor >> token: aToken [
 The main idea of our visitor is that it will return a collection with all matching nodes.
 If no matching nodes are found, an empty collection is returned.
 
-!!!!! Searching in variables nodes
+!!!! Searching in variables nodes
 
 Let's then start implementing the visit methods for variable nodes.
 ==RBProgramNodeVisitor== will already treat special variables as variable nodes, so a single visit method is enough for all four kind of nodes.
@@ -893,7 +893,7 @@ SearchVisitor >> visitVariableNode: aNode [
 ]
 ]]]
 
-!!!!! Searching in message nodes
+!!!! Searching in message nodes
 
 Mesage nodes will match a search if their selector begins with the searched token.
 In addition, to follow the specification children of the message need to be iterated in depth first in-order.
@@ -909,7 +909,7 @@ SearchVisitor >> visitMessageNode: aNode [
 ]
 ]]]
 
-!!!!! Searching in literal nodes
+!!!! Searching in literal nodes
 
 Literal nodes contain literal objects such as strings, but also booleans or numbers.
 To search in them, we need to transform such values as string and then perform the search within that string.
@@ -922,7 +922,7 @@ SearchVisitor >> visitLiteralNode: aNode [
 ]
 ]]]
 
-!!!!! The rest of the nodes
+!!!! The rest of the nodes
 
 The rest of the nodes do not contain strings to search in them.
 Instead the contain children we need to search.
