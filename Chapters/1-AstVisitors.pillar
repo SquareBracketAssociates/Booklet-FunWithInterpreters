@@ -49,28 +49,29 @@ Expressions are constructs that can be evaluated to a value.
 For example, the program ==17 max: 42== is the message send ==max:== to receiver 17 with argument 42, and can be evaluated to the value 42 (since it is bigger than 17).
 
 [[[language=smalltalk
+| expression |
 expression := RBParser parseExpression: '17 max: 42'.
-
 expression receiver formattedCode
->>> 17.
+>>> 17
 
 expression selector
->>> #max.
+>>> #max
 
 expression arguments first formattedCode
->>> 42.
+>>> 42
 ]]]
 
-Expressions can be combined to build more complex expressions. In the following example, the expresion ==17 max: 42== is used as the receiver of another message expression, the message ==asString== with no arguments.
+Expressions are a natural instance of Composite pattern where expressions can be combined to build more complex expressions.
+In the following example, the expression ==17 max: 42== is used as the receiver of another message expression, the message ==asString== with no arguments.
 
 [[[language=smalltalk
+| expression |
 expression := RBParser parseExpression: '(17 max: 42) asString'.
-
 expression receiver formattedCode
->>> (17 max: 42).
+>>> (17 max: 42)
 
 expression selector
->>> #asString.
+>>> #asString
 
 expression arguments
 >>> #()
@@ -80,48 +81,59 @@ Of course, message sends are not the only expressions we have in Pharo.
 Another kind of expression that appeared already in the examples above are literal objects such as numbers.
 
 [[[language=smalltalk
+| expression |
 expression := RBParser parseExpression: '17'.
-
 expression formattedCode
->>> 17.
+>>> 17
 ]]]
 
-Figure *@NodeHierarchy* show the node inheritance hierarchy of Pharo.
+Pharo is a simple language, the number of nodes that can compose the method ASTs is structured in a class hiearchy. 
+Figure *@NodeHierarchy* shows the node inheritance hierarchy of Pharo.
 
 +Overview of the method node hierarchy.>file://figures/RBNodeHierarchy.pdf|label=NodeHierarchy|width=80+
 
 !!!Literal Nodes
 
-Literal nodes represent literal objects. A literal object is an object that is not created directly by sending the ==new== message to a class. Instead, the developer writes directly in the source code the value of that object, and the object is created automatically from it. Literal objects in Pharo are strings, numbers, characters, booleans (==true==, and  ==false==), ==nil== and literal arrays (==\#()==).
+Literal nodes represent literal objects. A literal object is an object that is not created directly by sending the ==new== message to a class.
+Instead, the developer writes directly in the source code the value of that object, and the object is created automatically from it at parse time.
+Literal objects in Pharo are strings, symbols, numbers, characters, booleans (==true==, and  ==false==), ==nil== and literal arrays (==\#()==).
 
-Literal nodes in Pharo are instances of the ==RBLiteralValueNode==, and understand the message ==value== which returns the value of the object. In other words, literal objects in Pharo are resolved at parse time. Notice that the ==value== message does not return a string representation of the literal object, but the literal object itself.
+Literal nodes in Pharo are instances of the ==RBLiteralValueNode==, and understand the message ==value== which returns the value of the object.
+In other words, literal objects in Pharo are resolved at parse time. Notice that the ==value== message does not return a string representation of the literal object, but the literal object itself.
 
+From then on we will omit the declaration of temporaries in the code snippets for the sake of space.
 [[[language=smalltalk
 integerExpression := RBParser parseExpression: '17'.
 integerExpression value
->>> 17.
+>>> 17
+]]]
 
+[[[language=smalltalk
 trueExpression := RBParser parseExpression: 'true'.
 trueExpression value
->>> true.
+>>> true
 
+[[[language=smalltalk
 "Remember, strings need to be escaped"
 stringExpression := RBParser parseExpression: '''a string'''.
 stringExpression value
->>> 'a string'.
+>>> 'a string'
 ]]]
 
 A special case of literals are literal arrays, which have their own node: ==RBLiteralArrayNode==.
-Literal array nodes understand the message ==value== as any other literal, returning the literal array instance. However, it allows us to access the sub collection of literals using the message ==contents==. 
+Literal array nodes understand the message ==value== as any other literal, returning the literal array instance. 
+However, it allows us to access the sub collection of literals using the message ==contents==. 
 
 [[[language=smalltalk
 arrayExpression := RBParser parseExpression: '#(1 2 3)'.
 arrayExpression value
->>> #(1 2 3).
+>>> #(1 2 3)
 
 arrayExpression contents first
->>> RBLiteralValueNode(1).
+>>> RBLiteralValueNode(1)
 ]]]
+
+In addition to messages and literals, Pharo program can contain variables.
 
 !!!! The Variable Node, Self and Super Nodes
 
@@ -131,7 +143,7 @@ Variables are instances of ==RBVariableNode== and know their ==name==.
 [[[language=smalltalk
 variableExpression := RBParser parseExpression: 'aVariable'.
 variableExpression name
->>> 'aVariable'.
+>>> 'aVariable'
 ]]]
 
 Variable nodes are used to equally denote temporary, argument, instance, class or global variables.
@@ -141,10 +153,11 @@ Instead of complexifying the parser with this kind of information, the Pharo too
 Then the parser generates a simple AST, and tools can later annotate that AST with semantic information from a context if required.
 An example of this kind of treatment is the compiler, which requires such contextual information to produce the correct final code.
 
-For the matter of this booklet, we will not consider nor use semantic analysis, and we will stick with normal ==RBVariableNode== objects.
+For the matter of this book, we will not consider nor use semantic analysis, and we will stick with normal ==RBVariableNode== objects.
 The only exception to this are ==self==, ==super== and ==thisContext== special variables.
-Special variables are variables are recognised at parse-time, and generating special nodes ==RBSelfNode==, ==RBSuperNode== and ==RBThisContextNode== for them.
-These special nodes inherit from ==RBVariableNode== and work as normal variable nodes for the purposes of this booklet.
+Special variables are variables that are recognised at parse-time, and generating special nodes ==RBSelfNode==, ==RBSuperNode== and ==RBThisContextNode== for them.
+These special nodes inherit from ==RBVariableNode== and work as normal variable nodes for the purposes of this book.
+
 
 !!! Assignment Nodes
 
@@ -463,7 +476,15 @@ And we can also ask a node if it is an expression node or not:
 - ==isValue==
 
 
-!!! AST Visitors
+!!! Conclusion
+
+We basically did a tour of the Pharo AST nodes. 
+Any other nodes follow a similar principal.
+You should have now the basis to understand the concept of ASTs and we can move on to the next chapter.
+
+
+
+!! AST Visitors
 
 In the previous sections we have seen how to create and manipulate AST nodes.
 The ==RBParser== class implements a parser of expressions and methods that return AST nodes for the text given as argument.
