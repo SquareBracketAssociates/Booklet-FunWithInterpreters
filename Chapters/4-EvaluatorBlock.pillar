@@ -14,26 +14,8 @@ It means that we need a way to represent a closure.
 A closure is similar in a way to a method, except that it does not have a name, and can be defined in a method or another block.
 
 We define a class, ==CHBlock== to represent a block. It has an instance variable ==code== to hold an AST represeting the block body.
-
-@@todo need a test
-
-[[[
-CHInterpretable >> returnBlock [
-	^ [ 1 . 5 ]
-]
-]]]
-
-[[[
-CHInterpreterTest >> testBlock [
-	"returnBlock
-		^ [ 1 . 5 ]
-	"
-	| bk1 |
-	bk1 := (self executeSelector: #returnBlock).
-	self assert: bk1 code body isSequence
-]
-]]]
-
+The Pharo compiler represents a block as an instance of the ==RBBlockNode== class.
+It body is then an instance of the ==RBSequenceNode==.
 
 [[[
 Object subclass: #CHBlock
@@ -53,6 +35,49 @@ CHBlock >> code
 ]]]
 
 
+We write a test for this. 
+The method ==returnBlock== just returns a block without executing it. 
+
+[[[
+CHInterpretable >> returnBlock [
+	^ [ 1 . 5 ]
+]
+]]]
+
+The test verifies that we get the corresponding AST (see Figure *@NodeHierarchy*).
+
+[[[
+CHInterpreterTest >> testBlock [
+	"
+	returnBlock
+		^ [ 1 . 5 ] 
+	"
+	| bk1 |
+	bk1 := (self executeSelector: #returnBlock).
+	self assert: bk1 code isBlock.
+	self assert: bk1 code body isSequence
+]
+]]]
+
+When the interpreter encounters a block node, it should create the associated block object.
+We redefine the method ==visitBlockNode:== to do it. 
+
+[[[
+CHInterpreter >> visitBlockNode: aRBBlockNode [
+	^ CHBlock new
+		code: aRBBlockNode;
+		yourself
+]
+]]]
+
+The new test should pass. 
+
+!!! Handling Block Execution
+
+Closures are executed when they receive the messages ==value==, ==value:==, ==value:value:== and more. 
+On the reception of such messages, their bodies should be executed.
+
+The following code and its companion test illustrate what we expect. 
 [[[
 CHInterpretable >> returnBlockValue [
 	^ [ 1 . 5 ] value
@@ -68,8 +93,18 @@ CHInterpreterTest >> testBlockValueIsLastStatementValue
 	self assert: (self executeSelector: #returnBlockValue) equals: 5
 ]]]
 
+In Pharo all the control flow instructions are based on the execution of closures.
+In addition certain methods are primitives in the sense that they cannot be expressed in Pharo (this is the case
+for ==at:== and ==at:put:==).
 
-!!! About value
+This raises the question of the implementation of the interpretation of such methods by our interpreter. 
+We do not really want to have to changes the ==visitMessageNode:== method for each control flow. 
+
+The solution we propose is to distinguish the message to be executed by tagging it with a pragma.
+For example the following method ==value== is tagged with the annotation ==astInterpreterPrimitive: #value==. 
+
+Note that the method values is a primitive from the interpreter perspective in the sense
+that we cannot to express its definition in Pharo without replying on reflective operation.
 
 [[[
 CHBlock >> value [
@@ -83,7 +118,7 @@ CHBlock >> value [
 ]
 ]]]
 
-
+Once such a method is tagged, we have to change the ==visitMessageNode:== method to take into it account.
 
 
 

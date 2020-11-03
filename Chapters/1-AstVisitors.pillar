@@ -1,17 +1,24 @@
-!! AST Visitors
+!! AST
 
-The cornerstone of an AST interpreter are the ASTs, short for abstract syntax tree.
-An abstract syntax tree is a tree data structure that represents a program from the syntax point of view. In other words, each node in the tree will represent an element that is written in a program. To illustrate it, consider the piece of Pharo code below:
+The cornerstone of an AST interpreter is ASTs, short for abstract syntax trees.
+An abstract syntax tree is a tree data structure that represents a program from the syntax point of view. 
+In other words, each node in the tree represents an element that is written in a program. 
+To illustrate it, consider the piece of Pharo code below:
 
 [[[language=smalltalk
 variable := 'constant' , self message
 ]]]
 
-This piece of code assigns into a variable named ==variable== the result of sending the ==,== message to a =='constant'== string, with ==self message== as argument. An AST will then organize the code above as a tree containing nodes representing variables, assignments, strings, and message sends.
+This piece of code assigns into a variable named ==variable== the result of sending the ==,== message to a =='constant'== string, to the result of the message ==self message==. 
+
+An AST organizes the code above as a tree containing nodes representing variables, assignments, strings, and message sends.
 
 In the first part of this chapter we will study ASTs by looking at the existing AST implementation in Pharo, the RBAST. RBAST is the AST implementation used currently (Pharo 9.0) by many tools in Pharo's tool-chain, such as the compiler, the syntax-highlighter, the auto-completion, the code quality engine and the refactoring engine. As so, it's an interesting piece of engineering, and we will find it provides most of what we will need for our journey to have fun with interpreters.
 
-In the second part of the chapter we will study (or re-study, for those who already know it) the visitor design pattern. To be usable by the many tools named before, RBASTs implement a visitor interface. Tools performing complex operations on ASTs may then visitor classes with their algorithm. As we will see in the chapters after this one, one such tool is an interpreter, thus mastering ASTs and visitors is essential.
+In the following chapter we will study (or re-study, for those who already know it) the Visitor design pattern. 
+To be usable by the many tools named before, RBASTs implement a visitor interface. 
+Tools performing complex operations on ASTs may then define visitor classes with their algorithm. 
+As we will see in the chapters after this one, one such tool is an interpreter, thus mastering ASTs and visitors is essential.
 
 !!! Pharo Abstract Syntax Trees
 
@@ -42,28 +49,29 @@ Expressions are constructs that can be evaluated to a value.
 For example, the program ==17 max: 42== is the message send ==max:== to receiver 17 with argument 42, and can be evaluated to the value 42 (since it is bigger than 17).
 
 [[[language=smalltalk
+| expression |
 expression := RBParser parseExpression: '17 max: 42'.
-
 expression receiver formattedCode
->>> 17.
+>>> 17
 
 expression selector
->>> #max.
+>>> #max
 
 expression arguments first formattedCode
->>> 42.
+>>> 42
 ]]]
 
-Expressions can be combined to build more complex expressions. In the following example, the expresion ==17 max: 42== is used as the receiver of another message expression, the message ==asString== with no arguments.
+Expressions are a natural instance of Composite pattern where expressions can be combined to build more complex expressions.
+In the following example, the expression ==17 max: 42== is used as the receiver of another message expression, the message ==asString== with no arguments.
 
 [[[language=smalltalk
+| expression |
 expression := RBParser parseExpression: '(17 max: 42) asString'.
-
 expression receiver formattedCode
->>> (17 max: 42).
+>>> (17 max: 42)
 
 expression selector
->>> #asString.
+>>> #asString
 
 expression arguments
 >>> #()
@@ -73,48 +81,61 @@ Of course, message sends are not the only expressions we have in Pharo.
 Another kind of expression that appeared already in the examples above are literal objects such as numbers.
 
 [[[language=smalltalk
+| expression |
 expression := RBParser parseExpression: '17'.
-
 expression formattedCode
->>> 17.
+>>> 17
 ]]]
 
+Pharo is a simple language, the number of nodes that can compose the method ASTs is structured in a class hiearchy. 
+Figure *@NodeHierarchy* shows the node inheritance hierarchy of Pharo.
 
++Overview of the method node hierarchy (TODO: remove RBPatternPragmaNode - Add RBSelectorNode).>file://figures/RBNodeHierarchy.pdf|label=NodeHierarchy|width=80+
 
 !!!Literal Nodes
 
-Literal nodes represent literal objects. A literal object is an object that is not created directly by sending the ==new== message to a class. Instead, the developer writes directly in the source code the value of that object, and the object is created automatically from it. Literal objects in Pharo are strings, numbers, characters, booleans (==true==, and  ==false==), ==nil== and literal arrays (==\#()==).
+Literal nodes represent literal objects. A literal object is an object that is not created directly by sending the ==new== message to a class.
+Instead, the developer writes directly in the source code the value of that object, and the object is created automatically from it at parse time.
+Literal objects in Pharo are strings, symbols, numbers, characters, booleans (==true==, and  ==false==), ==nil== and literal arrays (==\#()==).
 
-Literal nodes in Pharo are instances of the ==RBLiteralValueNode==, and understand the message ==value== which returns the value of the object. In other words, literal objects in Pharo are resolved at parse time. Notice that the ==value== message does not return a string representation of the literal object, but the literal object itself.
+Literal nodes in Pharo are instances of the ==RBLiteralValueNode==, and understand the message ==value== which returns the value of the object.
+In other words, literal objects in Pharo are resolved at parse time. Notice that the ==value== message does not return a string representation of the literal object, but the literal object itself.
 
+From then on we will omit the declaration of temporaries in the code snippets for the sake of space.
 [[[language=smalltalk
 integerExpression := RBParser parseExpression: '17'.
 integerExpression value
->>> 17.
+>>> 17
+]]]
 
+[[[language=smalltalk
 trueExpression := RBParser parseExpression: 'true'.
 trueExpression value
->>> true.
+>>> true
 
+[[[language=smalltalk
 "Remember, strings need to be escaped"
 stringExpression := RBParser parseExpression: '''a string'''.
 stringExpression value
->>> 'a string'.
+>>> 'a string'
 ]]]
 
 A special case of literals are literal arrays, which have their own node: ==RBLiteralArrayNode==.
-Literal array nodes understand the message ==value== as any other literal, returning the literal array instance. However, it allows us to access the sub collection of literals using the message ==contents==. 
+Literal array nodes understand the message ==value== as any other literal, returning the literal array instance. 
+However, it allows us to access the sub collection of literals using the message ==contents==. 
 
 [[[language=smalltalk
 arrayExpression := RBParser parseExpression: '#(1 2 3)'.
 arrayExpression value
->>> #(1 2 3).
+>>> #(1 2 3)
 
 arrayExpression contents first
->>> RBLiteralValueNode(1).
+>>> RBLiteralValueNode(1)
 ]]]
 
-!!!! The Variable Node, self and super nodes
+In addition to messages and literals, Pharo program can contain variables.
+
+!!!! The Variable Node, Self and Super Nodes
 
 Variable nodes in the AST tree are used when variables are used or assigned to.
 Variables are instances of ==RBVariableNode== and know their ==name==.
@@ -122,7 +143,7 @@ Variables are instances of ==RBVariableNode== and know their ==name==.
 [[[language=smalltalk
 variableExpression := RBParser parseExpression: 'aVariable'.
 variableExpression name
->>> 'aVariable'.
+>>> 'aVariable'
 ]]]
 
 Variable nodes are used to equally denote temporary, argument, instance, class or global variables.
@@ -132,60 +153,71 @@ Instead of complexifying the parser with this kind of information, the Pharo too
 Then the parser generates a simple AST, and tools can later annotate that AST with semantic information from a context if required.
 An example of this kind of treatment is the compiler, which requires such contextual information to produce the correct final code.
 
-For the matter of this booklet, we will not consider nor use semantic analysis, and we will stick with normal ==RBVariableNode== objects.
+For the matter of this book, we will not consider nor use semantic analysis, and we will stick with normal ==RBVariableNode== objects.
 The only exception to this are ==self==, ==super== and ==thisContext== special variables.
-Special variables are variables are recognised at parse-time, and generating special nodes ==RBSelfNode==, ==RBSuperNode== and ==RBThisContextNode== for them.
-These special nodes inherit from ==RBVariableNode== and work as normal variable nodes for the purposes of this booklet.
+Special variables are variables that are recognised at parse-time, and generating special nodes ==RBSelfNode==, ==RBSuperNode== and ==RBThisContextNode== for them.
+These special nodes inherit from ==RBVariableNode== and work as normal variable nodes for the purposes of this book.
+
 
 !!! Assignment Nodes
 
 Assignment nodes in the AST represent assignment expressions using the ==:\=== operator.
-Assignments are indeed expressions: their value is the value of the variable after the assignment.
+Now there is the question to know if an assignment an expression (i.e., returns a value) or a statement. 
+Some languages propose that assignments are not expressions and as such do not return a value. 
+
+In Pharo following Smalltalk design, assignments are expressions: their value is the value of the variable after the assignment.
+This allows on to chain assignments. 
+
 We will see in the next chapter, when implementing an evaluator, why this is important.
 
 An assignment node is an instance of ==RBAssignmentNode==.
-If we send it the ==variable== message answers the variable it assigns to.
+If we send it the ==variable== message, it answers the variable it assigns to.
 The message ==value== returns the expression at the right of the assignment.
 
 [[[language=smalltalk
 assignmentExpression := RBParser parseExpression: 'var := #( 1 2 ) size'.
 assignmentExpression variable
->>> RBVariableNode(var).
-
+>>> RBVariableNode(var)
+]]]
+[[[language=smalltalk
 assignmentExpression value
->>> RBMessageNode(#(1 2) size).
+>>> RBMessageNode(#(1 2) size)
 ]]]
 
 !!! Message Nodes
 
-Message nodes are the core of Pharo programs, and they are the most common composed expression node we will find in the AST.
+Message nodes are the core of Pharo programs, and they are the most common composed expression node we find in the AST.
 Message are instances of ==RBMessageNode== and they have a receiver, a selector and a collection of arguments, obtained through the ==receiver==, ==selector== and ==arguments== messages.
 We say that message nodes are composed expressions because the ==receiver== and ==arguments== of a message are expressions in themselves, which can be as simple as literals or variables, or it can be other composed messages too.
 
 [[[language=smalltalk
 messageExpression := RBParser parseExpression: '17 max: 42'.
 messageExpression receiver
->>> RBLiteralValueNode(17).
+>>> RBLiteralValueNode(17)
 ]]]
 
-Note that the arguments is a normal collection of expressions.
+Note that the arguments is a normal collection of expressions - in the sense that there is not special node class to represent such a sequence.
 
 [[[language=smalltalk
 messageExpression arguments
->>> an OrderedCollection(RBLiteralValueNode(42)).
+>>> an OrderedCollection(RBLiteralValueNode(42))
 ]]]
 
-And that the selector is also just a symbol.
+And that the message selector returns also just a symbol.
+We can obtain the object representing the selector using ==selectorNode==.
 
 [[[language=smalltalk
 messageExpression selector
->>> #max:.
+>>> #max:
 ]]]
 
 !!!! A note on message nodes and precedence
 
-For those readers that already master the syntax of Pharo, you will remember that there exist three kind of messages: unary, binary and keyword messages. Besides their number of parameters, the Pharo syntax accords an order of precedences between them too. I.e., unary messages get to be evaluated before binary messages, which get to be evaluated before keyword messages. Only parentheses override this precedence.
-Precedence of messages in RBASTs is resolved at parse-time. In other words, the output of ==RBParser== is an AST respecting the precedence rules of Pharo.
+For those readers that already master the syntax of Pharo, you remember that there exist three kind of messages: unary, binary and keyword messages. 
+Besides their number of parameters, the Pharo syntax accords an order of precedences between them too. i.e., unary messages get to be evaluated before binary messages, which get to be evaluated before keyword messages. 
+Only parentheses override this precedence.
+Precedence of messages in ASTs is resolved at parse-time. 
+In other words, the output of ==RBParser== is an AST respecting the precedence rules of Pharo.
 
 Let's consider a couple of examples illustrating this.
 If we feed the ==RBParser== with the expression below, it will create a ==RBMessageNode== as we already know it.
@@ -202,9 +234,12 @@ Now, let's change the expression adding extra parenthesis as in:
 variable keyword: (argument + 42) unaryMessage
 ]]]
 
-The resulting AST completely changed! The root is still the ==keyword:== message, but now its first argument is the ==unaryMessage== sent to a (now in parenthesis) ==(argument + 42)== receiver.
+@@todo Add a diagram 
 
-Finally, if modify the parenthesis again to wrap the keyword message, the root of the resulting AST has changed too. 
+The resulting AST completely changed! 
+The root is still the ==keyword:== message, but now its first argument is the ==unaryMessage== sent to a (now in parenthesis) ==(argument + 42)== receiver.
+
+Finally, if modify the parenthesis again to wrap the keyword message, the root of the resulting AST has changed too.
 It is now the ==+== binary message.
 
 [[[
@@ -215,7 +250,7 @@ It is now the ==+== binary message.
 
 !!! Cascade Nodes
 
-Cascade nodes represent cascaded message expressions.
+Cascade nodes represent cascaded message expressions, i.e., messages sent to the same receiver.
 Cascaded messages are messages separated by semi-colons (==;==) such as in the following example.
 
 [[[language=smalltalk
@@ -225,7 +260,7 @@ OrderedCollection new
     yourself
 ]]]
 
-Which is, in practical terms, equivalent to a sequence of messages to the same receiver:
+This cascade is, in practical terms, equivalent to a sequence of messages to the same receiver:
 
 [[[language=smalltalk
 t := OrderedCollection new.
@@ -247,7 +282,7 @@ In the following chapters we will have to be careful when manipulating cascade n
 [[[language=smalltalk
 cascadeExpression := RBParser parseExpression: 'var msg1; msg2'.
 cascadeExpression receiver
->>> RBVariableNode(var).
+>>> RBVariableNode(var)
 
 cascadeExpression messages
 >>> an OrderedCollection(RBMessageNode(var msg1) RBMessageNode(var msg2))
@@ -255,7 +290,9 @@ cascadeExpression messages
 
 !!! Dynamic Literal Array Nodes
 
-Pharo has dynamic literal arrays. Dynamic literal arrays differ from literal arrays in that its elements are calculated at runtime instead of at parse time. To delay the execution of the elements in the dynamic array, a dynamic array node contains expressions, separated by dots.
+Pharo has dynamic literal arrays. 
+A dynamic literal array differs from a literal array in that its elements are calculated at runtime instead of at parse time. 
+To delay the execution of the elements in the dynamic array, a dynamic array node contains expressions, separated by dots.
 
 [[[language=smalltalk
 { 1 + 1 . self message . anObject doSomethingWith: anArgument + 3 }
@@ -280,7 +317,9 @@ arrayNode children.
 !!! Method and Block Nodes
 
 Now that we have studied the basic nodes representing expressions, we can build up methods from them.
-Methods in RBAST are represented as instances of ==RBMethodNode== and need to be parsed with a variant of the parser we have used so far, a method parser. The ==RBParser== class fulfills the role of a method parser when we use the message ==parseMethod:== instead of ==parseExpression:==. For example, the following piece of code returns a ==RBMethodNode== instance for a method named ==myMethod==.
+Methods are represented as instances of ==RBMethodNode== and need to be parsed with a variant of the parser we have used so far, a method parser.
+The ==RBParser== class fulfills the role of a method parser when we use the message ==parseMethod:== instead of ==parseExpression:==. 
+For example, the following piece of code returns a ==RBMethodNode== instance for a method named ==myMethod==.
 
 [[[language=smalltalk
 methodNode := RBParser parseMethod: 'myMethod
@@ -288,9 +327,9 @@ methodNode := RBParser parseMethod: 'myMethod
 	self'
 ]]]
 
-A method node differs from the expression nodes we have seen before in the fact that method nodes can only be roots in the AST tree. Method nodes cannot be children of other nodes.
+A method node differs from the expression nodes that we have seen before by the fact that method nodes can only be roots in the AST tree. Method nodes cannot be children of other nodes.
 
-Method nodes have a name or selector, accessed through the ==selector== message, a list of arguments, accessed through the ==arguments== message, and as we will see in the next section they also contain a ""body"" with the list of statements in the method.
+Method nodes have a name or selector, accessed through the ==selector== message, a list of arguments, accessed through the ==arguments== message, and as we will see in the next section they also contain a body with the list of statements in the method.
 
 [[[language=smalltalk
 methodNode selector
@@ -304,18 +343,18 @@ A sequence node is a sequence of instructions or statements.
 All expressions are statements, including all nodes we have already seen such as literals, variables, arrays, assignments and message sends.
 We will introduce later two more instructions that can be included as part of a sequence node: block nodes and return nodes.
 Block nodes are expressions that are syntactically and thus structurally similar to methods.
-Return nodes, representing the return instruction ==\^==, are instruction nodes but not expression nodes, i.e., they can only be children of sequence nodes.
+Return nodes, representing the return instruction ==\^==, are statement nodes but not expression nodes, i.e., they can only be children of sequence nodes.
 
-@@note for guille I have the impressions that using statements is better than instruction. It would be nice also to have a diagram of the inheritance tree. 
+@@note for guille I have the impression that using statements is better than instruction. It would be nice also to have a diagram of the inheritance tree. Yes I would to have a expression tree and a statement tree.
 
-If we take the example from before, we can access the sequence node body of our method with the ==body== message.
+If we take the previous example, we can access the sequence node body of our method with the ==body== message.
 
 [[[language=smalltalk
 methodNode := RBParser parseMethod: 'myMethod
 	1+1.
 	self'.
 
-methodNode body.
+methodNode body
 >>> RBSequenceNode(1 + 1. self)
 ]]]
 
@@ -328,16 +367,17 @@ methodNode body statements.
 
 Besides the instructions, sequence nodes also are the ones defining temporary variables.
 Consider for example the following method defining a temporary.
-In RBAST, temporary variables are defined as part of the sequence node and not the method node.
-This is because temporary variables can be defined inside a block node, as we will see later.
-We can access the temporary variables of a sequence node by asking it for its ==temporaries==.
 
 [[[language=smalltalk
 myMethod
   | temporary |
 	1+1.
-	self'.
+	self'
 ]]]
+
+In an AST, temporary variables are defined as part of the sequence node and not the method node.
+This is because temporary variables can be defined inside a block node, as we will see later.
+We can access the temporary variables of a sequence node by asking it for its ==temporaries==.
 
 [[[language=smalltalk
 methodNode := RBParser parseMethod: 'myMethod
@@ -350,7 +390,7 @@ methodNode body temporaries.
 
 !!! Return Nodes
 
-Return AST nodes represent the instruction that are syntactically identified with the caret character ==^==.
+Return AST nodes represent the instruction that are syntactically identified by the caret character ==^==.
 Return nodes, instances of ==RBReturnNode== are not expression nodes, i.e., they can only be found as a direct child of sequence nodes.
 Return nodes represent the fact of returning a value, and that value is an expression, which we is accessible through the ==value== message.
 
@@ -369,7 +409,12 @@ returnNode value.
 Note that as in Pharo return statements are not mandatory in a method, they are not mandatory in the AST either.
 Indeed, we can have method ASTs without return nodes.
 In those cases, the semantics of Pharo specifies that ==self== is implicitly returned.
-It is interesting to note that the AST does not force semantics but only syntax: we will add semantics to the AST when we evaluate it in a subsequent chapter.
+It is interesting to note that the AST does not contain semantics but only syntax: we will add semantics to the AST when we evaluate it in a subsequent chapter.
+In Pharo this is the compiler that ensures that a method always at the minimum return self.
+
+
+
+
 
 !!!! Block Nodes
 
@@ -383,14 +428,13 @@ They can be stored in variables, passed as message arguments and returned by mes
 
 [[[
 blockNode := RBParser parseExpression: '[ :arg | | temp | 1 + 1. temp ]'.
-
-blockNode arguments.
+blockNode arguments
 >>>an OrderedCollection(RBVariableNode(arg))
 
-blockNode body temporaries.
+blockNode body temporaries
 >>>an OrderedCollection(RBVariableNode(temp))
 
-blockNode body statements.
+blockNode body statements
 >>>an OrderedCollection(RBMessageNode(1 + 1) RBVariableNode(temp))
 ]]]
 
@@ -401,9 +445,9 @@ Those knowing ASTs for other languages, would have noticed that we have indeed f
 This is because in Pharo, control-flow statements such as conditionals or loops are expressed as messages, so no special case for them is required in the syntax.
 Because of this, Pharo's syntax fits in a post-card.
 
-In this section we will explore some core-messages of RBAST, that allow common manipulation for all nodes: iterating the nodes, storing meta-data and testing methods.
+In this section we will explore some core-messages of Pharo's AST, that allow common manipulation for all nodes: iterating the nodes, storing meta-data and testing methods.
 Most of these manipulations are rather primitive and simple.
-In the next section we will see how the visitor pattern in conjunction with ASTs empowers us, and gives us the possibility to build more complex applications such as concrete and abstract evaluators as we will see in the next chapters.
+In the next Chapter we will see how the visitor pattern in conjunction with ASTs empowers us, and gives us the possibility to build more complex applications such as concrete and abstract evaluators as we will see in the next chapters.
 
 !!!! Iterating over an AST
 
@@ -419,7 +463,7 @@ RBASTs provide several protocols for accessing and iterating any AST node in a g
 !!!! Storing Properties
 
 Some manipulations require storing meta-data associated to AST nodes.
-RBASTs provide a protocols for storing arbitrary properties inside a node.
+Pharo ASTs provide a set of messages for storing arbitrary properties inside a node.
 Properties stored in a node are indexed by a key, following the API of Pharo dictionaries.
 
 - ==aNode propertyAt: aKey put: anObject==: inserts ==anObject== at ==aKey==, overriding existing values at ==aKey==.
@@ -434,8 +478,8 @@ Properties stored in a node are indexed by a key, following the API of Pharo dic
 
 !!!! Testing Methods
 
-RBASTs provide a testing protocol that can be useful for small applications and writing unit tests.
-All RBASTs answer the messages ==isXXX== with a boolean ==true== or ==false==.
+ASTs provide a testing protocol that can be useful for small applications and writing unit tests.
+All ASTs answer the messages ==isXXX== with a boolean ==true== or ==false==.
 A first set of methods allow us to ask a node if it is of a specified type:
 
 - ==isLiteralNode==
@@ -453,8 +497,44 @@ And we can also ask a node if it is an expression node or not:
 
 - ==isValue==
 
+@@todo Check with latest changes.
 
-!!! AST Visitors
+!!! Expressions and others
+
+In Pharo, all the nodes are expressions except returns.
+Assignments, literals, messages, block are expressions that return a value. 
+
+We cannot write the following 
+
+[[[language=smalltalk
+x := ^ 5
+]]]
+
+[[[language=smalltalk
+{ 1 . ^ 4 }
+]]]
+
+Returns changes the control flow of the language. 
+
+Temporary definitions could be seen as a kind of statements, but a limited one because they are always 
+at the beginning of a sequence node.
+
+Finally in block structure languages, method definitions are expressions or statements and can be nested. 
+In Pharo method definitions are not a statement: like class definitions they are top level elements. 
+This is why Pharo is not a block structure languages even if it has closures (named block) that 
+can be nested, passed as arguments or stored. 
+
+
+
+!!! Conclusion
+
+We basically did a tour of the Pharo AST nodes. 
+Any other nodes follow a similar principal.
+You should have now the basis to understand the concept of ASTs and we can move on to the next chapter.
+
+
+
+!! AST Visitors
 
 In the previous sections we have seen how to create and manipulate AST nodes.
 The ==RBParser== class implements a parser of expressions and methods that return AST nodes for the text given as argument.
@@ -473,7 +553,7 @@ However, more complex manipulations do require more than an iteration and a cond
 When an different operation is required for each kind of node in the AST, potentially with special cases depending on how nodes are composed, one object-oriented alternative is to implement it using the visitor design pattern.
 In this section we start reviewing the visitor pattern, and we then apply it for a single task: searching a string inside the tree.
 
-!!!! The Visitor Pattern
+!!! The Visitor Pattern
 
 The visitor pattern is one of the original design patterns from Gamma et Al.
 The main purpose of the visitor pattern is to externalize an operation from a data structure.
@@ -541,7 +621,7 @@ RBASTs are already extensible through visitors: its nodes implement ==acceptVisi
 This means we can introduce operations on the AST that were not foreseen by the original developers.
 In such cases, it is up to us to implement a visitor object with the correct ==visitXXX:== methods.
 
-!!!! Introducing AST visitors: measuring the depth of the tree
+!!! Introducing AST visitors: measuring the depth of the tree
 
 To introduce how to implement an AST visitor on RBASTs, let's implement a visitor that returns the max depth of the tree. That is, a tree with a single node has a depth of 1. A node with children node has a depth of 1 + the maximum depth amongst all its children.
 Let's call that visitor ==DepthCalculatorVisitor==.
@@ -557,7 +637,7 @@ RBAST nodes implement already the visitor pattern.
 They have an ==acceptVisitor:== method that will dispatch to the visitor with corresponding visit methods.
 This means we can already use our visitor, which will break on a visit.
 
-!!!!! Visiting message nodes
+!!!! Visiting message nodes
 
 Let's start by calculating the depth of the expression ==1+1==.
 This expression is made of a message node, and two literal nodes.
@@ -579,7 +659,7 @@ DepthCalculatorVisitor >> visitMessageNode: aRBMessageNode [
 ]
 ]]]
 
-!!!!! Visiting literal nodes
+!!!! Visiting literal nodes
 
 As soon as we restart the example, it will stop again with an exception again, but this time because our visitor does not know how to visit literal nodes.
 We know that literal nodes have no children, so we can implement the visit method as just returning one.
@@ -590,7 +670,7 @@ DepthCalculatorVisitor >> visitLiteralValueNode: aRBLiteralValueNode [
 ]
 ]]]
 
-!!!!! Calculating the depth of a method
+!!!! Calculating the depth of a method
 
 A method node contains a set of statements.
 Statements are either expressions or return statements.
@@ -627,7 +707,7 @@ DepthCalculatorVisitor >> visitSelfNode: aSelfNode [
 ]
 ]]]
 
-!!!!! Refactoring the implementation
+!!! Refactoring the implementation
 
 This simple AST visitor does not actually require different implementation for each of its nodes.
 We have seen above that we can differentiate the nodes between two kinds: leaf nodes that do not have children, and internal nodes that have children.
@@ -704,7 +784,7 @@ DepthCalculatorVisitor >> visitLiteralValueNode: aRBLiteralValueNode [
 ]
 ]]]
 
-!!!!! A common visitor superclass
+!!! A common visitor superclass
 
 If we take a look at our visitor above, we see a common structure has appeared.
 We have a lot of little visit methods per kind of node were we could do specific per-node treatments.
@@ -772,7 +852,7 @@ BaseASTVisitor >> visitVariableNode: aRBVariableNode [
 
 Fortunately for us, RBASTs already provide ==RBProgramNodeVisitor== a base class for our visitors, with many hooks to override in our specific subclasses.
 
-!!!! Searching the AST for a Token
+!!! Searching the AST for a Token
 
 Calculating the depth of an AST is a pretty naïve example for a visitor because we do not need special treatment per node. It is however a nice example to introduce the concepts, learn some common patterns, and it furthermore forced us to do some refactoring and understanding a complex visitor structure. Moreover, it was a good introduction for the ==RBProgramNodeVisitor== class.
 
@@ -799,7 +879,7 @@ SearchVisitor >> token: aToken [
 The main idea of our visitor is that it will return a collection with all matching nodes.
 If no matching nodes are found, an empty collection is returned.
 
-!!!!! Searching in variables nodes
+!!!! Searching in variables nodes
 
 Let's then start implementing the visit methods for variable nodes.
 ==RBProgramNodeVisitor== will already treat special variables as variable nodes, so a single visit method is enough for all four kind of nodes.
@@ -813,7 +893,7 @@ SearchVisitor >> visitVariableNode: aNode [
 ]
 ]]]
 
-!!!!! Searching in message nodes
+!!!! Searching in message nodes
 
 Mesage nodes will match a search if their selector begins with the searched token.
 In addition, to follow the specification children of the message need to be iterated in depth first in-order.
@@ -829,7 +909,7 @@ SearchVisitor >> visitMessageNode: aNode [
 ]
 ]]]
 
-!!!!! Searching in literal nodes
+!!!! Searching in literal nodes
 
 Literal nodes contain literal objects such as strings, but also booleans or numbers.
 To search in them, we need to transform such values as string and then perform the search within that string.
@@ -842,7 +922,7 @@ SearchVisitor >> visitLiteralNode: aNode [
 ]
 ]]]
 
-!!!!! The rest of the nodes
+!!!! The rest of the nodes
 
 The rest of the nodes do not contain strings to search in them.
 Instead the contain children we need to search.
