@@ -648,12 +648,11 @@ We should call the method ==lookup:fromClass:== from the ==visitMessageNode:==
 
 !!!! The Case of Super
 
-Many people gets confused by super semantics even book authors. 
- ==super== is the receiver of the message as we saw it in the first chapter.
- It means that since ==self== and ==super== are pointing to the same object that 
- the difference should be elsewhere and it is in the lookup.
+Many people gets confused by the semantics of ==super==. The ==super== variable has two different roles in the execution of an object oriented language. When the ==super== variable is read, its value is the receiver of the message as we saw it in the first chapter, it has the same value as ==self==.
 
- We define a method ==superMessageSend==. 
+The second role of the ==super== variable is to alter the method lookup when ==super== is used as the receiver of the message send. Whe ==super== is used as the receiver of a message send, the method lookup does not start at the class of the receiver, but at the class where the method is installed instead, allowing it to go up higher and higher in the hierarchy.
+
+We define a method ==superMessageSend==. 
  It is not really good since it uses ==super== while it is not needed. 
  We will see with the handling of overridden messages better 
  tests. 
