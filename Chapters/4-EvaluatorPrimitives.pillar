@@ -1,0 +1,37 @@
+!! Primitives
+
+This is a skeleton so far. I filled it with some pitch.
+
+This chapter is required for completeness, and is an optional quick read.
+However, in a more advanced interpreter primitives are a an essential tool to get decent performance.
+
+!!! Why Primitives
+
+we need primitives to implement some services that cannot be expressed in pure Pharo code. For example, arithmetic, object allocation...
+
+Some languages do not have primitive methods, they instead model such essential behaviour as keywords and operators. Those keywords and operators are then translated as special bytecodes.
+
+Compare also to native methods, without fallback.
+
+!!! Implementing Primitive Methods
+
+Primitives have to be detected after the lookup, before activating the method.
+They do not create a frame.
+
+!!!! Arithmetic Primitives
+
+Some examples of +, /.
+
+!!!! Object Allocation Primitives
+
+Show normal object allocation #basicNew, and allocation of a variable object #basicNew:.
+
+!!! Primitive Fallback Code
+
+Sometimes a primitive cannot carry out its job in which case the primitive fails.
+When there is a primitive failure, the method with the primitive is activated as a normal method, evaluating what is usually called the primitive's fallback code.
+
+
+!!! Conclusion
+
+This 
