@@ -453,58 +453,115 @@ CHInterpreter >> visitMessageNode: aMessageNode [
 ]
 ]]]
 
-!!! Verifying Argument Access
+!!! Handling Temporaries
 
-We take some time to verify that the interpreter handles correctly argument. 
+Temporary variables, or local variables, are variables that live within the scope of a method's execution.
+Memory for such variables is allocated when a method is activated, and released when the method returns.
+Because of this property, temporary variables are also called automatic variables in languages like C.
 
-We define the method ==collaboratorXIgnoringArgumentWithSameName:== that does not use its parameter.
+The usual way to implement such temporary variables is to allocate them in the method execution's frame.
+In that way, when the method returns, the frame is popped and all the values allocated in temporaries are discarded and can be reclaimed. In other words, we will manage temporaries the same way as we manage parameters.
+
+Our first scenario introducing temporaries will verify the default value of temporaries.
+Indeed when temporaries are allocated in Pharo, the execution engine (in this case our evaluator) should make sure these variables are correctly initialized to a default value, in this case ==nil==.
+
+Notice that temporaries cannot be observed from outside the execution of a method unless we halt the evaluation of a method in the middle of the evaluation. Since our testing approach is more like a black-box approach, we need to make our scenarios visible from the outside somehow. Because of these reasons, our tests will rely on returns again, as we did before with literal objects.
 
 [[[
-CHinterpretable >> collaboratorXIgnoringArgumentWithSameName: anInteger [
-	collaborator x: 100 
+CHInterpretable >> returnUnassignedTemp [
+	| temp |
+	^ temp
 ]
 ]]]
 
-We define the method ==changeCollaboratorXWithConflictingArgumentNames==.
+The companion test verifies that the value of a uninitialized temporary is ==nil==.
 
 [[[
-CHinterpretable >> changeCollaboratorXWithConflictingArgumentNames
-	collaborator collaboratorXIgnoringArgumentWithSameName: 1987
-]]]
-
-In the following test method, we set some state, then send a message to the method ==changeCollaboratorXWithConflictingArgumentNames==
-that invokes the method ==collaboratorXIgnoringArgumentWithSameName:== whose argument has the same name that the method ==x:==
-and it verifies that argument values did not interacted.
-[[[
-testArgumentAccessDoesNotEscapeItsDefinition [
-	" changeCollaboratorXWithConflictingArgumentNames
-		collaborator collaboratorXIgnoringArgumentWithSameName: 1987
-	"
-	receiver x: 200.
-	collaborator x: 300.
-	"Test precondition. Both methods have arguments with the same name.
-	Otherwise this test could be green but false."
+CHInterpreterTest >> testUnassignedTempHasNilValue [
 	self
-		assert: (CHInterpretable >> #collaboratorXIgnoringArgumentWithSameName:) argumentNames
-		equals: (CHInterpretable >> #x:) argumentNames.
-
-	self executeSelector: #changeCollaboratorXWithConflictingArgumentNames.
-	self assert: receiver x equals: 200.
-	self assert: collaborator x equals: 100
+    assert: (self executeSelector: #returnUnassignedTemp)
+    equals: nil
 ]
 ]]]
 
+The current subset of Pharo that we interpret does not contain blocks and their local/temporary variables.
+Therefore the temporary variable management we need to implement so far is rather simple.
+We will implement blocks and more complex lexical scopes in a later chapter.
+To make our test green, we modify our == execute:withReceiver:andArguments:== method to define the temporaries needed with ==nil== as value.
 
-!!! New Setup for Method Lookup
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection [
+	| result |
+	self pushNewFrame.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ].
+	anAST temporaryNames do: [ :tempName | self tempAt: tempName name put: nil ].
+	result := self visitNode: anAST body.
+	self popFrame.
+	^ result
+]
+]]]
 
-So far we have put aside the method lookup.
-We looked directly in the class and this is clearly not good.
+@@note Guille: this we already implemented it above because arguments are temps...!!!!
+And the value of a temporary variable is simply to return the value associated to the variable name in the current frame.
+[[[
+CHInterpreter >> visitTemporaryNode: aRBTemporaryNode [
+	^ self tempAt: aRBTemporaryNode name
+]
+]]]
 
-To test method lookup we introduce two superclasses as superclass of ==CHInterpretable==: 
-The class ==CHInterpretableSecondSuperclass== and its subclass ==CHInterpretableSuperclass==.
-With this setup we will be able to test all situations, even the ones which leads to infinite loops
-when following the definition of some books.
+The test should be pass.
 
+!!!! Implementing Temporary Variable Writes
+
+Finally we test that writes to temporary variables are working too.
+We define our scenario method ==writeTemporaryVariable==, which defines a temporary variable, assigns to it and returns it. An optimizing compiler for this code would be smart enough to do constant propagation of the literal integer and then realize that the temporary is dead code and remove it, leaving us with a method body looking like == ^ 100 ==. However, since the parser does not do such optimizations by itself, we are sure that the AST we are going to receive contains both the temporary definition, the assignment, and the temporary return.
+
+[[[
+CHInterpretable >> writeTemporaryVariable [
+	| temp |
+	temp := 100.
+	^ temp
+]
+]]]
+
+Its companion test checks that evaluating this method does effectively return 100, meaning that the temporary variable write succeeded, and that `temp` means the same variable in the assignment and in the access.
+
+[[[
+CHInterpreterTest >> testWriteTemporaryVariable [
+
+	self
+    assert: (self executeSelector: #writeTemporaryVariable)
+    equals: 100
+]
+]]]
+
+@@note Guille: again this is weird from a reader point of view, we did not implement anything for it. The store:... is hiding so much stuff, and we did not even really talk about it...
+
+!!!! A Paragraph on Name Conflict Resolution
+
+Inside the scope of a method, statements have access to parameters, temporaries, instance and global variables. A name conflict appears when two variables that should be visible in a method share the same name. In a conflict scenario the language developer needs to device a resolution strategy for these problems, to avoid ambiguities.
+
+For example, consider a method ==m:== that has an argument named ==integer== and defines a temporary variable also named ==integer==. How should values of that name be resolved? How are assignments resolved? A conflict resolution strategy provides a set of deterministic rules to answer these questions and let developers understand what their program do in a non-ambiguous way.
+
+A first simple strategy to avoid conflicts is preventing them at construction time. That is, the language should not allow developers to define variables if they generate a name conflict. For example, a method should not be able to define a temporary variable with the same name as an instance variable of its class. Usually these validations are done once at compile time, and programs that do not follow this rules are rejected.
+
+Another strategy to solve this problem is to allow shadowing. That is, we give each variable in our program a priority, and then the actual variable to read or write is looked-up using this priority system.
+Typically priorities in these schemas are modelled as lexical scopes. Lexical scoping divides a program in a hierarchy of scopes. Each scope defines variables and all but the top level scope have a parent scope. For example, the top level scope defines global variables, the class scope defines the instance variables, the method scope defines the parameters and temporaries. In this way, variable visibility can be defined in terms of a scope: the variables visible in a scope are those defined in the scope or in the parents of the scope. Moreover, scoping also gives a conflict resolution strategy: variables defined closer to the current scope in the scope hierarchy have more priority than those defined higher in the scope hierarchy.
+
+@@note should we or not?
+In the scope of these first chapters we will not manage conflict resolution explicitly. Name resolution is previously done in the AST semantic analysis upon which we are building our evaluator. This means name resolution is already resolved for us following the Opal compiler semantics: shadowing is forbidden.
+
+!!! Introducing the Method Lookup
+
+So far we have concentrated on method evaluation and put aside the method lookup.
+Our current solution fetches methods from the class of the receiver, without respecting inheritance.
+In this section we will remedy this problem in our evaluator and implement a proper method lookup algorithm.
+
+To implement and test the method lookup, we will extend our scenario classes with a class hierarchy.
+We introduce two superclasses above ==CHInterpretable==: ==CHInterpretableSecondSuperclass== and its subclass ==CHInterpretableSuperclass==.
+With this setup we will be able to test all interesting situations, even the ones leading to infinite loops
+if our method lookup is wrongly implemented.
 
 [[[
 Object subclass: #CHInterpretableSecondSuperclass
@@ -527,48 +584,49 @@ CHInterpretableSuperclass subclass: #CHInterpretable
 	package: 'Champollion-Core'
 ]]]
 
-Since we may want to invoke method that are not directly defined in the class ==CHInterpretable==
-but its superclasses, we adapt the helper method ==executeSelector:== to perform a lookup instead of accessible
-only  ==CHInterpretable==.
 
-[[[
-CHInterpreterTest >> executeSelector: aSymbol [
-	| ast |
-	ast := (CHInterpretable lookupSelector: aSymbol) ast.
-	^ self interpreter executeMethod: ast withReceiver: receiver
-]
-]]]
-
-In addition we define the method ==methodNotInSubclass== only the superclass of ==CHInterpretable==.
+Our first scenario for method lookup will check that sending a message climbs up the inheritance tree when a method is not found in the receiver's class class. In the code below, we define a method in ==CHInterpretable== that does a ==self== message whose method is implemented in its ==CHInterpretableSuperclass== superclass. Executing the first method should send the message, find the superclass method, and evaluate it.
 
 [[[
 CHInterpretableSuperclass >> methodNotInSubclass [
+
 	^ 5
 ]
-]]]
 
-Now we are ready to define a test to verify that the method lookup is climbing up the inheritance tree when a 
-method is not found.
+CHInterpretable >> sendMessageInSuperclass [
 
-[[[
+	^ self methodNotInSubclass
+]
+
 CHInterpreterTest >> testLookupMessageInSuperclass [
-	"CHInterpretable >> sendMessageInSuperclass
-		^ self methodNotInSubclass
-	CHInterpretableSuperclass >> methodNotInSubclass
-		^ 5
-	"
+
 	self assert: (self executeSelector: #sendMessageInSuperclass) equals: 5
 ]
 ]]]
 
+The test should fail with our evaluator as is, because the evaluation of the message send will not find the method in the receiver's class. A first step towards implementing the lookup is to refactor the method ==visitMessageNode:== and extract the wrong code into a ==lookup:fromClass:== method.
 
-The test should not work so we are ready to work. 
-We define the method ==lookup:fromClass:==. 
-- It checks that the current class passed as argument defines the method. In such case it returns the corresponding method AST.
-- If the method is not defined in the current class and we are not on the top of the hierarchy we recursively lookup from the superclass.
-- Else when we are on top of the hierarchy the  ==lookup:fromClass:== returns nil. This indicates that no method were found. 
+[[[
+CHInterpreter >> visitMessageNode: aMessageNode [
 
-The method ==lookup:fromClass:== does not raise an error because this way the visitMessageNode: method will be able to send the ==doesNotUnderstand:== message to the receiver.
+	| newReceiver method args |
+	newReceiver := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	method := self lookup: aMessageNode selector fromClass: newReceiver class.
+	^ self execute: method withReceiver: newReceiver andArguments: args
+]
+
+CHInterpreter >> lookup: aSelector fromClass: aClass [
+  ^ (aClass compiledMethodAt: aMessageNode selector) ast.
+]
+]]]
+
+The method ==lookup:fromClass:== is now the place to implement the method lookup algorithm:
+- if the current class defines the method returns the corresponding AST;
+- if the current class does not define the method and we are not on the top of the hierarchy we recursively lookup in the class' superclass;
+- else when we are on top of the hierarchy the  ==lookup:fromClass:== returns nil to indicate that no method was found.
+
+The method ==lookup:fromClass:== does not raise an error because this way the ==visitMessageNode:== method will be able to send the ==doesNotUnderstand:== message to the receiver, as we will see later in this chapter.
 
 [[[
 CHInterpreter >> lookup: aSymbol fromClass: aClass [
@@ -580,28 +638,15 @@ CHInterpreter >> lookup: aSymbol fromClass: aClass [
 
 	"Otherwise lookup recursively in the superclass.
 	If we reach the end of the hierarchy return nil"
-	^ aClass = ProtoObject
-		ifTrue: [ nil ]
-		ifFalse: [ self lookup: aSymbol fromClass: aClass superclass ]
+	^ aClass superclass
+		ifNil: [ nil ]
+		ifNotNil: [ self lookup: aSymbol fromClass: aClass superclass ]
 ]
 ]]]
 
 We should call the method ==lookup:fromClass:== from the ==visitMessageNode:==
 
-[[[
-CHInterpreter >> visitMessageNode: aMessageNode [
-	| newReceiver method args | 
-	newReceiver := self visitNode: aMessageNode receiver.
-	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
-	method := self lookup: aMessageNode selector fromClass: newReceiver class.
-	^ self executeMethod: method withReceiver: newReceiver andArguments: args
-]
-]]]
-
-Now we are ready to work on the case of ==super==. 
-
-
-!!! The Case of Super
+!!!! The Case of Super
 
 Many people gets confused by super semantics even book authors. 
  ==super== is the receiver of the message as we saw it in the first chapter.
@@ -680,11 +725,9 @@ CHInterpreterTest >> visitMessageNode: aMessageNode [
 	method :=  self lookup: aMessageNode selector fromClass: lookupClass.	
 	^ self executeMethod: method withReceiver: newReceiver andArguments: args
 ]
-]]]	
+]]]
 
-
-
-!!! Overridden Messsages
+!!!! Overridden Messsages
 So far we made sure that sending a message using ==super== starts in the superclass of the class using the expression. 
 Now we would like to make sure that the lookup works even in presence of overridden methods. 
 
@@ -720,7 +763,7 @@ CHInterpreterTest >> testLookupRedefinedMethod [
 This test should run. 
 
 
-!!! Checking Correct Semantics
+!!!! Checking Correct Semantics
 
 Some books define wrongly that ==super== looks up method starting from the superclass of the class of the receiver. 
 This is plain wrong and only works when the inheritance depth is limited to two: a class and its superclass.
@@ -776,225 +819,7 @@ CHInterpreter >> visitMessageNode: aMessageNode [
 ]
 ]]]
 
-We are ready to introduce temporaries.
-
-!!! Intermezzo -- About Temporaries
-
-Before implementing the interpretation of temporaries we want to show some particularities of Pharo semantics.
-Temporaries cannot shadow other temporaries.
-
-The following expression is rejected by the compiler because the second ==tmp== definition is illegal. 
-[[[language=pharo
-[ 
-	| tmp |
-	tmp := 2. 
-	[
-		| tmp |
-		tmp := 3 ]]
-]]]
-
-Similarly a temporary cannot shadow a block or a method parameter.
-Therefore the following expression is not allowed.
-
-[[[language=pharo
-	[ :tmp |
-		| tmp |
-		tmp := 2 ]
-]]]
-
-The following method is not valid either.
-[[[language=pharo
-with: arg
-
-	| arg |
-	^ arg
-]]]	
-
-!!!! Parameters are Read Only
-Finally parameters are read only. 
-Therefore the following method is not valid.
-[[[language=pharo
-with: arg
-	arg := 42
-]]]
-
-As well as the following expression
-
-[[[language=pharo
-	[ :tmp |
-		tmp := 2 ]
-]]]
-
-
-
-!!! Handling Temporaries
-
-Inside a method, the names of parameters, temporaries and instance variables are flattened and use a single namespace.
-We will manage temporaries the same way as parameters.
-
-We start by defining a method just defining and not assigning any value to a temporary variable.
-
-[[[
-CHInterpretable >> returnUnassignedTemp [
-	| temp |
-	^ temp
-]
-]]]
-
-The companion test verifies that the value of a uninitialized temporary is ==nil==.
-[[[
-CHInterpreterTest >> testUnassignedTempHasNilValue [
-	self assert: (self executeSelector: #returnUnassignedTemp) equals: nil
-]
-]]]
-
-The current subset of Pharo that we interpret does not contain blocks and their local/temporary variables.
-Therefore the temporary variable management is rather simple.
-We modify the == executeMethod:withReceiver:andArguments:== to define the temporaries needed.
-
-[[[
-CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection [
-	| result |
-	self pushNewFrame.
-	self tempAt: #___method put: anAST.
-	self tempAt: #self put: anObject.
-	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ].
-	anAST temporaryNames do: [ :tempName | self tempAt: tempName name put: nil ].
-	result := self visitNode: anAST body.
-	self popFrame.
-	^ result
-]
-]]]
-
-The value of a temporary variable is simply to return the value associated to the variable name in the current frame.
-[[[
-CHInterpreter >> visitTemporaryNode: aRBTemporaryNode [
-	^ self tempAt: aRBTemporaryNode name
-]
-]]]
-
-The test should be pass.
-
-!!! Checking Temporary Writing
-We test also that writing to a temporary variable is working.
-We define the simple method ==writeTemporaryVariable==.
-
-[[[
-CHInterpretable >> writeTemporaryVariable [
-	| temp |
-	temp := 100.
-	^ temp
-]
-]]]
-
-Its companion test should pass.
-
-[[[
-CHInterpreterTest >> testWriteTemporaryVariable [
-	"writeTemporaryVariable
-		| temp |
-		temp := 100.
-		^ temp
-	"
-	self assert: (self executeSelector: #writeTemporaryVariable) equals: 100
-]
-]]]	
-
-!!! Extended Read Temp Tests
-
-We take the time to make sure that our implementation is correct. For example, temporaries should correctly
-work when sending another message. 
-The method ==readCollaboratorTemporaryVariable== defines locally a variable with the same name than ==returnUnassignedTemp==.
-Within ==readCollaboratorTemporaryVariable== we assign the temp.
-[[[
-CHInterpretable >> readCollaboratorTemporaryVariable [
-	| temp |
-	temp := 17.
-	^ collaborator returnUnassignedTemp
-]
-]]]
-
-The companion test verifies that the assignment in one method does not affect the other.
-[[[
-CHInterpreterTest >> testReadTemporaryVariableDoesNotEscapeItsDefinition [
-	"readCollaboratorTemporaryVariable
-		| temp |
-		temp := 17.
-		^ collaborator returnUnassignedTemp
-	
-	returnUnassignedTemp
-		| temp |
-		^ temp
-	"
-	self assert: (self executeSelector: #readCollaboratorTemporaryVariable) equals: nil
-]
-]]]
-
-We verifies the same situation after a message send by define the method ==readTemporaryVariableAfterMessageSend==
-and a companion test.
-
-[[[
-CHInterpreterTest >> readTemporaryVariableAfterMessageSend [
-	| temp |
-	temp := 17.
-	collaborator returnUnassignedTemp.
-	^ temp
-]
-]]]
-
-The test ==testReadTemporaryVariableAfterMessageSend== verifies that the vale of the variable ==temp==
-is not changed by the message ==returnUnassignedTemp== that creates a new variable with the same name.
-
-[[[
-CHInterpreterTest >> testReadTemporaryVariableAfterMessageSend [
-	"readTemporaryVariableAfterMessageSend
-		| temp |
-		temp := 17.
-		collaborator returnUnassignedTemp.
-		^ temp
-	
-	returnUnassignedTemp
-		| temp |
-		^ temp
-	"
-	self assert: (self executeSelector: #readTemporaryVariableAfterMessageSend) equals: 17
-]
-]]]
-
-
-!!! Extended Write Temp Tests
-We write some extra tests to verify that values get assigned to the correct temporaries. 
-We define a new simple method ==writeCollaboratorTemporaryVariable== that sets a value to a temporary
-with the same name as the ones defined in method ==writeTemporaryVariable==.
-[[[
-CHInterpretable >> writeCollaboratorTemporaryVariable [
-	| temp |
-	temp := 17.
-	collaborator writeTemporaryVariable.
-	^ temp
-]
-]]]
-
-The test verifies that the semantics is correctly handled: a temporary access or store is only working on the associate
-frame -- frame that is correctly push and pop on the stack. 
-[[[
-CHInterpreterTest >> testWriteTemporaryVariableDoesNotEscapeItsDefinition [
-	"writeCollaboratorTemporaryVariable
-
-		| temp |
-		temp := 17.
-		collaborator writeTemporaryVariable.
-		^ temp
-	
-	writeTemporaryVariable
-
-		| temp |
-		temp := 100.
-		^ temp
-	"
-	self assert: (self executeSelector: #writeCollaboratorTemporaryVariable) equals: 17
-]
-]]]
+!!! Does not understand
 
 !!! Conclusion
 

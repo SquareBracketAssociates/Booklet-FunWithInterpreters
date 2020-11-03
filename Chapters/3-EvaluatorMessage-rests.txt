@@ -1,0 +1,155 @@
+
+!!! Verifying Argument Access
+
+We take some time to verify that the interpreter handles correctly argument. 
+
+We define the method ==collaboratorXIgnoringArgumentWithSameName:== that does not use its parameter.
+
+[[[
+CHinterpretable >> collaboratorXIgnoringArgumentWithSameName: anInteger [
+	collaborator x: 100 
+]
+]]]
+
+We define the method ==changeCollaboratorXWithConflictingArgumentNames==.
+
+[[[
+CHinterpretable >> changeCollaboratorXWithConflictingArgumentNames
+	collaborator collaboratorXIgnoringArgumentWithSameName: 1987
+]]]
+
+In the following test method, we set some state, then send a message to the method ==changeCollaboratorXWithConflictingArgumentNames==
+that invokes the method ==collaboratorXIgnoringArgumentWithSameName:== whose argument has the same name that the method ==x:==
+and it verifies that argument values did not interacted.
+[[[
+testArgumentAccessDoesNotEscapeItsDefinition [
+	" changeCollaboratorXWithConflictingArgumentNames
+		collaborator collaboratorXIgnoringArgumentWithSameName: 1987
+	"
+	receiver x: 200.
+	collaborator x: 300.
+	"Test precondition. Both methods have arguments with the same name.
+	Otherwise this test could be green but false."
+	self
+		assert: (CHInterpretable >> #collaboratorXIgnoringArgumentWithSameName:) argumentNames
+		equals: (CHInterpretable >> #x:) argumentNames.
+
+	self executeSelector: #changeCollaboratorXWithConflictingArgumentNames.
+	self assert: receiver x equals: 200.
+	self assert: collaborator x equals: 100
+]
+]]]
+
+
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+Since we may want to invoke method that are not directly defined in the class ==CHInterpretable==
+but its superclasses, we adapt the helper method ==executeSelector:== to perform a lookup instead of accessible
+only  ==CHInterpretable==.
+
+[[[
+CHInterpreterTest >> executeSelector: aSymbol [
+	| ast |
+	ast := (CHInterpretable lookupSelector: aSymbol) ast.
+	^ self interpreter executeMethod: ast withReceiver: receiver
+]
+]]]
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+!!! Extended Read Temp Tests
+
+We take the time to make sure that our implementation is correct. For example, temporaries should correctly
+work when sending another message. 
+The method ==readCollaboratorTemporaryVariable== defines locally a variable with the same name than ==returnUnassignedTemp==.
+Within ==readCollaboratorTemporaryVariable== we assign the temp.
+[[[
+CHInterpretable >> readCollaboratorTemporaryVariable [
+	| temp |
+	temp := 17.
+	^ collaborator returnUnassignedTemp
+]
+]]]
+
+The companion test verifies that the assignment in one method does not affect the other.
+[[[
+CHInterpreterTest >> testReadTemporaryVariableDoesNotEscapeItsDefinition [
+	"readCollaboratorTemporaryVariable
+		| temp |
+		temp := 17.
+		^ collaborator returnUnassignedTemp
+	
+	returnUnassignedTemp
+		| temp |
+		^ temp
+	"
+	self assert: (self executeSelector: #readCollaboratorTemporaryVariable) equals: nil
+]
+]]]
+
+We verifies the same situation after a message send by define the method ==readTemporaryVariableAfterMessageSend==
+and a companion test.
+
+[[[
+CHInterpreterTest >> readTemporaryVariableAfterMessageSend [
+	| temp |
+	temp := 17.
+	collaborator returnUnassignedTemp.
+	^ temp
+]
+]]]
+
+The test ==testReadTemporaryVariableAfterMessageSend== verifies that the vale of the variable ==temp==
+is not changed by the message ==returnUnassignedTemp== that creates a new variable with the same name.
+
+[[[
+CHInterpreterTest >> testReadTemporaryVariableAfterMessageSend [
+	"readTemporaryVariableAfterMessageSend
+		| temp |
+		temp := 17.
+		collaborator returnUnassignedTemp.
+		^ temp
+	
+	returnUnassignedTemp
+		| temp |
+		^ temp
+	"
+	self assert: (self executeSelector: #readTemporaryVariableAfterMessageSend) equals: 17
+]
+]]]
+
+
+!!! Extended Write Temp Tests
+We write some extra tests to verify that values get assigned to the correct temporaries. 
+We define a new simple method ==writeCollaboratorTemporaryVariable== that sets a value to a temporary
+with the same name as the ones defined in method ==writeTemporaryVariable==.
+[[[
+CHInterpretable >> writeCollaboratorTemporaryVariable [
+	| temp |
+	temp := 17.
+	collaborator writeTemporaryVariable.
+	^ temp
+]
+]]]
+
+The test verifies that the semantics is correctly handled: a temporary access or store is only working on the associate
+frame -- frame that is correctly push and pop on the stack. 
+[[[
+CHInterpreterTest >> testWriteTemporaryVariableDoesNotEscapeItsDefinition [
+	"writeCollaboratorTemporaryVariable
+
+		| temp |
+		temp := 17.
+		collaborator writeTemporaryVariable.
+		^ temp
+	
+	writeTemporaryVariable
+
+		| temp |
+		temp := 100.
+		^ temp
+	"
+	self assert: (self executeSelector: #writeCollaboratorTemporaryVariable) equals: 17
+]
+]]]
