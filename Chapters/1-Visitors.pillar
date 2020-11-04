@@ -89,7 +89,9 @@ In such cases, it is up to us to implement a visitor object with the correct ==v
 
 !!! Introducing AST visitors: measuring the depth of the tree
 
-To introduce how to implement an AST visitor on RBASTs, let's implement a visitor that returns the max depth of the tree. That is, a tree with a single node has a depth of 1. A node with children node has a depth of 1 + the maximum depth amongst all its children.
+To introduce how to implement an AST visitor on RBASTs, let's implement a visitor that returns the max depth of the tree. 
+That is, a tree with a single node has a depth of 1. 
+A node with children has a depth of 1 + the maximum depth amongst all its children.
 Let's call that visitor ==DepthCalculatorVisitor==.
 
 [[[language=smalltalk
@@ -99,9 +101,10 @@ Object subclass: #DepthCalculatorVisitor
   package: 'VisitorExample'
 ]]]
 
-RBAST nodes implement already the visitor pattern.
+Pharo's AST nodes implement already the visitor pattern.
 They have an ==acceptVisitor:== method that will dispatch to the visitor with corresponding visit methods.
-This means we can already use our visitor, which will break on a visit.
+
+This means we can already use our visitor but we will have to define some methods else it will break on a visit.
 
 !!!! Visiting message nodes
 
@@ -114,7 +117,8 @@ expression acceptVisitor: DepthCalculatorVisitor new.
 >>> Exception! DepthCalculatorVisitor does not understand visitMessageNode:
 ]]]
 
-If we execute the example above, we get a debugger because ==DepthCalculatorVisitor== does not understand ==visitMessageNode:==. We can then proceed to introduce that method in the debugger using the button ""create"" or by creating it in the browser.
+If we execute the example above, we get a debugger because ==DepthCalculatorVisitor== does not understand ==visitMessageNode:==. 
+We can then proceed to introduce that method in the debugger using the button ""create"" or by creating it in the browser.
 We can implement the visit method as follows, by iterating the children to calculate the maximum depth amongst the children, and then adding 1 to it.
 
 [[[
@@ -161,13 +165,16 @@ DepthCalculatorVisitor >> visitMethodNode: aRBMethodNode [
       inject: 0
       into: [ :max :node | max max: (node acceptVisitor: self) ])
 ]
+]]]
 
+[[[
 DepthCalculatorVisitor >> visitSequenceNode: aRBSequenceNode [
   ^ 1 + (aRBSequenceNode children
       inject: 0
       into: [ :max :node | max max: (node acceptVisitor: self) ])
 ]
-
+]]]
+[[[
 DepthCalculatorVisitor >> visitSelfNode: aSelfNode [
   ^ 1
 ]
@@ -185,33 +192,43 @@ DepthCalculatorVisitor >> visitNodeWithChildren: aNode [
       inject: 0
       into: [ :max :node | max max: (node acceptVisitor: self) ])
 ]
-
+]]]
+[[[
 DepthCalculatorVisitor >> visitMessageNode: aRBMessageNode [
   ^ self visitNodeWithChildren: aRBMessageNode
 ]
-
+[[[
 DepthCalculatorVisitor >> visitMethodNode: aRBMethodNode [
   ^ self visitNodeWithChildren: aRBMethodNode
 ]
-
+]]]
+[[[
 DepthCalculatorVisitor >> visitSequenceNode: aRBSequenceNode [
   ^ self visitNodeWithChildren: aRBSequenceNode
 ]
+]]]
 
+[[[
 DepthCalculatorVisitor >> visitLeafNode: aSelfNode [
   ^ 1
 ]
+]]]
 
+[[[
 DepthCalculatorVisitor >> visitSelfNode: aSelfNode [
   ^ self visitLeafNode: aSelfNode
 ]
-
+]]]
+[[[
 DepthCalculatorVisitor >> visitLiteralValueNode: aRBLiteralValueNode [
   ^ self visitLeafNode: aRBLiteralValueNode
 ]
 ]]]
 
-As a second step, we can refactor further by taking into account a simple intuition: leaf nodes do never have children. This means that ==aNode children== would always yield an empty collection for leaf nodes, and thus the result of the following expression will always be zero:
+!!! Second refactoring
+
+As a second step, we can refactor further by taking into account a simple intuition: leaf nodes do never have children. 
+This means that ==aNode children== always yields an empty collection for leaf nodes, and thus the result of the following expression is always be zero:
 
 [[[language=smalltalk
 (aNode children
@@ -219,7 +236,9 @@ As a second step, we can refactor further by taking into account a simple intuit
   into: [ :max :node | max max: (node acceptVisitor: self) ])
 ]]]
 
-In other words, we could reuse the implementation of ==visitNodeWithChildren:== for both nodes with and without children, to get rid of the duplicated ==1+==. Let's then rename the method ==visitNodeWithChildren:== into ==visitNode:== and make all visit methods delegate to it.
+In other words, we can reuse the implementation of ==visitNodeWithChildren:== for both nodes with and without children, to get rid of the duplicated ==1+==. 
+
+Let's then rename the method ==visitNodeWithChildren:== into ==visitNode:== and make all visit methods delegate to it.
 This will allow us also to remove the, now unused, ==visitLeafNode:==.
 
 [[[
@@ -228,61 +247,72 @@ DepthCalculatorVisitor >> visitNode: aNode [
       inject: 0
       into: [ :max :node | max max: (node acceptVisitor: self) ])
 ]
-
+]]]
+[[[
 DepthCalculatorVisitor >> visitMessageNode: aRBMessageNode [
   ^ self visitNode: aRBMessageNode
 ]
-
+]]]
+[[[
 DepthCalculatorVisitor >> visitMethodNode: aRBMethodNode [
   ^ self visitNode: aRBMethodNode
 ]
-
+]]]
+[[[
 DepthCalculatorVisitor >> visitSequenceNode: aRBSequenceNode [
   ^ self visitNode: aRBSequenceNode
 ]
-
+]]]
+[[[
 DepthCalculatorVisitor >> visitSelfNode: aSelfNode [
   ^ self visitNode: aSelfNode
 ]
-
+]]]
+[[[
 DepthCalculatorVisitor >> visitLiteralValueNode: aRBLiteralValueNode [
   ^ self visitNode: aRBLiteralValueNode
 ]
 ]]]
 
-!!! A common visitor superclass
+!!! Refactoring: A common Visitor superclass
 
 If we take a look at our visitor above, we see a common structure has appeared.
-We have a lot of little visit methods per kind of node were we could do specific per-node treatments.
+We have a lot of little visit methods per kind of node where we could do specific per-node treatments.
 For those nodes that do not do anything specific, with that node, we treat them as a more generic node with a more generic visit method.
-Our methods generic visit methods could then be moved to a common superclass ==BaseASTVisitor== defining the common structure, but making a single empty hook for the ==visitNode:== method.
+Our generic visit methods could then be moved to a common superclass named ==BaseASTVisitor== defining the common structure, but making a single empty hook for the ==visitNode:== method.
 
 [[[language=smalltalk
 Object subclass: #BaseASTVisitor
   instanceVariableNames: ''
   classVariableNames: ''
   package: 'VisitorExample'
-
+]]]
+[[[
 BaseASTVisitor >> visitNode: aNode [
   "Do nothing by default. I'm meant to be overridden by subclasses"
 ]
-
+]]]
+[[[
 BaseASTVisitor >> visitMessageNode: aRBMessageNode [
   ^ self visitNode: aRBMessageNode
 ]
-
+]]]
+[[[
 BaseASTVisitor >> visitMethodNode: aRBMethodNode [
   ^ self visitNode: aRBMethodNode
 ]
-
+]]]
+[[[
 BaseASTVisitor >> visitSequenceNode: aRBSequenceNode [
   ^ self visitNode: aRBSequenceNode
 ]
-
+]]]
+[[[
 BaseASTVisitor >> visitSelfNode: aSelfNode [
   ^ self visitNode: aSelfNode
 ]
-
+]]]
+[[[
 BaseASTVisitor >> visitLiteralValueNode: aRBLiteralValueNode [
   ^ self visitNode: aRBLiteralValueNode
 ]
@@ -295,7 +325,8 @@ BaseASTVisitor subclass: #DepthCalculatorVisitor
   instanceVariableNames: ''
   classVariableNames: ''
   package: 'VisitorExample'
-
+]]]
+[[[
 DepthCalculatorVisitor >> visitNode: aNode [
   ^ 1 + (aNode children
       inject: 0
@@ -310,26 +341,29 @@ For example, in our example above we could have differentiated ==RBSelf== nodes 
 BaseASTVisitor >> visitSelfNode: aRBSelfNode [
   ^ self visitVariableNode: aRBSelfNode
 ]
-
+]]]
+[[[
 BaseASTVisitor >> visitVariableNode: aRBVariableNode [
   ^ self visitNode: aRBVariableNode
 ]
 ]]]
 
-Fortunately for us, RBASTs already provide ==RBProgramNodeVisitor== a base class for our visitors, with many hooks to override in our specific subclasses.
+Fortunately for us, Pharo's ASTs already provide ==RBProgramNodeVisitor== a base class for our visitors, with many hooks to override in our specific subclasses.
 
 !!! Searching the AST for a Token
 
-Calculating the depth of an AST is a pretty naïve example for a visitor because we do not need special treatment per node. It is however a nice example to introduce the concepts, learn some common patterns, and it furthermore forced us to do some refactoring and understanding a complex visitor structure. Moreover, it was a good introduction for the ==RBProgramNodeVisitor== class.
+Calculating the depth of an AST is a pretty naïve example for a visitor because we do not need special treatment per node. 
+It is however a nice example to introduce the concepts, learn some common patterns, and it furthermore forced us to do some refactorings and understanding a complex visitor structure. 
+Moreover, it was a good introduction for the ==RBProgramNodeVisitor== class.
 
 In this section we will implement a visitor that does require different treatment per node: a node search.
-Our node search will look for a node in the RBAST tree that contains a token matching a string.
+Our node search will look for a node in the tree that contains a token matching a string.
 For the purposes of this example, we will keep it scoped to a ""begins with"" search, and will return all nodes it finds, in a depth-first in-order traversal.
 We leave as an exercise for the reader implementing variants such as fuzzy string search, traversing the AST in different order, and being able to provide a stream-like API to get only the next matching node on demand.
 
 Let's then start to define a new visitor class ==SearchVisitor==, subclass of ==RBProgramNodeVisitor==.
 This class will have an instance variable to keep the token we are looking for.
-Notice that we need to keep the token as part of the state of the visitor: the visitor API implemented by RBASTs do not support additional arguments to pass around some extra state. This means that this state needs to be kept in the visitor.
+Notice that we need to keep the token as part of the state of the visitor: the visitor API implemented by Pharo's ASTs do not support additional arguments to pass around some extra state. This means that this state needs to be kept in the visitor.
 
 [[[language=smalltalk
 RBProgramNodeVisitor subclass: #SearchVisitor
@@ -400,11 +434,12 @@ SearchVisitor >> visitNode: aNode [
 ]
 ]]]
 
+Another design would be to store the collection holding the rest inside the visitor and to avoid the temporary copies. 
+We let you refactor your code to implement it. 
+
 !!! Conclusion
 
-In this chapter we have studied ASTs, short for abstract syntax trees, an object-oriented representation of the syntactic structure of programs. We have also seen an implementation of them: the RB ASTs. RB provides a parser for Pharo methods and expressions that transforms a string into a tree representing the program.
-
-We have seen how we can manipulate those ASTs and we have reviewed the visitor design pattern first on a simple example, then on ASTs.
+In this chapter we have reviewed the visitor design pattern first on a simple example, then on ASTs.
 The visitor design pattern allows us to extend tree-like structures with operations without modifying the original implementation. The tree-like structure, in our case the AST, needs only to implement an accept-visit protocol. RB ASTs implement such a protocol and some handy base visitor classes.
 
 Finally, we implemented two visitors for ASTs: a depth calculator and a node searcher.
