@@ -20,7 +20,7 @@ In this section we start reviewing the visitor pattern, and we then apply it for
 
 !!! The Visitor Pattern
 
-The Visitor pattern is one of the original design patterns from Gamma et al ${citation=Gamm95a}$, ${citation=Alpe98a}$.
+The Visitor pattern is one of the original design patterns from Gamma et al ${cite:Gamm95a}$, ${cite:Alpe98a}$.
 The main purpose of the Visitor pattern is to externalize an operation from a data structure.
 For example, let's consider a file system implemented with the composite pattern, where nodes can be files or directories.
 This composite forms a tree, where file nodes are leaf nodes and directory nodes are non-leaf nodes.
