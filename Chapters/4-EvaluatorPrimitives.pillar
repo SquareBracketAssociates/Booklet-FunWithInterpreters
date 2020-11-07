@@ -201,12 +201,211 @@ In this section we will implement a series of essential primitives, that will ma
 
 !!!! Arithmetic Primitives
 
-Some examples of \+, /.
+The basic arithmetic primitive are small integer addition, substraction, multiplication and division.
+They all require a small integer receiver, a small integer argument, and that the result is also a small integer.
+Division in addition fails in case the argument is ==0==.
+The following code snippet illustrates integer addition and division.
+For shortness we did not include substraction and multiplication, they are implemented simularly to addition.
+
+[[[
+CHInterpreter >> initializePrimitiveTable [
+    ...
+  	primitives at: 1 	  put: #primitiveSmallIntegerAdd.
+  	primitives at: 2 	  put: #primitiveSmallIntegerMinus.
+  	primitives at: 9 	  put: #primitiveSmallIntegerMultiply.
+  	primitives at: 10 	put: #primitiveSmallIntegerDivide.
+    ...
+]
+
+CHInterpreter >> primitiveSmallIntegerAdd [
+  | receiver argument result |
+	self numberOfArguments < 1
+		ifTrue: [ CHPrimitiveFail signal ].
+
+  receiver := self receiver.
+  receiver class = SmallInteger
+  	ifFalse: [ CHPrimitiveFail signal ].
+
+  argument := self argumentAt: 1.
+  argument class = SmallInteger
+  	ifFalse: [ CHPrimitiveFail signal ].
+
+  result := receiver + argument.
+  result class = SmallInteger
+  	ifFalse: [ CHPrimitiveFail signal ].
+  ^ result
+]
+
+CHInterpreter >> primitiveSmallIntegerDivide [
+  | receiver argument result |
+	self numberOfArguments < 1
+		ifTrue: [ CHPrimitiveFail signal ].
+
+	receiver := self receiver.
+	receiver class = SmallInteger
+		ifFalse: [ CHPrimitiveFail signal ].
+	
+  argument := self argumentAt: 1.
+  (argument class = SmallInteger
+    and: [ argument ~= 0 ])
+    	ifFalse: [ CHPrimitiveFail signal ].
+
+	result := receiver / argument.
+	result class = SmallInteger
+		ifFalse: [ CHPrimitiveFail signal ].
+	^ result
+]
+]]]
+
+!!!! Comparison primitives
+
+Comparison primitives span in two different sets. The first set contains the primitives implementing number comparisons such as less than or greater or equals than. The second set contains the primitives for object identity comparison: identity equals to and identity not equals to.
+All number comparisons all require a small integer receiver, a small integer argument.
+Identity comparisons only require that the primitive receives an argument to compare to.
+The following code snippet illustrates both kind of methods with small integer less than and object idenity equality.
+
+[[[
+CHInterpreter >> initializePrimitiveTable [
+    ...
+    primitives at: 3 	put: #primitiveSmallIntegerLessThan.
+    primitives at: 4 	put: #primitiveSmallIntegerGreaterThan.
+    primitives at: 5 	put: #primitiveSmallIntegerLessOrEqualsThan.
+    primitives at: 6 	put: #primitiveSmallIntegerGreaterOrEqualsThan.
+
+    primitives at: 7 	put: #primitiveSmallIntegerEqualsThan.
+    primitives at: 8 	put: #primitiveSmallIntegerNotEqualsThan.
+    
+    primitives at: 110 	put: #primitiveIdentical.
+    primitives at: 111 	put: #primitiveNotIdentical.
+    ...
+]
+
+CHInterpreter >> primitiveSmallIntegerLessThan [
+	| receiver argument result |
+	self numberOfArguments < 1
+		ifTrue: [ CHPrimitiveFail signal ].
+
+	receiver := self receiver.
+	receiver class = SmallInteger
+		ifFalse: [ CHPrimitiveFail signal ].
+	
+	argument := self argumentAt: 1.
+	argument class = SmallInteger
+		ifFalse: [ CHPrimitiveFail signal ].
+
+	^ receiver < argument
+]
+
+CHInterpreter >> primitiveIdentical [
+  self numberOfArguments < 1
+	  ifTrue: [ CHPrimitiveFail signal ].
+
+  ^ self receiver == (self argumentAt: 1)
+]
+]]]
+
+!!!! Array Manipulation Primitives
+
+So far our interpreter is able to manipulate only objects with instance variables, but not arrays or their variants e.g., strings.
+Arrays are special objects whose state is accessed with primitives, usually in methods named ==at:== and ==at:put:== and ==size==.
+Array access primitives check that the receiver is of the right kind and that the index arguments are integers within bounds of the array.
+The following code snippet illustrates Array access primitives for general Arrays, and Strings.
+
+[[[
+CHInterpreter >> initializePrimitiveTable [
+    ...
+    primitives at: 60 	put: #primitiveAt.
+    primitives at: 61 	put: #primitiveAtPut.
+    primitives at: 62 	put: #primitiveSize.
+    primitives at: 63 	put: #primitiveStringAt.
+    primitives at: 64 	put: #primitiveStringAtPut.
+    ...
+]
+
+CHInterpreter >> primitiveSize [
+	self receiver class classLayout isVariable
+		ifFalse: [ CHPrimitiveFail signal ].
+	    
+	^ self receiver basicSize
+]
+
+CHInterpreter >> primitiveAt [
+  self numberOfArguments < 1
+	  ifTrue: [ CHPrimitiveFail signal ].
+
+	self receiver class classLayout isVariable
+		ifFalse: [ CHPrimitiveFail signal ].
+	
+	((self argumentAt: 1) isKindOf: SmallInteger)
+		ifFalse: [ CHPrimitiveFail signal ].
+		
+    "Bounds check"
+    self receiver size < (self argumentAt: 1)
+      ifTrue: [ CHPrimitiveFail signal ].
+    
+	^ self receiver basicAt: (self argumentAt: 1)
+]
+
+CHInterpreter >> primitiveStringAt [
+  self numberOfArguments < 1
+	  ifTrue: [ CHPrimitiveFail signal ].
+  
+  self receiver class classLayout isBytes
+		ifFalse: [ CHPrimitiveFail signal ].
+	
+	((self argumentAt: 1) isKindOf: SmallInteger)
+		ifFalse: [ CHPrimitiveFail signal ].
+    
+  "Bounds check"
+  self receiver size < (self argumentAt: 1)
+    ifTrue: [ CHPrimitiveFail signal ].
+	
+	^ self receiver at: (self argumentAt: 1)
+]
+]]]
 
 !!!! Object Allocation Primitives
 
-Show normal object allocation #basicNew, and allocation of a variable object #basicNew:.
+Object allocation is implemented by primitives ==new== and ==new:==.
+The method ==new== allocates a new object from a fixed-slot class.
+The method ==new:== allocates a new object from a variable-slot class such as Array, using the number of slots specified as argument. Both these primitives validate that the receiver are classes of the specified kinds.
+In addition ==new:== does check that there is an argument, it is a small integer.
+
+[[[
+CHInterpreter >> initializePrimitiveTable [
+    ...
+    primitives at: 70 	put: #primitiveBasicNew.
+    primitives at: 71 	put: #primitiveBasicNewVariable.
+    ...
+]
+
+CHInterpreter >> primitiveBasicNew [
+  self receiver isClass
+		ifFalse: [ CHPrimitiveFail signal ].
+	^ self receiver basicNew
+]
+
+CHInterpreter >> primitiveBasicNewVariable [
+  self numberOfArguments < 1
+    ifTrue: [ CHPrimitiveFail signal ].
+
+	self receiver isClass
+		ifFalse: [ CHPrimitiveFail signal ].
+  self receiver class classLayout isVariable
+  		ifFalse: [ CHPrimitiveFail signal ].
+	
+	((self argumentAt: 1) isKindOf: SmallInteger)
+		ifFalse: [ CHPrimitiveFail signal ].
+	
+	^ self receiver basicNew: (self argumentAt: 1)
+]
+]]]
 
 !!! Conclusion
 
-This 
+This chapter presented primitive behavior, implementing behaviour that cannot be purely expressed in the evaluated language.
+Primitive behaviour is accessed through primitive methods, which are methods marked with a ==primitive:== pragma.
+When a primitive method executes, it first executes the primitive behavior associated with the primitive id.
+If it fails, the body of the method is executed as in non-primitive methods.
+
+We have then discussed about primitive failures and verifications, and presented a short list of essential primitives that are required to execute more interesting Pharo programs.
