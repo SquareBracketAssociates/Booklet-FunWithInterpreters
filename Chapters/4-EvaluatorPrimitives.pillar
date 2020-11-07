@@ -3,12 +3,12 @@
 Our interpreter does not yet handle many essential behavior that prevent us to evaluate complex programs.
 This chapter introduces the concept of primitive methods in Pharo.
 We call primitive behavior the behaviour that needs to be implemented in the interpreter or evaluator because it cannot be purely expressed in the programming language, Pharo in this case.
-Let's consider for example the operation of adding up two numbers (==+==).
+Let's consider for example the operation of adding up two numbers (==\+==).
 We cannot express in a pure and concise way a normal method executing an addition.
 Along with arithmetics, other examples of primitive operations are object allocation and reflective object access.
 Such primitive behavior in Pharo is expressed as special methods, namely ""primitive methods"" in Pharo, whose behavior is defined in the interpreter or evaluator.
 
-Differently from languages such as Java or C, that express arithmetics as special operators that are compiled/interpreted differently, Pharo maintains the message-send metaphore for primitive behaviour. Indeed, in Pharo ==+== is a message, which triggers a look-up and a method activation. This separation makes redefining operators as simple as implementing a method with the selector ==+== in our own class, without the need for special syntax for it.
+Differently from languages such as Java or C, that express arithmetics as special operators that are compiled/interpreted differently, Pharo maintains the message-send metaphore for primitive behaviour. Indeed, in Pharo ==\+== is a message, which triggers a look-up and a method activation. This separation makes redefining operators as simple as implementing a method with the selector ==\+== in our own class, without the need for special syntax for it.
 
 In addition of essential behaviour, primitive behaviour can be used to implement performance-critical code in a much more efficient way, since primitives are implemented in the implementation language and do not suffer the interpretation overhead.
 
@@ -28,8 +28,8 @@ MyClass >> + anArgument [
 
 To define primitive behavior, Pharo relies on special methods called primitive methods.
 Primitive methods are normal Pharo methods with a special ==primitive== annotation.
-For example, let us consider the code snipped below, which is an excerpt of the ==SmallInteger>>+== method.
-This method looks like a normal method with selector ==+==, and with a normal method body doing ==^super + aNumber==.
+For example, let us consider the code snipped below, which is an excerpt of the ==SmallInteger>>\+== method.
+This method looks like a normal method with selector ==\+==, and with a normal method body doing ==^super \+ aNumber==.
 The only difference between this method and a normal one is that this method also has an annotation, or pragma, indicating that it is the primitive number 1.
 
 [[[
@@ -60,7 +60,7 @@ We need to also take care of sending the receiver and arguments of the message t
 
 Let's start by setting up our testing scenario: adding up two numbers.
 We make sure to work with small enough numbers in this test, to not care about primitive failures yet.
-Doing `1 + 5` the primitive should always be a success and return `6`.
+Doing ==1 \+ 5== the primitive should always be a success and return `6`.
 
 [[[
 CHInterpreter >> initialize [
@@ -197,9 +197,11 @@ CHInterpretable >> failingPrimitive [
 
 !!! Essential Primitives
 
+In this section we will implement a series of essential primitives, that will make it possible to execute a large range of Pharo programs.
+
 !!!! Arithmetic Primitives
 
-Some examples of +, /.
+Some examples of \+, /.
 
 !!!! Object Allocation Primitives
 
