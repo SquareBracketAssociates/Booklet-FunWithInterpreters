@@ -528,8 +528,5 @@ can be nested, passed as arguments or stored.
 
 !!! Conclusion
 
-We basically did a tour of the Pharo AST nodes. 
-Any other nodes follow a similar principal.
+In this chapter we have studied AST, short for abstract syntax trees, an object-oriented representation of the syntactic structure of programs. We have also seen an implementation of them: the RB ASTs. RB provides a parser for Pharo methods and expressions that transforms a string into a tree representing the program. We have seen how we can manipulate those ASTs. Any other nodes follow a similar principal.
 You should have now the basis to understand the concept of ASTs and we can move on to the next chapter.
-
-
