@@ -1,17 +1,50 @@
-!! Primitives
+!! Primitive Operations
 
-This is a skeleton so far. I filled it with some pitch.
+Our interpreter does not yet handle many essential behavior that prevent us to evaluate complex programs.
+This chapter introduces the concept of primitive methods in Pharo.
+We call primitive behavior the behaviour that needs to be implemented in the interpreter or evaluator because it cannot be purely expressed in the programming language, Pharo in this case.
+Let's consider for example the operation of adding up two numbers (==+==).
+We cannot express in a pure and concise way a normal method executing an addition.
+Along with arithmetics, other examples of primitive operations are object allocation and reflective object access.
+Such primitive behavior in Pharo is expressed as special methods, namely ""primitive methods"" in Pharo, whose behavior is defined in the interpreter or evaluator.
 
-This chapter is required for completeness, and is an optional quick read.
-However, in a more advanced interpreter primitives are a an essential tool to get decent performance.
+Differently from languages such as Java or C, that express arithmetics as special operators that are compiled/interpreted differently, Pharo maintains the message-send metaphore for primitive behaviour. Indeed, in Pharo ==+== is a message, which triggers a look-up and a method activation. This separation makes redefining operators as simple as implementing a method with the selector ==+== in our own class, without the need for special syntax for it.
 
-!!! Why Primitives
+In addition of essential behaviour, primitive behaviour can be used to implement performance-critical code in a much more efficient way, since primitives are implemented in the implementation language and do not suffer the interpretation overhead.
 
-we need primitives to implement some services that cannot be expressed in pure Pharo code. For example, arithmetic, object allocation...
+In this chapter we will study how primitive methods work, and how they should be properly implemented, including the evaluation of their fallback code.
 
-Some languages do not have primitive methods, they instead model such essential behaviour as keywords and operators. Those keywords and operators are then translated as special bytecodes.
 
-Compare also to native methods, without fallback.
+!!! Primitives in Pharo
+
+In Pharo the design of primitives is split in three different parts: messages, primitive methods, and the primitive itself which is provided by the interpreter. The first thing to note is that in Pharo programs primitive behavior is invoked through standard message sends. This allows developers to define operators as non-primitives on their own classes, by just implementing methods with the corresponding selectors and without any additional syntax. With some terminology abuse we could think of this as "operator redefinition", although it is no such, it is just a standard method re/definition. This operator redefinition feature is useful for example when creating internal domain specific languages (DSLs), or to have polymorphism between integers and floats.
+
+[[[
+MyClass >> + anArgument [
+  "Redefine +"
+  ...
+]
+]]]
+
+To define primitive behavior, Pharo relies on special methods called primitive methods.
+Primitive methods are normal Pharo methods with a special ==primitive== annotation.
+For example, let us consider the code snipped below, which is an excerpt of the ==SmallInteger>>+== method.
+This method looks like a normal method with selector ==+==, and with a normal method body doing ==^super + aNumber==.
+The only difference between this method and a normal one is that this method also has an annotation, or pragma, indicating that it is the primitive number 1.
+
+[[[
+SmallInteger >> + aNumber [
+	<primitive: 1>
+	^ super + aNumber
+]
+]]]
+
+Before diving into how primitive methods are executed, let us introduce the third component in place: the interpreter primitives.
+The interpreter or evaluator, defines a set of supported primitives with unique ids.
+In our case for example, the primitive with id ==1== implements the behavior that adds up two integers.
+
+When a primitive method is activated, it first looks-up what primitive to execute from its primitive id number, and executes it.
+The primitive performs some validations if required, executes the corresponding behavior, and returns either with a success if everything went ok, or a failure if there was a problem. If the execution was a success, the method execution returns with the value computed by the primitive. If the execution was a failure, the body of the method is executed instead. Because of this, the body of a primitive method is also named the "fall-back code".
 
 !!! Implementing Primitive Methods
 
