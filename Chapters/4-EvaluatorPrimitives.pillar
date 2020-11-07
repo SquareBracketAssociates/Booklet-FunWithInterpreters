@@ -12,7 +12,7 @@ Differently from languages such as Java or C, that express arithmetics as specia
 
 In addition of essential behaviour, primitive behaviour can be used to implement performance-critical code in a much more efficient way, since primitives are implemented in the implementation language and do not suffer the interpretation overhead.
 
-In this chapter we will study how primitive methods work, and how they should be properly implemented, including the evaluation of their fallback code.
+In this chapter we will study how primitive methods work, and how they should be properly implemented, including the evaluation of their fallback code. We will then visit some of the essential primitives we need to make work to execute complex examples.
 
 
 !!! Primitives in Pharo
@@ -48,8 +48,154 @@ The primitive performs some validations if required, executes the corresponding 
 
 !!! Implementing Primitive Methods
 
-Primitives have to be detected after the lookup, before activating the method.
-They do not create a frame.
+To implementing primitives in our evaluator we need to only change how methods are activated.
+Indeed, as we have seen above, the method lookup nor other special nodes are required for the execution, and the AST already supports pragma nodes, which we need to extract the method's primitive id.
+
+Inside the activation of a method, we need to look for the primitive to execute, and check for failures.
+A simple way to implement the primitives is as methods in our evaluator.
+We then need to map primitive ids to those methods in our evaluator.
+We will implement such mapping using a table with the form ==<id, evaluator_selector>==.
+Upon primitive method execution, we extract the primitive id from the pragma, get the selector of that id from the table, and use ==perform:== on the interpreter with that selector to execute the primitive.
+We need to also take care of sending the receiver and arguments of the message to the primitive, so it can manipulate them.
+
+Let's start by setting up our testing scenario: adding up two numbers.
+We make sure to work with small enough numbers in this test, to not care about primitive failures yet.
+Doing `1 + 5` the primitive should always be a success and return `6`.
+
+[[[
+CHInterpreter >> initialize [
+  	super initialize. 
+  	stack := Stack new.
+  	primitives := Dictionary new.
+  	self initializePrimitiveTable.
+]
+
+CHInterpreter >> initializePrimitiveTable [
+	primitives at: 1 put: #primitiveSmallIntegerAdd
+]
+
+
+]]]
+
+[[[
+CHInterpretable >> smallintAdd [
+	^ 1 + 5
+]
+
+CHInterpreterTests >> testSmallIntAddPrimitive [
+  	self
+      assert: (self executeSelector: #smallintAdd)
+      equals: 6
+]
+]]]
+
+In our first iteration we will not care about optimizing our evaluator, for which we had already and we will have tons of opportunities.
+To have a simple implementation to work on we will start by executing the primitive after creating the method's frame, in the ==visitMethodNode:== method.
+This way the primitive has a simple way to access the receiver and the arguments by reading the frame.
+We will leave primitive failures management for our second iteration.
+
+[[[
+CHInterpreter >> visitMethodNode: aMethodNode [	
+	aMethodNode isPrimitive ifTrue: [ 
+		"Do not handle primitive failures for now"
+		^ self executePrimitiveMethod: aMethodNode ].
+	
+	^ self visitNode: aMethodNode body
+]
+
+CHInterpreter >> executePrimitiveMethod: anAST [
+	| primitiveNumber |
+	primitiveNumber := anAST pragmas
+		detect: [ :each | each isPrimitive ]
+		ifFound: [ :aPragmaPrimitive | aPragmaPrimitive arguments first value ]
+		ifNone: [ self error: 'Not a primitive method' ].
+		
+	^ self perform: (primitives at: primitiveNumber)
+]
+
+CHInterpreter >> primitiveSmallIntegerAdd [
+	| receiver argument |
+	receiver := self receiver.
+	argument := self argumentAt: 1.
+	^ receiver + argument
+]
+
+CHInterpreter >> argumentAt: anInteger [
+  ^ self tempAt: (self currentMethod arguments at: anInteger) name
+]
+]]]
+
+!!! Primitive Failures and Fallback Code
+
+Let's now consider what should happen when a primitive fails.
+For example, following Pharo's specification, primitive 1 fails when the receiver or the argument are not small integers, or whenever their sum overflows and does not fit into a small integer anymore.
+To produce one of such failing cases, we can implement primitive 1 in our ==CHInterpretable== class, which should fail because the receiver should be a small integer. When it fails, the fallback code should execute.
+
+[[[
+CHInterpretable >> failingPrimitive [
+  <primitive: 1>
+  ^ 'failure'
+]
+
+CHInterpretable >> callingFailingPrimitive [
+  ^ self failingPrimitive
+]
+
+CHInterpreterTests >> testFailingPrimitive [
+  	self
+      assert: (self executeSelector: #callingFailingPrimitive)
+      equals: 'failure'
+]
+]]]
+
+To add primitive failures in a clean way, let's introduce them as exceptions.
+In our primitive, if we detect a failure condition, we will raise a ==CHPrimitiveFail== error.
+We then need to modify the way we evaluate methods to handle ==CHPrimitiveFail== exceptions and continue evaluating the body.
+
+[[[
+CHInterpreter >> primitiveSmallIntegerAdd [
+	| receiver argument |
+	receiver := self receiver.
+	receiver class = SmallInteger
+		ifFalse: [ CHPrimitiveFail signal ].
+
+	argument := self argumentAt: 1.
+	^ receiver + argument
+]
+
+CHInterpreter >> argumentAt: anInteger [
+	^ self tempAt: (self currentMethod arguments at: anInteger) name
+]
+
+CHInterpreter >>visitMethodNode: aMethodNode [
+	[aMethodNode isPrimitive ifTrue: [ 
+		"Do not handle primitive failures for now"
+		^ self executePrimitiveMethod: aMethodNode ]]
+		on: CHPrimitiveFail do: [ :err | 
+			"Nothing, just continue with the method body" ].
+	
+	^ self visitNode: aMethodNode body
+]
+]]]
+
+With these changes, everything should work fine now.
+  
+!!!! Typical Primitive Failure Cases
+
+For primitives to work properly, and for Pharo to be a safe language, primitives should properly do a series of checks.
+This is specially important when the interpreter fully controls all other aspects of the language, such as the memory.
+In such cases, primitives, as well as the other parts of the evaluator, have full power over our objects, potentially producing memory corruptions.
+
+Among the basic checks that primitives should do, they should not only verify that arguments are of the primitive's expected type, as we have shown above. A general check to do in addition is that the primitive was called with the right number of arguments. This check is particularly important because developers may wrongly define primitives such as we did before, where we have defined a unary method, in other words with no arguments, using a primitive that expects one argument. If we don't properly check the arguments trying to access it could cause an interpreter failure, while the proper behaviour should be to just fail the primitive and let the fallback code carry on the execution.
+
+[[[
+CHInterpretable >> failingPrimitive [
+  <primitive: 1>
+  ^ 'failure'
+]
+]]]
+
+!!! Essential Primitives
 
 !!!! Arithmetic Primitives
 
@@ -58,12 +204,6 @@ Some examples of +, /.
 !!!! Object Allocation Primitives
 
 Show normal object allocation #basicNew, and allocation of a variable object #basicNew:.
-
-!!! Primitive Fallback Code
-
-Sometimes a primitive cannot carry out its job in which case the primitive fails.
-When there is a primitive failure, the method with the primitive is activated as a normal method, evaluating what is usually called the primitive's fallback code.
-
 
 !!! Conclusion
 
