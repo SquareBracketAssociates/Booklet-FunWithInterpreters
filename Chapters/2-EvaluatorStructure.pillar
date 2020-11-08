@@ -1,13 +1,17 @@
 !! Implementing a Structural Evaluator
 
-An evaluator is kind of interpreter that executes a program. For example a Pharo evaluator is an interpreter that takes as input a Pharo program and executes each of the statements of such input program, returning finally the result of the execution. In this and the following chapters we will implement a Pharo evaluator as an AST interpreter, using the visitor pattern we have seen before, meaning that the input of our evaluator will be AST nodes of a program to evaluate.
+An evaluator is kind of interpreter that executes a program. For example a Pharo evaluator is an interpreter that takes as input a Pharo program and executes each of the statements of such input program, returning finally the result of the execution. 
+In this and the following chapters we will implement a Pharo evaluator as an AST interpreter, using the Visitor pattern we have seen before, meaning that the input of our evaluator will be AST nodes of a program to evaluate.
 
 For presentation purposes, we will develop the evaluator in several stages, each in a different chapter.
 First, in this chapter, we will show how to implement a structural evaluator, i.e., an evaluator that reads and writes the structures of objects, starting the presentation from constant values.
 Later chapters will incrementally add support for other language features that deserve a chapter for themselves such as messages and blocks.
 
 The presentation of this chapter is done in a somehow-relaxed TDD (test driven development) style.
-For each new feature we first define the scenario we want to cover. Since we are developing an evaluator, each scenario will be some code to execute and an expected result. We then define a test for the scenario and we make it pass. Before going to the next scenario, we do some refactorings to enhance the quality of our code.
+For each new feature we first define the scenario we want to cover. 
+Since we are developing an evaluator, each scenario will be some code to execute and an expected result. 
+We then define a test for the scenario and we make it pass. 
+Before going to the next scenario, we do some refactorings to enhance the quality of our code.
 
 During this process we will define and refine an AST visitor.
 Note that we will write the visitor from scratch but we will reuse the node of the Pharo AST and their functionalities.
@@ -15,6 +19,7 @@ Note that we will write the visitor from scratch but we will reuse the node of t
 !!! Setting Up the Stage
 
 To start writing our Pharo evaluator in TDD style, we will start by creating out test class ==CHInterpreterTest==.
+Our class names are prefix with CH because we named the package of the interpreter Champollion.
 
 [[[
 TestCase subclass: #CHInterpreterTest
@@ -27,8 +32,10 @@ This class will, until a change is imperative, host all our test methods.
 
 !!!! Preparing the Scenarii
 
-Our scenarios, made out of classes and methods to be interpreted, need to be written somewhere too.
-We could store those scenarios in strings in our test class, that we will then need to parse and give to our interpreter as input. However, for simplicity, and because in this book we do not want to center ourselves in parsing issues, we will write our scenarii as normal Pharo code, in normal Pharo classes. This solution is simple enough and versatile to support more complex situations in the future.
+Our scenarii, made out of classes and methods to be interpreted, need to be written somewhere too.
+We could store those scenarios in strings in our test class, that we will then need to parse and give to our interpreter as input. 
+However, for simplicity, and because in this book we do not want to center ourselves in parsing issues, we will write our scenarii as normal Pharo code, in normal Pharo classes. 
+This solution is simple enough and versatile to support more complex situations in the future.
 
 We will host our first scenarios as methods in a new class named ==CHInterpretable==.
 
@@ -43,7 +50,9 @@ Object subclass: #CHInterpretable
 !!! Evaluating Literals: Integers
 
 Testing our evaluator requires that we test and assert some observable behavior.
-In Pharo there are two main observable behaviors: either side-effects through assignments or results of methods through return statements. We have chosen to use return statements, to introduce variables and assignments later. To start, our first scenario is a method returning an integer, as in the code below:
+In Pharo there are two main observable behaviors: either side-effects through assignments or results of methods through return statements.
+We have chosen to use return statements, to introduce variables and assignments later. 
+To start, our first scenario is a method returning an integer, as in the code below:
 
 [[[
 CHInterpretable >> returnInteger [
@@ -55,7 +64,7 @@ Executing such a method should return an integer with value 5.
 
 !!!! Writing a Red Test
 
-Our first test will implement what our scenario defined above: executing our method should return 5.
+Our first test implements what our scenario defined above: executing our method should return 5.
 This first test specifies not only part of the behaviour of our interpreter, but also helps us in defining the part of its API: we want our interpreter to be able to start executing starting from some method's AST.
 Below we define a first test for it: ==testReturnInteger==.
 
@@ -68,28 +77,35 @@ CHInterpreterTest >> testReturnInteger [
 ]
 ]]]
 
-Our first test is worth one comment: since our evaluator is an AST interpreter, it requires an AST as input.
+This first test is worth one comment: since our evaluator is an AST interpreter, it requires an AST as input.
 In other words, we need to get the AST of the ==returnInteger== method.
 Instead of invoking the parser to get an AST from source code, we will use Pharo's reflective API to get the AST of an already existing method.
 
-!!!! Making the test pass: a First Literal Evaluator
+!!! Making the test pass: a First Literal Evaluator
 
-Executing our first test will fail first because our test does not understand ==interpreter==, meaning we need to implement a method for it in our test class. We implement it as a factory method in our test class, returning a new instance of ==CHInterpreter==, and we define the class ==CHInterpreter== as follows.
+Executing our first test fails first because our test does not understand ==interpreter==, meaning we need to implement a method for it in our test class. 
+We implement it as a factory method in our test class, returning a new instance of ==CHInterpreter==, and we define the class ==CHInterpreter== as follows.
 
 [[[
 CHInterpreterTest >> interpreter [
 	^ CHInterpreter new
 ]
+]]]
 
+[[[
 Object subclass: #CHInterpreter
 	instanceVariableNames: ''
 	classVariableNames: ''
 	package: 'Champollion-Core'
 ]]]
 
-The class ==CHInterpreter== will be the main entry point for our evaluator, and it will implement a visitor pattern over the Pharo method ASTs.  Note that we do not inherit from the default Pharo AST Visitor. The Pharo AST visitor implements already generic versions of the ==visitXXX:=== methods that will do nothing instead of failing. Not inheriting from it allows us to get problems as does not understand exceptions that we will implement step by step in the debugger. We nevertheless follow the same API as the default AST visitor and we use the nodes' ==accept:== visiting methods.
+The class ==CHInterpreter==  is the main entry point for our evaluator, and it will implement a visitor pattern over the Pharo method ASTs.  Note that it does not inherit from the default Pharo AST Visitor.
+The Pharo AST visitor implements already generic versions of the ==visitXXX:=== methods that will do nothing instead of failing. 
+Not inheriting from it allows us to get problems as does not understand exceptions that we will implement step by step in the debugger. 
+We nevertheless follow the same API as the default AST visitor and we use the nodes' ==accept:== visiting methods.
 
-At this point, re-executing the test fails with a new error: our ==CHInterpreter== instance does not understand the message ==execute:==. We imeplement ==execute:== to call the visitor main entry point, i.e., the method ==visitNode:==.
+At this point, re-executing the test fails with a new error: our ==CHInterpreter== instance does not understand the message ==execute:==. 
+We implement ==execute:== to call the visitor main entry point, i.e., the method ==visitNode:==.
 
 [[[
 CHInterpreter >> execute: anAST [
@@ -103,7 +119,8 @@ CHInterpreter >> visitNode: aNode [
 ]
 ]]]
 
-Since the AST we will evaluate is the AST of a method, restarting the test the execution halts because of the missing ==visitMethodNode:==. A first implementation for this method simply continues the visit on the body of the method.
+Since we evaluate a method AST, when we reexecute the test, the execution halts because of the missing ==visitMethodNode:==. 
+A first implementation for this method simply continues the visit on the body of the method.
 
 [[[
 CHInterpreter >> visitMethodNode: aMethodNode [
@@ -111,20 +128,24 @@ CHInterpreter >> visitMethodNode: aMethodNode [
 ]
 ]]]
 
-Execution then arrives to a missing ==visitSequenceNode:==. Indeed, the body of a method is a sequence node containing a list of temporary variable definitions and a list of statements. Since our scenario has only a single statement with no temporary variables, a first version of ==visitSequenceNode:== ignores temporary declarations and handles all the statements paying attention that the last statement value should be returned. So we visit all the statements except the last one, and we then visit the last one and return its result. 
+Execution then arrives to a missing ==visitSequenceNode:==. 
+Indeed, the body of a method is a sequence node containing a list of temporary variable definitions and a list of statements. 
+Since our scenario has only a single statement with no temporary variables, a first version of ==visitSequenceNode:== ignores temporary declarations and handles all the statements paying attention that the last statement value should be returned. 
+So we visit all the statements except the last one, and we then visit the last one and return its result. 
 
 [[[
 CHInterpreter >> visitSequenceNode: aSequenceNode [
-  "Visit all but the last statement without caring about the result"
+	"Visit all but the last statement without caring about the result"
+	
 	aSequenceNode statements allButLast 
 		do: [ :each | self visitNode: each ].
-  "Return the result of visiting the last statement"
 	^ self visitNode: aSequenceNode statements last
 ]	
 ]]]
 
-The visitor will then visit the return node, for which we define the ==visitReturnNode:== method.
+Then the visitor visits the return node, for which we define the ==visitReturnNode:== method.
 This method simply visits the contents of the return node (invoking recursively the visitor) and returns the obtained value.
+At the point, the value is not yet covered by the visitor. 
 
 [[[
 CHInterpreter >> visitReturnNode: aReturnNode [
@@ -133,8 +154,8 @@ CHInterpreter >> visitReturnNode: aReturnNode [
 ]]]
 
 Finally, the contents of the return node, the integer ==5== is represented as a literal value node.
-To handle this node we define the method ==visitLiteralValueNode:== in our visitor.
-The implementation just returns the value of the node, which will be the integer we were looking for.
+To handle this node, we define the method ==visitLiteralValueNode:==.
+The implementation just returns the value of the node, which is the integer we were looking for.
 
 [[[
 CHInterpreter >> visitLiteralValueNode: aRBLiteralValueNode [
