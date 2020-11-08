@@ -165,9 +165,9 @@ CHInterpreter >> visitLiteralValueNode: aRBLiteralValueNode [
 
 Our first test is now green and we are ready to continue our journey.
 
-!!! Evaluating Literals: Floats and Booleans
+!!! Evaluating Literals: Floats
 
-For completeness, let's implement in our evaluator support for literal floats and booleans.
+For completeness, let's implement support for literal floats.
 Since we already have integer constants working, let's consider next a method returning a float literal.
 We can see such scenario in the code below:
 
@@ -181,7 +181,7 @@ Executing such method should return ==3.14==.
 
 !!!! Writing a Test
 
-Testing this case is straight forward, we should test that evaluating our method should return 5.
+Testing this case is straight forward, we should test that evaluating our method should return 3.14.
 We already defined that our interpreter understands the ==execute:==  message, so this test can follow the implementation of our previous test.
 
 [[[
@@ -193,10 +193,11 @@ CHInterpreterTest >> testReturnFloat [
 ]
 ]]]
 
-Two discussions come from writing this test. First, this test is already green, because the case of floating point constants and integer constants exercise the same code, so nothing is to be done on this side. Second, some would argue that this test is somehow repeating code from the previous scenario: we will take care of this during our refactoring step.
+Two discussions come from writing this test. First, this test is already green, because the case of floating point constants and integer constants exercise the same code, so nothing is to be done on this side. 
+Second, some would argue that this test is somehow repeating code from the previous scenario: we will take care of this during our refactoring step.
 
 
-!!!! Refactor: Improving the Test Infrastructure
+!!! Refactor: Improving the Test Infrastructure
 
 Since we will write many tests with similar structure during this book, it comes handy to share some logic between them. The two tests we wrote so far show a good candidate of logic to share as repeated code we can extract.
 
@@ -232,7 +233,7 @@ CHInterpreterTest >> testReturnFloat [
 
 We are ready to efficiently write tests for the other constants. 
 
-!!!! Evaluating booleans
+!!! Evaluating booleans
 
 Boolean literals are the objects ==false== and ==true==, typically used for conditionals and control flow statements. In the previous sections we implemented support for numbers, in this section we will introduce support for returning boolean values as follows:
 
