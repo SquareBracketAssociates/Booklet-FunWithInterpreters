@@ -544,7 +544,7 @@ CHInterpreterTest >> testReturnInstanceVariableRead [
 
 !!! Evaluating Variables: Instance Variable Writes
 
-Now that we have support for instance variable reads, we can keep on going with instance variable writes.
+Now that we have support for instance variable reads, we keep on going with instance variable writes.
 In our scenario, a method writes a literal integer into an instance variable ==x== and then returns the value of the assignment. This scenario has two observable behaviors that we will test separately.
 First, such an assignment should be observable from the outside by reading that variable.
 Second, an assignment is an expression whose value is the assigned value, thus the return value should be also the assigned value.
@@ -555,32 +555,44 @@ CHInterpretable >> store100IntoX [
 ]	
 ]]]
 
-To test this behavior, we evaluate the method above and then we validate that effectively the instance variable was mutated. To make sure the value was modified, we set an initial value to the variable before the evaluation. After the evaluation we should not keep that value. The case of the return is similar to our previous tests.
+To test this behavior, we evaluate the method above and then we validate that effectively the instance variable was mutated. 
+To make sure the value was modified, we set an initial value to the variable before the evaluation. 
+After the evaluation we should not keep that value. 
+The case of the return is similar to our previous tests.
 
 [[[
 CHInterpreterTest >> testStore100IntoX [
-
 	receiver x: 17.
 	self executeSelector: #store100IntoX.
 	self assert: receiver x equals: 100
 ]
 
 CHInterpreterTest >> testAssignmentReturnsAssignedValue [
-
 	self
-    assert: (self executeSelector: #store100IntoX)
-    equals: 100
+		assert: (self executeSelector: #store100IntoX)
+		equals: 100
+]
+]]]
+
+And finally, we implement a getter for the ==x== variable.
+This getter is used to extract the value in the tests.
+
+[[[
+CHInterpretable >> x [
+	^ x
 ]
 ]]]
 
 !!!! Making the test pass: visiting assignment nodes
 
 To make this test pass, we need to define the method ==visitAssignmentNode:==.
-Evaluating an assignment node with the form `variable := expression` requires that we evaluate the `expression` and then set that value to the left-side variable. Notice that the variable we are assigning into does not need to be evaluated/visited: the evaluation of a variable is equivalent to reading its value. And in the left part of an assignment, we do not care about the value of the variable, but about the location of the variable.
+Evaluating an assignment node with the form ==variable := expression== requires that we evaluate the ==expression== and then set that value to the left-side variable. 
+Notice that the variable we are assigning into does not need to be evaluated/visited: the evaluation of a variable is equivalent to reading its value. 
+And in the left part of an assignment, we do not care about the value of the variable, but about the location of the variable.
 
-@@note Guille: I don't like to use store:with: (nor nodes that are already semantically analysed), because it hides name resolution... We should explain name resolution at some point, I believe this is an important topic, that also is needed for compilation. Also name resolution to me it's not a parser responsibility, so we should have at least a section to talk about this. Because what we have now is an optimization. Anyways, for later :)
+% Agreed there was a little note above but it is not really clear @@note Guille: I don't like to use store:with: (nor nodes that are already semantically analysed), because it hides name resolution... We should explain name resolution at some point, I believe this is an important topic, that also is needed for compilation. Also name resolution to me it's not a parser responsibility, so we should have at least a section to talk about this. Because what we have now is an optimization. Anyways, for later :)
 
-Our visit method then looks as follows: we recursively visit the right-side of the assignment (got through the `value` accessor), we set that value to the variable, and we finally return the stored value
+Our visit method then looks as follows: we recursively visit the right-side of the assignment (got through the ==value== accessor), we set that value to the variable, and we finally return the stored value.
 
 [[[
 CHInterpreter >> visitAssignmentNode: anAssignmentNode [
@@ -593,7 +605,8 @@ CHInterpreter >> visitAssignmentNode: anAssignmentNode [
 ]
 ]]]
 
-To set the value to the variable, we delegate the storing to the variable node itself. Again, since our RB AST nodes contain semantic information and know when a variable is an instance variable, the variable in this case will be an ==RBInstanceVariableNode==. Mirroring the instance variable read, an instance variable write will reflectively write the value to the object using ==instVarNamed:put:==.
+To set the value to the variable, we delegate the storing to the variable node itself. Again, since our AST nodes contain semantic information and know when a variable is an instance variable, the variable in this case is an ==RBInstanceVariableNode==. 
+Mirroring the instance variable read, an instance variable write reflectively writes the value to the object using ==instVarNamed:put:==.
 
 [[[
 RBInstanceVariableNode >> store: anObject with: anInterpreter [
@@ -601,24 +614,18 @@ RBInstanceVariableNode >> store: anObject with: anInterpreter [
 ]
 ]]]
 
-And finally, to make our tests green, we implement a getter for the ==x== variable.
-This getter is used to extract the value during our assertion.
-
-[[[
-CHInterpretable >> x [
-	^ x
-]
-]]]
-
-Now our tests should pass.
+Now the tests should pass.
 
 
 !!! Evaluating Variables: Global Reads
 
-We finish this chapter with the reading of global variables, which cover two cases: proper global variables, and the access to classes. To better control our testing environment, we decided to not use the Pharo environment by default. Instead, the interpreter will know its global environment in an instance variable and lookup globals in it using a simple API, making it possible to use the system's global environment instead if we wanted to. Also, we leave outside of the scope of this chapter the writing to global variables.
+We finish this chapter with the reading of global variables, which cover two cases: proper global variables, and the access to classes.
+To better control our testing environment, we decided to not use the Pharo environment by default. 
+Instead, the interpreter will know its global environment in an instance variable and lookup globals in it using a simple API, making it possible to use the system's global environment instead if we wanted to. 
+We also leave outside of the scope of this chapter the writing to global variables.
 The case of global variable writing is similar to the instance variable assignment, and it would require only to redefine ==store:with:== in the corresponding node for global variables.
 
-Our first testing scenario, similar to the previous ones, is as follows: a method ==returnGlobal== which reads and returns the global named ==Global==.
+Our first testing scenario, similar to the previous ones, is as follows: we define a method ==returnGlobal== reads and returns the global named ==Global==.
 
 [[[
 CHInterpretable >> returnGlobal [
@@ -626,7 +633,7 @@ CHInterpretable >> returnGlobal [
 ]
 ]]]
 
-We define a test which specifies that the interpreter' environment has a binding whose key is #Global and value is a new object.
+We define a test which specifies that the interpreter' environment has a binding whose key is ==#Global== and value is a new object.
 
 [[[
 CHInterpreterTest >> testReturnGlobal [
@@ -637,7 +644,7 @@ CHInterpreterTest >> testReturnGlobal [
 ]
 ]]]
 
-We introduce a new instance variable named ==gloabEnvironment== in our class ==CHInterpreter== and we initialize it to an empty dictionary.
+We introduce a new instance variable named ==globalEnvironment== in the class ==CHInterpreter== and we initialize it to an empty dictionary.
 
 [[[
 Object subclass: #CHInterpreter
@@ -653,29 +660,36 @@ CHInterpreter >> initialize [
 ]
 ]]]
 
-We add ==globalEnvironmentAt:put:== to add a new binding to the environment.
+We define the method ==globalEnvironmentAt:put:== to add a new binding to the environment.
 [[[
 CHInterpreter >> globalEnvironmentAt: aSymbol put: anObject [
 	globalEnvironment at: aSymbol put: anObject
 ]
 ]]]
 
-Finally we simply define a new method ==visitGlobalNode:== that will return the value of a global node
-by returning the value associated with the key in the global environment. We decided that trying to access a global that is not defined will raise an error in the interpreter and halt the interpretation. An alternative design would have returned a default value instead such as ==nil==. A more complex design would have been to throw an exception in the interpreted program. For the moment, halting the interpreter with an error suffices for our job.
+Finally we simply define a new method ==visitGlobalNode:== that returns the value of a global node
+by returning the value associated with the key in the global environment. 
+We decided that trying to access a global that is not defined will raise an error in the interpreter and halt the interpretation. 
+An alternative design would return a default value instead such as ==nil==. 
+A more complex design would have been to throw an exception in the interpreted program. 
+For the moment, halting the interpreter with an error suffices for our job.
 
 [[[
 CHInterpreter >> visitGlobalNode: aRBGlobalNode [
 	^ self globalEnvironment
-      at: aRBGlobalNode name 
-		  ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
+		at: aRBGlobalNode name 
+		ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
 ]
 ]]]
 
 
 !!! Conclusion
 
-In this chapter we have used the visitor pattern over AST nodes to implement a first version of an structural evaluator. This evaluator covers literal integers, floats, booleans and arrays, instance variables and global variables. Althought we have not talked about it explicitly, we also implemented a first version of the visit of statements and return nodes.
+In this chapter we have used the visitor pattern over AST nodes to implement a first version of a structural evaluator. 
+This evaluator covers literal integers, floats, booleans and arrays, instance variables and global variables. 
+Although we have not talked about it explicitly, we also implemented a first version of the visit of statements and return nodes.
 
-This first evaluator serves as basis for implementing the execution of the main operations in Pharo: messages. The following chapters will start by decomposing message resolution into method-lookup and apply operations, introduce the execution stack, the management of temporary variables and argument, and `super` message-sends.
+This first evaluator serves as basis for implementing the execution of the main operations in Pharo: messages.
+The following chapters will start by decomposing message resolution into method-lookup and apply operations, introduce the execution stack, the management of temporary variables and argument, and 'super' message-sends.
 
-We leave for the reader the exercise of extending this prototype with support for dynamic arrays (e.g., `{ self expression. 1+1 }`), class variables reads and writes, and global variable writes. We further invite the reader to explore changing the language semantics by modifying this simple evaluator: How could we implement read-only objects? Log all variable reads and writes? Wrap all literals to do taint analysis?
+We leave for the reader the exercise of extending this prototype with support for dynamic arrays (e.g., =={ self expression. 1+1 }==), class variables reads and writes, and global variable writes. We further invite the reader to explore changing the language semantics by modifying this simple evaluator: How could we implement read-only objects? Log all variable reads and writes? Wrap all literals to do taint analysis?
