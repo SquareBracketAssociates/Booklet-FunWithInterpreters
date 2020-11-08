@@ -1,8 +1,12 @@
 !! Evaluating Message-sends
 
-In the previous chapter we focused on structural evaluation: reading literal objects and reading and writing values from objects and globals. However, the key abstraction in object-oriented programming and in Pharo in particular are message-sends. The work we did in the previous chapter is nevertheless important to set up the stage: we know have a better taste of the visitor pattern, we started a first testing infrastructure, and eventually message-sends need to carry out some work by using literal objects or reading and writing variables.
+In the previous chapter we focused on structural evaluation: reading literal objects and reading and writing values from objects and globals. However, the key abstraction in object-oriented programming and in Pharo in particular is message-sending. 
+The work we did in the previous chapter is nevertheless important to set up the stage: we have a better taste of the visitor pattern, we started a first testing infrastructure, and eventually message-sends need to carry out some work by using literal objects or reading and writing variables.
 
-In this chapter we will introduce message-sends. Message-sends deserve a chapter on their own because they introduce many different concerns. On the one hand, each message-send is resolved in two steps: first the method-lookup searches in the receiver's hierarchy the method to be executed, and second that method is applied on the receiver. The method-lookup algorithm needs to support normal message-sends as well as `super` message-sends.  On the other hand, each method application needs to set up an execution context to store the receiver, arguments and temporary variables for that method execution. These execution contexts form the execution stack or call-stack. Sending a message pushes a new context in the call-stack, returning from a method pops a context from the call-stack.
+In this chapter we introduce message-sends. 
+Message-sends deserve a chapter on their own because they introduce many different concerns. 
+On the one hand, each message-send is resolved in two steps: first the method-lookup searches in the receiver's hierarchy the method to be executed, and second that method is applied on the receiver (i.e., it is evaluated with self bound to the receiver). The method-lookup algorithm needs to support normal message-sends as well as 'super' message-sends.  On the other hand, each method application needs to set up an execution context to store the receiver, arguments and temporary variables for that specific method execution. These execution contexts form the execution stack or call-stack. Sending a message pushes a new context in the call-stack, returning from a method pops a context from the call-stack.
+
 
 !!! Introduction to Stack Management
 
