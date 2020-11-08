@@ -1,66 +1,68 @@
-!! Interpreter2: Handling Blocks 
+!! Block Closures and Control Flow Statements
 
-An important aspect of Pharo is its use of closures (named blocks).
-In Pharo closures are used to expression all the control-flow instructions. 
-In this chapter we will extend interper to handle a first version of closures. 
-Later on we will add support for non-local return in Block.
+In this chapter we will extend our evaluator to manage block closures.
+Blocks closures, lambda functions, lambda expressions, anonymous functions, or just blocks, are an important concept in most modern programming languages, including Pharo.
+Block closures are functions without a name, thus anonymous, that allow developers to abstract general algorithms from their particular details. For example, a sorting algorithm can be separated from its sorting criteria by making the sorting criteria a block closure passed as argument to it. This allows developers to have the sorting algorithm defined and tested in a single place, and being able to reuse it with multiple criterion in different contexts.
 
-!!! Representing a Closure
-The interpretation of a closure is different from the interpretation of its execution. 
-The interpretation of a closure is the closure itself (the object that represents it).
-The interpretation of the execution is the execution of the closure body.
+Block closures are at the center of the Pharo language, because Pharo leverages block closures to define its control-flow instructions: conditionals, iterations, early returns. This means that implementing block closures is enough to support all kind of control flow statements in Pharo.
+Moreover, Pharo libraries make usage of block closures to define library-specific control flow instructions, such as the ==do:== and ==select:== messages understood by collections.
+Fevelopers are also encouraged to define their own control flow statements, to hide implementation details of their libraries from their users.
 
-It means that we need a way to represent a closure.
-A closure is similar in a way to a method, except that it does not have a name, and can be defined in a method or another block.
+This chapter starts by explaining what blocks are and how they are evaluated.
+Block evaluation, beign a core part of the language definition, is a service that is requested to the evaluator/interpreter through a primitive.
+We then dive into the lexical capture feature of blocks: when a block closure is created, it captures its defining context, namely its enclosing context. This makes blocks able to read and write not only it's own temporary variables but also all the variables accessible to its enclosing context.
+Finally, we implement non-local returns: return instructions that make the enclosing method context to return instead of the block's one. Non-local returns are usually used as early returns like ==break== statements in other languages.
 
-We define a class, ==CHBlock== to represent a block. It has an instance variable ==code== to hold an AST represeting the block body.
-The Pharo compiler represents a block as an instance of the ==RBBlockNode== class.
-It body is then an instance of the ==RBSequenceNode==.
+!!! Representing a Block Closure
+
+When a block expression is executed ==[ 1\+2 ]==, the instructions inside the block definition are not executed.
+Instead, a block object is created, containing those instructions.
+The execution of those instructions is delayed until we send the message ==value== to the block object.
+
+This means that from our evaluator point of view, the evaluation of the closure will be different from the evaluation of its execution. Evaluating a block node will return a block object, and the method ==value== will require a primitive to request the interpreter the block's execution. This means that we need a way to represent a closure object in our evaluator, and that closure should store the code it is supposed to evaluate later when receiving the ==value== message.
+
+Let us define the class ==CHBlock== to represent a block.
+It has an instance variable ==code== to hold the block's AST, instance of the ==RBBlockNode== class.
+Notice that we do not use the existing ==BlockClosure== class from Pharo, since this class is tied up with the Pharo bytecode.
+For the sake of simplicity, we will not reconciliate bytecode and AST implementations, meaning that we need our own AST-based block implementation.
 
 [[[
 Object subclass: #CHBlock
 	instanceVariableNames: 'code'
 	classVariableNames: ''
-	package: 'Champollion'
+	package: 'Champollion-Core'
 ]]]
 
 [[[
-CHBlock >> code: aRBBlockNode 
+CHBlock >> code: aRBBlockNode [
 	code := aRBBlockNode
+]
 ]]]
 
 [[[
-CHBlock >> code
+CHBlock >> code [
 	^ code
-]]]
-
-
-We write a test for this. 
-The method ==returnBlock== just returns a block without executing it. 
-
-[[[
-CHInterpretable >> returnBlock [
-	^ [ 1 . 5 ]
 ]
 ]]]
 
-The test verifies that we get the corresponding AST (see Figure *@NodeHierarchy*).
+@@note did we explain before that a method with no return returns self? I think we did not, we should add it! :)
+
+Differently from the execution of a method that implicitly returns ==self== when it has no explicit return statement, a block without return statement implicitly returns the result of its last expression. Let us write a testing scenario for this case: evaluating the following block should return ==5== as it is its last expression. 
 
 [[[
-CHInterpreterTest >> testBlock [
-	"
-	returnBlock
-		^ [ 1 . 5 ] 
-	"
-	| bk1 |
-	bk1 := (self executeSelector: #returnBlock).
-	self assert: bk1 code isBlock.
-	self assert: bk1 code body isSequence
+CHInterpretable >> returnBlockValue [
+	^ [ 1 . 5 ] value
 ]
 ]]]
 
-When the interpreter encounters a block node, it should create the associated block object.
-We redefine the method ==visitBlockNode:== to do it. 
+[[[
+CHInterpreterTest >> testBlockValueIsLastStatementValue [
+	self assert: (self executeSelector: #returnBlockValue) equals: 5
+]
+]]]
+
+When the interpreter encounters a block node, it create a block object for it.
+We define the method ==visitBlockNode:== as follows: 
 
 [[[
 CHInterpreter >> visitBlockNode: aRBBlockNode [
@@ -70,69 +72,55 @@ CHInterpreter >> visitBlockNode: aRBBlockNode [
 ]
 ]]]
 
-The new test should pass. 
-
-!!! Handling Block Execution
-
-Closures are executed when they receive the messages ==value==, ==value:==, ==value:value:== and more. 
+Closures are executed when they receive the message ==value== or one of its variants.
 On the reception of such messages, their bodies should be executed.
-
-The following code and its companion test illustrate what we expect. 
-[[[
-CHInterpretable >> returnBlockValue [
-	^ [ 1 . 5 ] value
-]
-]]]
-
-
-[[[
-CHInterpreterTest >> testBlockValueIsLastStatementValue
-	"returnBlockValue
-		^ [ 1 . 5 ] value
-	"
-	self assert: (self executeSelector: #returnBlockValue) equals: 5
-]]]
-
-In Pharo all the control flow instructions are based on the execution of closures.
-In addition certain methods are primitives in the sense that they cannot be expressed in Pharo (this is the case
-for ==at:== and ==at:put:==).
-
-This raises the question of the implementation of the interpretation of such methods by our interpreter. 
-We do not really want to have to changes the ==visitMessageNode:== method for each control flow. 
-
-The solution we propose is to distinguish the message to be executed by tagging it with a pragma.
-For example the following method ==value== is tagged with the annotation ==astInterpreterPrimitive: #value==. 
-
-Note that the method values is a primitive from the interpreter perspective in the sense
-that we cannot to express its definition in Pharo without replying on reflective operation.
+Pharo does not define a way to request the execution of the block's body, unless we relied on our same interpreter.
+However, since we still want this to be an implementation detail, we will define method evaluation as in normal Pharo, with primitive id ==201==.
 
 [[[
 CHBlock >> value [
-
-	"AST interpreter primitive.
-	This will call"
-	<astInterpreterPrimitive: #value>
-	
-	"If there "
-	self halt.
+	<primitive: 201>
+  "If the fallback code executes it means that block evaluation failed.
+  Return nil for now in such case."
+  ^ nil
 ]
 ]]]
 
-Once such a method is tagged, we have to change the ==visitMessageNode:== method to take into it account.
+We now need to implement the new primitive in our evaluator.
+A first version of it could just visit the body of the block's code.
+Remember that primitives are executed in their own frame already, so the block's body will share the frame created for the primitive method.
+
+[[[
+CHInterpreter >> initializePrimitiveTable [
+  ...
+  primitives at: 201 put: #primitiveBlockValue.
+  ...
+]
+
+CHInterpreter >> primitiveBlockValue [
+	^ self visitNode: self receiver code body
+]
+]]]
 
 
+!!! Lexical Closure
 
+As we stated before, block closures capture their defining context, namely its enclosing context.
+Blocks are able to read and write their own temporary variables, but also all the variables accessible to its enclosing context.
+In this section we will make evolve our closure execution infrastructure to support closure temporaries, and to provide access to the enclosing environment.
 
+!!!! Closure temporaries
 
+Our simplified closure implementation does not yet have support for closure temporaries.
+Indeed, a closure such as
 
+[[[
+  [ | temp | temp ] value
+]]]
 
+will fail with an interpreter failure because ==temp== is not defined in the frame.
 
-
-
-
-
-
-!!! Self in Block
+!!!! Self in Block
 
 [[[
 CHInterpretable >> readSelfInBlock [
@@ -149,7 +137,7 @@ CHInterpreterTest >> testReadSelfInBlock [
 ]
 ]]]
 
-!!! Instance Variable Access
+!!!! Instance Variable Access
 
 [[[
 CHInterpreterTest >> testReadInstanceVariableInBlock
@@ -160,7 +148,7 @@ CHInterpreterTest >> testReadInstanceVariableInBlock
 	self assert: (self executeSelector: #readInstanceVariableInBlock) equals: receiver x
 ]]]
 
-!!! Instance Variable Store
+!!!! Instance Variable Store
 
 [[[
 CHInterpretable >> writeInstanceVariableInBlock
@@ -178,6 +166,7 @@ CHInterpreterTest >> testWriteInstanceVariableInBlock [
 	self assert: receiver x equals: 17
 ]
 ]]]
+
 
 
 !!! Conclusion
