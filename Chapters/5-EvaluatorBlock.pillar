@@ -102,72 +102,220 @@ CHInterpreter >> primitiveBlockValue [
 ]
 ]]]
 
-
-!!! Lexical Closure
-
-As we stated before, block closures capture their defining context, namely its enclosing context.
-Blocks are able to read and write their own temporary variables, but also all the variables accessible to its enclosing context.
-In this section we will make evolve our closure execution infrastructure to support closure temporaries, and to provide access to the enclosing environment.
-
 !!!! Closure temporaries
 
 Our simplified closure implementation does not yet have support for closure temporaries.
-Indeed, a closure such as
+Indeed, a closure such as the following will fail with an interpreter failure because ==temp== is not defined in the frame.
 
 [[[
   [ | temp | temp ] value
 ]]]
 
-will fail with an interpreter failure because ==temp== is not defined in the frame.
+To solve this we need to declare all block temporaries when activating the block, as we did previously for methods.
+As a first attempt to make our test green, let's declare block temporaries once the block is activated:
 
-!!!! Self in Block
+[[[
+CHInterpreter >> primitiveBlockValue [
+  "Initialize all temporaries in nil"
+  aSequenceNode temporaryNames do: [ :e | self tempAt: e put: nil ].		
+	^ self visitNode: self receiver code body
+]
+]]]
+
+This is however, very similart to a sequence of messages we wrote when activating a normal method.
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection [
+	| result |
+	self pushNewFrame.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ].
+	anAST temporaryNames do: [ :tempName | self tempAt: tempName name put: nil ].
+	result := self visitNode: anAST body.
+	self popFrame.
+	^ result
+]
+]]]
+
+One way to solve this repetition is by moving temporary initialization to the ==visitSequenceNode:== method, since both method nodes and block nodes have sequence nodes inside them.
+
+[[[
+CHInterpreter >> visitSequenceNode: aSequenceNode [
+  "Initialize all temporaries in nil"
+  aSequenceNode temporaryNames do: [ :e | self tempAt: e put: nil ].		
+
+  "Visit all but the last statement without caring about the result"
+  aSequenceNode statements allButLast 
+  	do: [ :each | self visitNode: each ].
+  
+  "Return the result of visiting the last statement"
+  ^ self visitNode: aSequenceNode statements last
+]
+
+CHInterpreter >> primitiveBlockValue [
+	^ self visitNode: self receiver code body
+]
+
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection [
+	| result |
+	self pushNewFrame.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ].
+	result := self visitNode: anAST body.
+	self popFrame.
+	^ result
+]
+]]]
+
+!!! Lexical Closures
+
+As we stated before, block closures capture their defining context, namely its enclosing context.
+Blocks are able to read and write their own temporary variables, but also all the variables accessible to its enclosing context.
+In this section we will make evolve our closure execution infrastructure to support closure temporaries, and to provide access to the enclosing environment.
+
+!!!! Capturing the Defining Context
+
+When a closure is created, it does not capture the defining method but the defining execution context.
+The defining execution context gives the closure access to that context's receiver, arguments and temporaries.
+Moreover, it is a fairly common mistake to think that the captured context is the caller context, and not the defining context.
+This is the case in the example above, where the context where the block closure is defined is both the defined and the caller. However, as soon as we work on more complex scenarios, where blocks are sent as arguments of methods, or stored in temporary variables, this does not hold anymore.
+
+A first scenario to check that our block properly captures the defining context is to evaluate ==self== inside a block.
+In our current design, the receiver specified in the block's frame is the block itself.
+Indeed, the expression ==[ ... ] value== is a message send where the block is the message receiver and ==value== is the message. 
+However, the ==self== variable should be bound to the instance of ==CHInterpretable==.
 
 [[[
 CHInterpretable >> readSelfInBlock [
 	^ [ self ] value
 ]
-]]]
 
-[[[
 CHInterpreterTest >> testReadSelfInBlock [
-	"readSelfInBlock
-		^ [ self ] value
-	"
 	self assert: (self executeSelector: #readSelfInBlock) equals: receiver
 ]
 ]]]
 
-!!!! Instance Variable Access
+To make this test work, we need to implement two different things in our evaluator. First we need to capture the defining context at block creation time in ==visitBlockNode:==. Second we need to use that captured context to resolve variables.
+
+Calturing the defining context is as simple as storing the current ==topFrame== at the moment of the method creation, as follows.
+We extend ==CHBlock== with a ==definingContext== instance variable and corresponding accessors.
 
 [[[
-CHInterpreterTest >> testReadInstanceVariableInBlock
-	"
-	readInstanceVariableInBlock
-		^ [ x ] value
-	"
-	self assert: (self executeSelector: #readInstanceVariableInBlock) equals: receiver x
-]]]
+Object subclass: #CHBlock
+  instanceVariableNames: 'code definingContext'
+  classVariableNames: ''
+  package: 'Champollion-Core'
+    
+CHInterpreter >> visitBlockNode: aRBBlockNode [
+	^ CHBlock new
+		code: aRBBlockNode;
+    definingContext: self topFrame;
+		yourself
+]
 
-!!!! Instance Variable Store
+CHInterpreter >> definingContext: aContext	[
+	definingContext := aContext
+]
 
-[[[
-CHInterpretable >> writeInstanceVariableInBlock
-	[ x := 17 ] value
-]]]
-
-
-[[[
-CHInterpreterTest >> testWriteInstanceVariableInBlock [
-	"
-	writeInstanceVariableInBlock
-		[ x := 17 ] value
-	"
-	self executeSelector: #writeInstanceVariableInBlock.
-	self assert: receiver x equals: 17
+CHInterpreter >> definingContext	[
+	^ definingContext
 ]
 ]]]
 
+Resolving the block variables is a bit more tricky case, as it can be resolved in many different ways.
+For now we will choose to set the correct values and override the incorrect ones in the current frame upon block activation.
+This solution will work as far as this primitive does not fail.
+We leave for the reader to think what happens in such a case.
 
+[[[
+CHInterpreter >> primitiveBlockValue [
+  | theBlock |
+  theBlock := self receiver.
+  self receiver: theBlock definingContext receiver.
+  ^ self visitNode: self receiver code body
+]
+
+CHInterpreter >> receiver: aValue [
+	^ self tempAt: #self put: aValue
+]
+]]]
+
+Now that we can correctly resolve the receiver, instance variable reads and writes should work properly too.
+We leave as an exercise for the reader to verify their correctness.
+
+!!!! Looking up Temporaries in Lexical Contexts
+
+A problem we have not solved yet involves the reads and writes of temporary variables that are not part of the current frame.
+This is the case when a block tries to access a temporary of a parent lexical scope, such as another surrounding scope, or the home method.
+
+Our next scenario checks that blocks can correctly read and write temporaries of the enclosing contexts.
+In our test, the enclosing environment creates a temporary. The block reads that value and increases it by one.
+When the block returns, the value of its temporary should have been updated from 0 to 1.
+
+[[[
+CHInterpretable >> increaseEnclosingTemporary [
+  | temp |
+  temp := 0.
+	[ temp := temp + 1 ] value.
+  ^ temp
+]
+
+CHInterpreterTest >> testIncreaseEnclosingTemporary [
+	self assert: (self executeSelector: #increaseEnclosingTemporary) equals: 1
+]
+]]]
+
+This scenario is resolved by implementing a temporary variable lookup in the block's defining context.
+Of course, a block could be defined inside another's block context, so our lookup needs to be recursive.
+The final case of our recursion is when the current lookup context does not have a defining context i.e., it is a method and not a block.
+
+To simplify temporary variable lookup let's define first a helper method ==lookupFrameDefiningTemporary:== that returns the frame in which a temporary is defined. This method will return a frame, and will have to walk from a frame to its defining frame up to a method. However, so far the only object in our design knowing the defining frame is the block, and we do not have any way to access a block from its frame.
+
+One possibility is to store a block in its frame when it is activated, and then go from a frame to its block to its defining frame and continue the lookup. Another possibility, which we will implement, is to directly store the defining context in the frame when the block is activated.
+
+[[[
+CHInterpreter >> primitiveBlockValue [
+	| theBlock |
+	theBlock := self receiver.
+	self receiver: (theBlock definingContext at: #self).
+	self tempAt: #__definingContext put: theBlock definingContext.
+	^ self visitNode: theBlock code body
+]
+
+CHInterpreter >> lookupFrameDefiningTemporary: aName [
+  | currentLookupFrame |
+  currentLookupFrame := self topFrame.
+  [ currentLookupFrame includesKey: aName ]
+    whileFalse: [ currentLookupFrame := currentLookupFrame at: #__definingContext ].
+  ^ currentLookupFrame
+]
+]]]
+
+Now we need to redefine temporary reads and writes.
+Temporary reads need to lookup the frame where the variable is defined and read the value from it.
+Temporary writes need to lookup the frame where the variable is defined and write the value to it.
+
+[[[
+CHInterpreter >> visitTemporaryNode: aTemporaryNode [
+  | definingFrame |
+  definingFrame := self lookupFrameDefiningTemporary: aTemporaryNode name.
+  ^ definingFrame at: aTemporaryNode name
+]
+
+CHInterpreter >> visitAssignmentNode: aRBAssignmentNode [
+  | rightSide |
+  rightSide := self visitNode: aRBAssignmentNode value.
+  aRBAssignmentNode variable variable isTempVariable
+    ifTrue: [ | definingFrame |
+      definingFrame := self
+        lookupFrameDefiningTemporary: aRBAssignmentNode variable name.
+        definingFrame at: aRBAssignmentNode variable name put: rightSide ]
+    ifFalse: [ aRBAssignmentNode variable variable write: rightSide to: self receiver ].
+  ^ rightSide
+]
+]]]
+
+!!! Block Non-Local Return
 
 !!! Conclusion
 
