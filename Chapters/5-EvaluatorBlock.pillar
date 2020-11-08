@@ -317,9 +317,88 @@ CHInterpreter >> visitAssignmentNode: aRBAssignmentNode [
 
 !!! Block Non-Local Return
 
+We have seen so far that blocks implicitly return the value of their last expression.
+Return statements, instead, break the execution of the defining method, namely the home method, and return from it.
+For example, let's consider a method using ==ifTrue:== to implement a guard which should stop the method execution if the guard fails:
+
+[[[
+CHInterpretable >> methodWithGuard
+  true ifTrue: [ ^ nil ].
+  ^ self doSomethingExpensive
+]]]
+
+@@note put a figure here to show the stack, the blocks, their relationships.
+
+In this case, the block is not activated by ==methodWithGuard==. ==methodWithGuard== activates ==ifTrue:== which in turn activates our block. Still, our block knows the context of ==methodWithGuard== as its defining context.
+
+If the block executes, the return statement should not return ==nil== to the ==ifTrue:== context: it should return from  ==methodWithGuard== with the ==nil== value, as if it was the return value of the method. Because of this, we call such return inside blocks "non-local returns", because they return from a non-local context, its home context.
+
+To implement non-local returns, we will first start by defining a new helper method: ==homeFrameOf:== that returns the home frame of a frame. Note that the home frame of a normal method frame is itself.
+
+[[[
+CHInterpreter >> homeFrame [
+  | currentLookupFrame |
+  currentLookupFrame := self topFrame.
+  [ currentLookupFrame includesKey: #__definingContext ]
+    whileTrue: [ currentLookupFrame := currentLookupFrame at: #__definingContext ].
+  ^ currentLookupFrame
+]
+]]]
+
+A simple way to implement non local returns in Pharo is by using exceptions: exceptions unwind automatically the call-stack, thus short-circuiting the execution of all methods automatically. When we activate a method we then need to prepare ourselves to catch the exception indicating a return, and only manage it if the return is targetting the current method's context:
+
+[[[
+CHInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection [
+	| result thisFrame |	
+	thisFrame := self pushNewFrame.
+
+	self tempAt: #__method put: anAST.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection
+    do: [ :arg :value | self tempAt: arg name put: value ].
+
+	result := [ self visitNode: anAST ]
+		on: CHReturn "A return statement was executed"
+		do: [ :return | 
+			return homeFrame = thisFrame
+				ifTrue: [ return value ]
+				ifFalse: [ return pass ] ].
+
+	self popFrame.
+	^ result
+]
+
+CHInterpreter >> visitReturnNode: aReturnNode [
+  CHReturn new
+		value: (self visitNode: aReturnNode value);
+		homeFrame: self homeFrame;
+		signal
+]
+
+Error subclass: #CHReturn
+	instanceVariableNames: 'value homeFrame'
+	classVariableNames: ''
+	package: 'Champollion-Core'
+
+CHReturn >> homeFrame [
+  ^ homeFrame
+]
+
+CHReturn >> homeFrame: aFrame [
+  homeFrame := aFrame
+]
+
+CHReturn >> value [
+  ^ value
+]
+
+CHReturn >> value: aValue [
+  value := aValue
+]
+]]]
+
 !!! Conclusion
 
-In this chapter we extended the interpreter to handle message arguments, method temporaries and method lookup.
-We revisited the semantics of ==self== and ==super==.
+In this chapter we have extended our evaluator with block closures. Our block closure implementation required adding a kind of object to our runtime, ==CHBlock==, to represent blocks containing some AST. Then we refined our evaluator to define a block evaluation primitive, and correctly set up the lexical context. Our lexical context implementation gives blocks access to the defining context's receiver and temporaries. We then shown a first implementation of non-local returns, using exceptions to unwind the stack.
 
 

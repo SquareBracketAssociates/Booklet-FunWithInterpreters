@@ -1,0 +1,29 @@
+
+Guille says:
+  I did not keep writing on this because in Pharo the VM callback is on the Context object, which we did not yet have at this part of the book.
+  We could define it in some other receiver, say the block itself but then what should ==cannotReturn== do?
+  Right now cannotReturn: throws an exception, which we also do not manage yet...
+
+
+!!!! Returning to Dead Frames
+
+This implementation will handle most of the blocks we will find while programming in Pharo.
+There is however an additional case we did not cover yet: blocks can be stored to be executed later, and thus their enclosing context may have returned and not be in the stack anymore. In this case, the standard Pharo implementation will detect the situation and activate a special message, using the same mechanism as "does not understand".
+
+A scenario illustrating the situation is shown in the following code snippet:
+
+[[[
+CHInterpretable >> returnToDeadFrame [
+  | aBlock |
+  aBlock := self buildBlock.
+  aBlock value.
+]
+
+CHInterpretable >> buildBlock [
+  ^ [ ^ true ]
+]
+]]]
+
+With our current implementation, the ==CHReturn== exception will unwind the full stack because it will not find the home frame in the stack, and will provoke an evaluator failure. The solution to this issue is two-fold. First, when a method returns we mark it as dead. Second, when we attempt to return to a dead frame we send the ==cannotReturn:== message instead of returning.
+
+...
