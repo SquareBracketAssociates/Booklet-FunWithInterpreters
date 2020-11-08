@@ -215,7 +215,6 @@ And we can now proceed to rewrite our first two tests as follows:
 
 [[[
 CHInterpreterTest >> testReturnInteger [
-
 	self 
 		assert: (self executeSelection: #returnInteger)
 		equals: 5
@@ -224,10 +223,9 @@ CHInterpreterTest >> testReturnInteger [
 
 [[[
 CHInterpreterTest >> testReturnFloat [
-
 	self
-    assert: (self executeSelector: #returnFloat)
-    equals: 3.14
+		assert: (self executeSelector: #returnFloat)
+		equals: 3.14
 ]
 ]]]
 
@@ -235,7 +233,8 @@ We are ready to efficiently write tests for the other constants.
 
 !!! Evaluating booleans
 
-Boolean literals are the objects ==false== and ==true==, typically used for conditionals and control flow statements. In the previous sections we implemented support for numbers, in this section we will introduce support for returning boolean values as follows:
+Boolean literals are the objects ==false== and ==true==, typically used for conditionals and control flow statements. 
+In the previous sections we implemented support for numbers, now we introduce support for returning boolean values as follows:
 
 [[[
 CHInterpretable >> returnBoolean [
@@ -243,7 +242,7 @@ CHInterpretable >> returnBoolean [
 ]
 ]]]
 
-Evaluating such method should return ==false==.
+Evaluating such a method should return ==false==.
 We define a test for our boolean scenario.
 Note that here we do not use ==deny:==, because we want to make the result explicit for the reader of the test.
 
@@ -264,16 +263,16 @@ This is because booleans are represented in the AST with literal value nodes, wh
 
 Now that we support simple literals such as booleans and numbers, let's introduce literal arrays.
 Literal arrays are arrays that are defined inline in methods with all their elements being other literals.
+Literals refer to the fact that such objects are created during the parsing of the method code and now by sending 
+a message. 
 For this scenario, let's define two different test scenarii: an empty literal array and a literal array that has elements.
 
 [[[
 CHInterpretable >> returnEmptyLiteralArray [
-
 	^ #()
 ]
 
 CHInterpretable >> returnRecursiveLiteralArray [
-
 	^ #(true 1 #('ahah'))
 ]
 ]]]
@@ -286,14 +285,12 @@ Writing tests to cover these two scenarios is again straight forward:
 
 [[[
 CHInterpreterTest >> testReturnEmptyLiteralArray [
-
 	self 
 		assert: (self executeSelector: #returnEmptyLiteralArray) 
 		equals: #()
 ]
 
 CHInterpreterTest >> testReturnRecursiveLiteralArray [
-
 	self 
 		assert: (self executeSelector: #returnRecursiveLiteralArray) 
 		equals: #(true 1 #('ahah'))
@@ -302,20 +299,21 @@ CHInterpreterTest >> testReturnRecursiveLiteralArray [
 
 !!!! Making the test pass: visiting literal array nodes
 
-We now have to implement the method ==visitLiteralArrayNode:== to visit literal arrays.
+We have to implement the method ==visitLiteralArrayNode:== to visit literal arrays.
 Literal arrays contain an array of literal nodes, representing the elements inside the literal array.
-To make our test green, we need to evaluate a literal array node to an array where each element is the value of its corresponding literal node. Moreoverl, literal arrays are recursive structures: an array can contain other arrays. In other words, we should handle the visit of literal arrays recursively.
+To make our tests pass, we need to evaluate a literal array node to an array where each element is the value of its corresponding literal node. Moreover, literal arrays are recursive structures: an array can contain other arrays. 
+In other words, we should handle the visit of literal arrays recursively.
 Here we return the values returned by the interpretation of the elements. 
 
 [[[
 CHInterpreter >> visitLiteralArrayNode: aRBLiteralArrayNode [
 	^ aRBLiteralArrayNode contents 
 			collect: [ :literalNode | self visitNode: literalNode ]
-      as: Array
+			as: Array
 ]
 ]]]
 
-This makes our tests green, and so far there is no much to refactor or clean.
+This makes our tests pass, and so far there is no much to refactor or clean.
 Up until now we did not consider that any form of variable and we should handle such case.
 
 !!! Evaluating Variables: ==self== and ==super==
