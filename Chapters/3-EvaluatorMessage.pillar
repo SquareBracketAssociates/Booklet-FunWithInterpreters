@@ -15,8 +15,9 @@ Indeed, each time a program will send a message to another object, we should cha
 
 A first step to introduce stack management without breaking all our previous tests is to replace the single ==receiver== instance variable with a stack that will be initialized when the evaluator is created. The top of the stack will represent the current execution, and thus we will take the current receiver at each moment from the stack top. Moreover, each time we tell our interpreter to execute something we need to initialize our stack with a single frame.
 
-[[[
-"Replace the receiver instance variable by a stack"
+@@todo add a diagram here with the stack
+
+[[[caption=Replace the receiver instance variable by a stack
 Object subclass: #CHInterpreter
 	instanceVariableNames: 'stack'
 	classVariableNames: ''
@@ -62,16 +63,16 @@ CHInterpreter >> pushNewFrame [
 ]
 ]]]
 
-This refactor kept all our test green, and opened the path to introduce message-sends.
+This refactor kept all the test green, and opened the path to introduce message-sends.
 As the reader may have observed, this stack can only grow.
 We will take care of popping frames from the stack later when we revisit method returns.
 
 !!! Evaluating a First Message Send
 
 Let's start as usual by defining a new method exhibiting the scenario we want to work on.
-In this case, we want to start by extending our evaluator to correctly evaluate message sends to their return values. Our scenario method ==sendMessageReturnX== does a self message-send and returns the value returned by this message send. On the one hand, we want that in our scenario the receiver of both messages is the same. On the other hand, we want that the message send is correctly evaluated to the return value of the activated method.
+In this case, we want to start by extending our evaluator to correctly evaluate return values of message sends.
 
-Notice that our method ==sendMessageReturnX== and the implementation of the message it sends ==returnX== live in the same class. This means that in this first scenario we can concentrate on the stack management and return value of the message sends, without caring too much about the details of the method lookup algorithm. For this first version we will define a simple and incomplete yet useful method lookup algorithm.
+Our scenario method ==sendMessageReturnX== does a self message-send and returns the value returned by this message send. On the one hand, we want that in our scenario the receiver of both messages is the same. On the other hand, we want that the message send is correctly evaluated to the return value of the activated method.
 
 [[[language=pharo
 CHInterpretable >> sendMessageReturnX [
@@ -79,7 +80,15 @@ CHInterpretable >> sendMessageReturnX [
 ]
 ]]]
 
-In our test we want to ensure that in a ==self== message-send, the receiver of both called and callee methods is the same. One way to do that is to mutate the receiver of the first message-send, and access one of its instance variables in the method that is activated by the second message-send.
+Notice that our method ==sendMessageReturnX== and the implementation of the message it sends ==returnX== live in the same class. 
+This means that in this first scenario we can concentrate on the stack management and return value of the message sends, without caring too much about the details of the method lookup algorithm. 
+For this first version we will define a simple and incomplete yet useful method lookup algorithm.
+
+
+@@todo SD-Guille I do not get the following paragraph - I could not really understand and I could not fix it. 
+
+In our test we want to ensure that in a ==self== message-send, the receiver of both called and callee methods is the same. 
+One way to do that is to mutate the receiver of the first message-send, and access one of its instance variables in the method that is activated by the second message-send.
 
 [[[language=pharo
 CHInterpreterTest >> testSelfSend [
@@ -91,7 +100,11 @@ CHInterpreterTest >> testSelfSend [
 ]]]
 
 To make this test green, we need to implement the method ==visitMessageNode:==.
-Evaluation a message node requires that we recursively evaluate the receiver node, which may be a literal node or a complex expression such as another message-send. From such evaluation we obtain the actual receiver object. Starting from the receiver, we will lookup the method with the same selector as the message-send. In our first implementation we will just fetch the desired method's AST from the receiver's class. Finally, we can activate this method with the receiver using ==execute:withReceiver:== the activation will push a new frame to the call-stack with the given receiver, evaluate the method, and eventually return with a value.
+Evaluation a message node requires that we recursively evaluate the receiver node, which may be a literal node or a complex expression such as another message-send.
+From such an evaluation we obtain the actual receiver object. 
+Starting from the receiver, we will lookup the method with the same selector as the message-send. 
+In our first implementation we will just fetch the desired method's AST from the receiver's class. 
+Finally, we can activate this method with the receiver using ==execute:withReceiver:== the activation will push a new frame to the call-stack with the given receiver, evaluate the method, and eventually return with a value.
 
 [[[
 CHInterpreter >> visitMessageNode: aMessageNode [
@@ -106,7 +119,7 @@ CHInterpreter >> visitMessageNode: aMessageNode [
 !!! Balancing the Stack
 
 We mentioned earlier that when the execution of a method is finished and the execution returns to its caller method, its frame should be also discarded from the stack. The current implementation clearly does not do it.
-Indeed, we also said that our initial implementation of the stack only grows, our code never pops frames from the stack.
+Indeed, we also said that our initial implementation of the stack only grows: as shown by the method ==executeMethod:withReceiver:==, our code never pops frames from the stack.
 
 [[[language=pharo
 CHInterpreter >> executeMethod: anAST withReceiver: anObject [
@@ -117,11 +130,13 @@ CHInterpreter >> executeMethod: anAST withReceiver: anObject [
 ]]]
 
 To solve this issue, let us write a test showing the problem first.
-The idea of this test is that upon return, the frame of the caller method should be restored and with it its receiver. If we make that the caller and callee methods have different receiver instances, then this test can be expressed as some expression executed after a message-send returns. The following code snippet shows an scenario that fulfills these requirements: it sets an instance variable with some value, sends a message to an object other than ==self== and upon its return it accesses its instance variable again before returning it. Assuming the collaborator object does not modify ==self==, then the result of evaluating this message should be that 1000 is returned.
+The idea of this test is that upon return, the frame of the caller method should be restored and with it its receiver. 
+If we make that the caller and callee methods have different receiver instances, then this test can be expressed as some expression executed after a message-send returns. SD- I did not get the last part of the sentence.
+
+The following code snippet shows an scenario that fulfills these requirements: it sets an instance variable with some value, sends a message to an object other than ==self== and upon its return it accesses its instance variable again before returning it. Assuming the collaborator object does not modify ==self==, then the result of evaluating this message should be that 1000 is returned.
 
 [[[
 CHInterpretable >> setXAndMessage [
-
 		x := 1000.
 		collaborator returnX.
 		^ x
@@ -132,14 +147,13 @@ Our test ==testBalancingStack== executes the message ==setXAndMessage== that sho
 
 [[[
 CHInterpreterTest >> testBalancingStack [
-
 	self
-    assert: (self executeSelector: #setXAndMessage)
-    equals: 1000
+		assert: (self executeSelector: #setXAndMessage)
+		equals: 1000
 ]
 ]]]
 
-We then finish our set-up by extending ==CHInterpretable== to support delegating to a collaborator object.
+We then finish our setup by extending ==CHInterpretable== to support delegating to a collaborator object.
 We add a ==collaborator== instance variable to the class ==CHInterpretable== with its companion accessors. 
 This way we will be able to test that the correct object is set and passed around in the example.
 
@@ -158,7 +172,7 @@ CHInterpretable >> collaborator: anObject [
 ]
 ]]]
 
-And in the ==setUp== method we give a collaborator to our initial receiver.
+And in the ==setUp== method we pass a collaborator to our initial receiver.
 
 [[[
 CHInterpreterTest >> setUp [
@@ -173,8 +187,8 @@ CHInterpreterTest >> setUp [
 Executing this test breaks because the access to the instance variable ==x== returns nil, showing the limits of our current implementation.  This is due to the fact that evaluating message send ==returnX== creates a new frame with the collaborator as receiver, and since that frame is not popped from of the stack, when the method returns, the access to the ==x== instance variable accesses the one of the uninitialized collaborator instead of our receiver object.
 
 To solve this problem, we should pop the frame when a method activation finishes. 
-This way the stack is balanced. This is what the new implementation of ==executeMethod:withReceiver:==
-is doing.
+This way the stack is balanced. 
+This is what the new implementation of ==executeMethod:withReceiver:==is doing.
 
 [[[language=pharo
 CHInterpreter >> executeMethod: anAST withReceiver: anObject [
@@ -190,10 +204,10 @@ CHInterpreter >> popFrame [
 ]
 ]]]
 
-!!!! Ensuring the receiver is correctly set: an Extra Test
 
-Our previous tests did ensure that messages return the correct value, activate the correct methods, and that the stack grows and shrinks. However, we did not ensure yet that the receiver changes correctly on a message send, and since we do not lose any opportunity to strenghten our trust in our implementation with a new 
-test, let's write a test for it.
+!!! Ensuring the receiver is correctly set: an Extra Test
+
+Our previous tests did ensure that messages return the correct value, activate the correct methods, and that the stack grows and shrinks. However, we did not ensure yet that the receiver changes correctly on a message send, and since we do not lose any opportunity to strenghten our trust in our implementation with a new test, let's write a test for it.
 
 The scenario, illustrated in ==changeCollaboratorX== will ask the collaborator to ==store100IntoX==, implemented previosly. In this scenario, we must ensure that the state of the receiver and the collaborator  are indeed separate and that changing the collaborator will not affect the initial receiver's state.
 
@@ -203,14 +217,15 @@ CHInterpretable >> changeCollaboratorX [
 ]
 ]]]
 
-Our test for this scenario is as follows. If we give some value to the receiver and collaborator, executing our method should change the collaborator but not the initial receiver.
+Our test for this scenario is as follows. 
+If we give some value to the receiver and collaborator, executing our method should change the collaborator but not the initial receiver.
 
 [[[
 CHInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSender [
 	receiver x: 200.
 	collaborator x: 300.
 
-  "changeCollaboratorX will replace collaborator's x but not the receiver's"
+	"changeCollaboratorX will replace collaborator's x but not the receiver's"
 	self executeSelector: #changeCollaboratorX.
 
 	self assert: receiver x equals: 200.
@@ -229,12 +244,12 @@ TestCase subclass: #CHInterpreterTest
 CHInterpreterTest >> setUp [
 	super setUp.
 	receiver := CHInterpretable new.
-  collaborator := CHInterpretable new.
+	collaborator := CHInterpretable new.
 	receiver collaborator: collaborator
 ]
 ]]]
 
-This test runs green, meaning that our implementation already covered correctly this case.
+This test passes, meaning that our implementation already covered correctly this case.
 We are ready to continue our journey in message-sends.
 
 !!! Supporting Message Arguments
