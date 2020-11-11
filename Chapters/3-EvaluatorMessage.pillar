@@ -259,9 +259,9 @@ So far we have worked only with unary messages. Unary messages have no arguments
 
 In addition of simply passing the arguments, from an evaluator point of view, we need to care about evaluation order too. This is particularly important because Pharo is an imperative language where messages can trigger side effects. Evaluating two messages in one order may not have the same result as evaluating them in a different order. Arguments in Pharo are evaluated eagerly after evaluating the receiver expression, but before evaluating the message, from left to right. Once all expressions are evaluated, the resulting objects are send as part of the message-send.
 
-!!!! Initial Argument Support
+!!! Initial Argument Support
 
-To implement some initial support for arguments, our first scenario is to simply send a message with an argument. For our scenario we already count with one message with an argument: the ==x:== setter. We can then define a method ==changeCollaboratorWithArgument== which uses a it.
+To implement some initial support for arguments, our first scenario is to simply send a message with an argument. For our scenario we already count with one message with an argument: the ==x:== setter. We can then define a method ==changeCollaboratorWithArgument== which uses it.
 
 [[[language=smalltalk
 CHInterpretable >> changeCollaboratorWithArgument [
@@ -269,7 +269,7 @@ CHInterpretable >> changeCollaboratorWithArgument [
 ]
 ]]]
 
-In our test, we verify that the method evaluation effectively modifies the collaborator object 
+In the test, we verify that the method evaluation effectively modifies the collaborator object 
 as written in ==changeCollaboratorWithArgument==, and not the initial receiver object.
 
 [[[language=smalltalk
@@ -287,10 +287,14 @@ CHInterpreterTest >> testArgumentAccess [
 
 Since we have not implemented any support for arguments yet, this test should fail.
 
-Implementing argument support requires two main changes. On the caller side, we need to evaluate the arguments in the context of the caller method and then store those values in the new frame. On the callee side, when an argument access is evaluated, those accesses will not re-evaluate the expressions in the caller. Instead, argument access will just read the variables pre-stored in the current frame.
+Implementing argument support requires two main changes:
+- On the caller side, we need to evaluate the arguments in the context of the caller method and then store those values in the new frame. 
+- On the callee side, when an argument access is evaluated, those accesses will not re-evaluate the expressions in the caller. Instead, argument access will just read the variables pre-stored in the current frame.
 
-Let's start by defining the method ==visitArgumentNode:== to implement how a method accesses an argument. We implement this as a look-up in the current frame using the name of the argument.
+Let's start with the second step (the callee side) by defining the method ==visitArgumentNode:== to implement how a method accesses an argument. 
+We implement this as a look-up in the current frame using the name of the argument.
 
+SD this is visitTemporaryNode: or visitArgumentNode: 
 [[[
 CHInterpreter >> visitTemporaryNode: aRBArgumentNode [
 	^ self topFrame at: aRBArgumentNode name
@@ -310,15 +314,20 @@ CHInterpreter >> visitMessageNode: aMessageNode [
 ]]]
 
 To include arguments in the method activation, let's add a new ==arguments== parameter to our method ==execute:withReceiver:== to get ==execute:withReceiver:withArguments:==. 
-In addition to add the receiver to the new frame representing the execution, we add a binding for each parameter (called unfornately arguments in Pharo AST) with their corresponding value in the argument collection. We use the message ==with:do:== to iterate both the parameter list and actual arguments as pairs.
+
+In addition to adding the receiver to the new frame representing the execution, we add a binding for each parameter (called unfornately arguments in Pharo AST) with their corresponding value in the argument collection. 
+We use the message ==with:do:== to iterate both the parameter list and actual arguments as pairs.
+
+SD - Guille why not adding parameter to the AST like that the book is "correct" we are using tempAt: put: but I'm sure we already defined it.
 
 [[[
 CHInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection [
 	| result |
 	self pushNewFrame.
 	self tempAt: #self put: anObject.
-	anAST arguments with: aCollection
-    do: [ :arg :value | self topFrame at: arg name put: value ]. 
+	anAST arguments 
+		with: aCollection
+		do: [ :arg :value | self topFrame at: arg name put: value ]. 
 	result := self visitNode: anAST.
 	self popFrame.
 	^ result
@@ -329,13 +338,16 @@ Instead of just removing the old ==executeMethod:withReceiver:== method, we rede
  
 [[[
 CHInterpreter >> executeMethod: anAST withReceiver: anObject [
-	 ^ self executeMethod: anAST withReceiver: anObject andArguments: #()
+	^ self 
+		executeMethod: anAST 
+		withReceiver: anObject 
+		andArguments: #()
 ]
 ]]]
 
 Our tests should all pass now.
 
-!!!! Refactoring the Terrain
+!!! Refactoring the Terrain
 
 Let's now refactor a bit the existing code to clean it up and expose some existing but hidden functionality. Let us extract the code that accesses ==self== and the frame parameters into two other methods that make more intention revealing that we are accessing values in the current frame.
 
@@ -343,29 +355,33 @@ Let's now refactor a bit the existing code to clean it up and expose some existi
 CHInterpreter >> tempAt: aSymbol [
 	^ self topFrame at: aSymbol
 ]
-
+]]]
+[[[
 CHInterpreter >> tempAt: aSymbol put: anInteger [
 	self topFrame at: aSymbol put: anInteger
 ]
-
+]]]
+[[[
 CHInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection [
 	| result |
 	self pushNewFrame.
 	self tempAt: #self put: anObject.
-	anAST arguments with: aCollection
-    do: [ :arg :value | self tempAt: arg name put: value ]. 
+	anAST arguments 
+		with: aCollection
+		do: [ :arg :value | self tempAt: arg name put: value ].
 	result := self visitNode: anAST.
 	self popFrame.
 	^ result
 ]
-
+]]]
+[[[
 CHInterpreter >> receiver [
-
 	^ self tempAt: #self
 ]
+]]]
 
+[[[
 CHInterpreter >> visitTemporaryNode: aRBTemporaryNode [
-
 	^ self tempAt: aRBTemporaryNode name
 ]
 ]]]
