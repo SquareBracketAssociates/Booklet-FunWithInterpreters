@@ -531,15 +531,15 @@ The companion test verifies that the value of a uninitialized temporary is ==nil
 [[[
 CHInterpreterTest >> testUnassignedTempHasNilValue [
 	self
-    assert: (self executeSelector: #returnUnassignedTemp)
-    equals: nil
+		assert: (self executeSelector: #returnUnassignedTemp)
+		equals: nil
 ]
 ]]]
 
-The current subset of Pharo that we interpret does not contain blocks and their local/temporary variables.
+The current subset of Pharo that we interpret does not contain blocks and their local/temporary variables (We will implement blocks and more complex lexical scopes in a subsequent chapter).
 Therefore the temporary variable management we need to implement so far is rather simple.
-We will implement blocks and more complex lexical scopes in a later chapter.
-To make our test green, we modify our == execute:withReceiver:andArguments:== method to define the temporaries needed with ==nil== as value.
+
+To make our test pass, we modify the ==execute:withReceiver:andArguments:== method to define the temporaries needed with ==nil== as value.
 
 [[[
 CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection [
@@ -562,12 +562,14 @@ CHInterpreter >> visitTemporaryNode: aRBTemporaryNode [
 ]
 ]]]
 
-The test should be pass.
+The tests should be pass.
 
 !!! Implementing Temporary Variable Writes
 
 Finally we test that writes to temporary variables are working too.
-We define our scenario method ==writeTemporaryVariable==, which defines a temporary variable, assigns to it and returns it. An optimizing compiler for this code would be smart enough to do constant propagation of the literal integer and then realize that the temporary is dead code and remove it, leaving us with a method body looking like == ^ 100 ==. However, since the parser does not do such optimizations by itself, we are sure that the AST we are going to receive contains both the temporary definition, the assignment, and the temporary return.
+We define our scenario method ==writeTemporaryVariable==, which defines a temporary variable, assigns to it and returns it. 
+An optimizing compiler for this code would be smart enough to do constant propagation of the literal integer and then realize that the temporary is dead code and remove it, leaving us with a method body looking like == ^ 100 ==. 
+However, since the parser does not do such optimizations by itself, we are sure that the AST weget contains both the temporary definition, the assignment, and the temporary return.
 
 [[[
 CHInterpretable >> writeTemporaryVariable [
@@ -577,7 +579,7 @@ CHInterpretable >> writeTemporaryVariable [
 ]
 ]]]
 
-Its companion test checks that evaluating this method does effectively return 100, meaning that the temporary variable write succeeded, and that `temp` means the same variable in the assignment and in the access.
+Its companion test checks that evaluating this method does effectively return 100, meaning that the temporary variable write succeeded, and that ==temp== means the same variable in the assignment and in the access.
 
 [[[
 CHInterpreterTest >> testWriteTemporaryVariable [
@@ -587,18 +589,30 @@ CHInterpreterTest >> testWriteTemporaryVariable [
 ]
 ]]]
 
-@@note Guille: again this is weird from a reader point of view, we did not implement anything for it. The store:... is hiding so much stuff, and we did not even really talk about it...
+@@note Guille: again this is weird from a reader point of view, we did not implement anything for it. The store:... is hiding so much stuff, and we did not even really talk about it... Indeed the store is really magic here. I do not really like it. 
 
 !!! About Name Conflict Resolution
 
 Inside the scope of a method, statements have access to parameters, temporaries, instance and global variables. A name conflict appears when two variables that should be visible in a method share the same name. In a conflict scenario the language developer needs to device a resolution strategy for these problems, to avoid ambiguities.
 
-For example, consider a method ==m:== that has an argument named ==integer== and defines a temporary variable also named ==integer==. How should values of that name be resolved? How are assignments resolved? A conflict resolution strategy provides a set of deterministic rules to answer these questions and let developers understand what their program do in a non-ambiguous way.
+For example, consider a method ==m:== that has an argument named ==integer== and defines a temporary variable also named ==integer==. 
+How should values of that name be resolved? 
+How are assignments resolved? 
+A conflict resolution strategy provides a set of deterministic rules to answer these questions and let developers understand what their program do in a non-ambiguous way.
 
-A first simple strategy to avoid conflicts is preventing them at construction time. That is, the language should not allow developers to define variables if they generate a name conflict. For example, a method should not be able to define a temporary variable with the same name as an instance variable of its class. Usually these validations are done once at compile time, and programs that do not follow this rules are rejected.
+A first simple strategy to avoid conflicts is preventing them at construction time. 
+That is, the language should not allow developers to define variables if they generate a name conflict. 
+For example, a method should not be able to define a temporary variable with the same name as an instance variable of its class. 
+Usually these validations are done once at compile time, and programs that do not follow this rules are rejected.
 
-Another strategy to solve this problem is to allow shadowing. That is, we give each variable in our program a priority, and then the actual variable to read or write is looked-up using this priority system.
-Typically priorities in these schemas are modelled as lexical scopes. Lexical scoping divides a program in a hierarchy of scopes. Each scope defines variables and all but the top level scope have a parent scope. For example, the top level scope defines global variables, the class scope defines the instance variables, the method scope defines the parameters and temporaries. In this way, variable visibility can be defined in terms of a scope: the variables visible in a scope are those defined in the scope or in the parents of the scope. Moreover, scoping also gives a conflict resolution strategy: variables defined closer to the current scope in the scope hierarchy have more priority than those defined higher in the scope hierarchy.
+Another strategy to solve this problem is to allow shadowing. 
+That is, we give each variable in our program a priority, and then the actual variable to read or write is looked-up using this priority system.
+Typically priorities in these schemas are modelled as lexical scopes. 
+Lexical scoping divides a program in a hierarchy of scopes. 
+Each scope defines variables and all but the top level scope have a parent scope. 
+For example, the top level scope defines global variables, the class scope defines the instance variables, the method scope defines the parameters and temporaries. 
+In this way, variable visibility can be defined in terms of a scope: the variables visible in a scope are those defined in the scope or in the parents of the scope. 
+Moreover, scoping also gives a conflict resolution strategy: variables defined closer to the current scope in the scope hierarchy have more priority than those defined higher in the scope hierarchy.
 
 @@note should we or not?
 In the scope of these first chapters we will not manage conflict resolution explicitly. Name resolution is previously done in the AST semantic analysis upon which we are building our evaluator. This means name resolution is already resolved for us following the Opal compiler semantics: shadowing is forbidden.

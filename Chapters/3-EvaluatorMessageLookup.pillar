@@ -1,20 +1,24 @@
 !! Method Lookup
 
-Method lookup deserves a chapter on its own, it represents the internal logic of late-binding and it the first part of sending a message. The method-lookup algorithm needs to support normal message-sends as well as 'super' message-sends.  On the other hand, each method application needs to set up an execution context to store the receiver, arguments and temporary variables for that specific method execution. These execution contexts form the execution stack or call-stack. Sending a message pushes a new context in the call-stack, returning from a method pops a context from the call-stack.
+Method lookup deserves a chapter on its own, it represents the internal logic of late-binding and it the first part of sending a message. The method-lookup algorithm needs to support normal message-sends as well as 'super' message-sends.  
+We will implement method lookup for message send to an object. Then we will present message send to super and we will 
+finish by looking at how to support error (message ==doesNotUnderstand:==).
 
 
 
 
-!!! Introducing the Method Lookup
+!!! Method Lookup Introduction
 
-So far we have concentrated on method evaluation and put aside the method lookup.
-Our current solution fetches methods from the class of the receiver, without respecting inheritance.
-In this section we will remedy this problem in our evaluator and implement a proper method lookup algorithm.
+So far we have concentrated on method evaluation and put aside method lookup.
+Our current solution fetches methods from the class of the receiver, without supporting inheritance.
+In this section we address this problem and implement a proper method lookup algorithm.
 
 To implement and test the method lookup, we will extend our scenario classes with a class hierarchy.
 We introduce two superclasses above ==CHInterpretable==: ==CHInterpretableSecondSuperclass== and its subclass ==CHInterpretableSuperclass==.
 With this setup we will be able to test all interesting situations, even the ones leading to infinite loops
 if our method lookup is wrongly implemented.
+
+@@todo: add a diagram here
 
 [[[
 Object subclass: #CHInterpretableSecondSuperclass
@@ -38,7 +42,9 @@ CHInterpretableSuperclass subclass: #CHInterpretable
 ]]]
 
 
-Our first scenario for method lookup will check that sending a message climbs up the inheritance tree when a method is not found in the receiver's class class. In the code below, we define a method in ==CHInterpretable== that does a ==self== message whose method is implemented in its ==CHInterpretableSuperclass== superclass. Executing the first method should send the message, find the superclass method, and evaluate it.
+Our first scenario for method lookup will check that sending a message climbs up the inheritance tree when a method is not found in the receiver's class class. 
+In the code below, we define a method in ==CHInterpretable== that does a ==self== message whose method is implemented in its ==CHInterpretableSuperclass== superclass. 
+Executing the first method should send the message, find the superclass method, and evaluate it.
 
 [[[
 CHInterpretableSuperclass >> methodInSuperclass [
@@ -53,6 +59,9 @@ CHInterpreterTest >> testLookupMessageInSuperclass [
 	self assert: (self executeSelector: #sendMessageInSuperclass) equals: 5
 ]
 ]]]
+
+
+!!! Implement a First Lookup
 
 The test should fail with our evaluator as is, because the evaluation of the message send will not find the method in the receiver's class. A first step towards implementing the lookup is to refactor the method ==visitMessageNode:== and extract the wrong code into a ==lookup:fromClass:== method.
 
