@@ -18,7 +18,7 @@ We introduce two superclasses above ==CHInterpretable==: ==CHInterpretableSecond
 With this setup we will be able to test all interesting situations, even the ones leading to infinite loops
 if our method lookup is wrongly implemented.
 
-@@todo: add a diagram here
+@@todo add a diagram here
 
 [[[
 Object subclass: #CHInterpretableSecondSuperclass
