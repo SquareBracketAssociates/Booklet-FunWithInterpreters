@@ -1,10 +1,8 @@
 !! Method Lookup
 
-Method lookup deserves a chapter on its own, it represents the internal logic of late-binding and it the first part of sending a message. The method-lookup algorithm needs to support normal message-sends as well as 'super' message-sends.  
+Method lookup deserves a chapter on its own: it represents the core internal logic of late-binding and it the first part of sending a message. The method-lookup algorithm needs to support normal message-sends as well as 'super' message-sends.  
 We will implement method lookup for message send to an object. Then we will present message send to super and we will 
 finish by looking at how to support error (message ==doesNotUnderstand:==).
-
-
 
 
 !!! Method Lookup Introduction
