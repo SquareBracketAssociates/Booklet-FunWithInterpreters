@@ -58,6 +58,7 @@ CHInterpreterTest >> testLookupMessageInSuperclass [
 ]
 ]]]
 
++A simple hierarchy for self-send lookup.>file://figures/SimpleHierarchy.pdf|width=80|label=fighierarchy+
 
 !!! Implement a First Lookup
 
