@@ -446,4 +446,4 @@ Finally, we implemented two visitors for ASTs: a depth calculator and a node sea
 The depth calculator is a visitor that does not require special manipulation per-node, but sees all nodes through a common view. The search visitor has a common case for most nodes, and then implements special search conditions for messages, literals and variables.
 
 In the following chapters we will use the visitor pattern to implement AST interpreters: a program that will specifies how to evaluate an AST. A normal evaluator interpreter yields the result of executing the AST.
-However, we will see that abstract interpreters will evaluate an AST in an abstract way, useful for code analyses.
+However, we will see that abstract interpreters will evaluate an AST in an abstract way, useful for code analysis.
