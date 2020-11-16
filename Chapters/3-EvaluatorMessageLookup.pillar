@@ -16,7 +16,7 @@ We introduce two superclasses above ==CHInterpretable==: ==CHInterpretableSecond
 With this setup we will be able to test all interesting situations, even the ones leading to infinite loops
 if our method lookup is wrongly implemented.
 
-@@todo add a diagram here
++A simple hierarchy for self-send lookup testing.>file://figures/SimpleHierarchy.pdf|width=80|label=fighierarchy+
 
 [[[
 Object subclass: #CHInterpretableSecondSuperclass
@@ -58,11 +58,12 @@ CHInterpreterTest >> testLookupMessageInSuperclass [
 ]
 ]]]
 
-+A simple hierarchy for self-send lookup.>file://figures/SimpleHierarchy.pdf|width=80|label=fighierarchy+
+
 
 !!! Implement a First Lookup
 
-The test should fail with our evaluator as is, because the evaluation of the message send will not find the method in the receiver's class. A first step towards implementing the lookup is to refactor the method ==visitMessageNode:== and extract the wrong code into a ==lookup:fromClass:== method.
+The test should fail with our evaluator as is, because the evaluation of the message send will not find the method in the receiver's class. 
+A first step towards implementing the lookup is to refactor the method ==visitMessageNode:== and extract the wrong code into a ==lookup:fromClass:== method.
 
 [[[
 CHInterpreter >> visitMessageNode: aMessageNode [
@@ -80,8 +81,8 @@ CHInterpreter >> lookup: aSelector fromClass: aClass [
 
 The method ==lookup:fromClass:== is now the place to implement the method lookup algorithm:
 - if the current class defines the method returns the corresponding AST;
-- if the current class does not define the method and we are not on the top of the hierarchy we recursively lookup in the class' superclass;
-- else when we are on top of the hierarchy the  ==lookup:fromClass:== returns nil to indicate that no method was found.
+- if the current class does not define the method and we are not on the top of the hierarchy, we recursively lookup in the class' superclass;
+- else when we are on top of the hierarchy and the  ==lookup:fromClass:== returns nil to indicate that no method was found.
 
 The method ==lookup:fromClass:== does not raise an error because this way the ==visitMessageNode:== method will be able to send the ==doesNotUnderstand:== message to the receiver, as we will see later in this chapter.
 
