@@ -7,7 +7,7 @@ For example, counting the number of message sends in an AST is as simple as the 
 
 [[[language=smalltalk
 count := 0.
-aNode nodesDo: [ :n | 
+aNode nodesDo: [ :n |
   n isMessage
     ifTrue: [ count := count + 1 ] ].
 count
@@ -68,7 +68,7 @@ DirectoryNode >> acceptVisitor: aVisitor [
 In this way, we can re-implement a ==SizeVisitor== that calculates the total size of a node in the file system as follows.
 When a size visitor visits a file, it asks the file for its size.
 When it visits a directory, it must iterate the children and sum the sizes.
-However, it cannot directly ask the ==size== of the children, because only ==FileNode== instances do understand it but directories do not. Because of this, we need to make a recursive call and re-ask the child node to accept the visitor. 
+However, it cannot directly ask the ==size== of the children, because only ==FileNode== instances do understand it but directories do not. Because of this, we need to make a recursive call and re-ask the child node to accept the visitor.
 Then each node will again dispath on the size visitor.
 
 
@@ -89,8 +89,8 @@ In such cases, it is up to us to implement a visitor object with the correct ==v
 
 !!! Introducing AST visitors: measuring the depth of the tree
 
-To introduce how to implement an AST visitor on RBASTs, let's implement a visitor that returns the max depth of the tree. 
-That is, a tree with a single node has a depth of 1. 
+To introduce how to implement an AST visitor on RBASTs, let's implement a visitor that returns the max depth of the tree.
+That is, a tree with a single node has a depth of 1.
 A node with children has a depth of 1 + the maximum depth amongst all its children.
 Let's call that visitor ==DepthCalculatorVisitor==.
 
@@ -117,7 +117,7 @@ expression acceptVisitor: DepthCalculatorVisitor new.
 >>> Exception! DepthCalculatorVisitor does not understand visitMessageNode:
 ]]]
 
-If we execute the example above, we get a debugger because ==DepthCalculatorVisitor== does not understand ==visitMessageNode:==. 
+If we execute the example above, we get a debugger because ==DepthCalculatorVisitor== does not understand ==visitMessageNode:==.
 We can then proceed to introduce that method in the debugger using the button ""create"" or by creating it in the browser.
 We can implement the visit method as follows, by iterating the children to calculate the maximum depth amongst the children, and then adding 1 to it.
 
@@ -227,7 +227,7 @@ DepthCalculatorVisitor >> visitLiteralValueNode: aRBLiteralValueNode [
 
 !!! Second refactoring
 
-As a second step, we can refactor further by taking into account a simple intuition: leaf nodes do never have children. 
+As a second step, we can refactor further by taking into account a simple intuition: leaf nodes do never have children.
 This means that ==aNode children== always yields an empty collection for leaf nodes, and thus the result of the following expression is always be zero:
 
 [[[language=smalltalk
@@ -236,7 +236,7 @@ This means that ==aNode children== always yields an empty collection for leaf no
   into: [ :max :node | max max: (node acceptVisitor: self) ])
 ]]]
 
-In other words, we can reuse the implementation of ==visitNodeWithChildren:== for both nodes with and without children, to get rid of the duplicated ==1+==. 
+In other words, we can reuse the implementation of ==visitNodeWithChildren:== for both nodes with and without children, to get rid of the duplicated ==1+==.
 
 Let's then rename the method ==visitNodeWithChildren:== into ==visitNode:== and make all visit methods delegate to it.
 This will allow us also to remove the, now unused, ==visitLeafNode:==.
@@ -352,8 +352,8 @@ Fortunately for us, Pharo's ASTs already provide ==RBProgramNodeVisitor== a base
 
 !!! Searching the AST for a Token
 
-Calculating the depth of an AST is a pretty naïve example for a visitor because we do not need special treatment per node. 
-It is however a nice example to introduce the concepts, learn some common patterns, and it furthermore forced us to do some refactorings and understanding a complex visitor structure. 
+Calculating the depth of an AST is a pretty naïve example for a visitor because we do not need special treatment per node.
+It is however a nice example to introduce the concepts, learn some common patterns, and it furthermore forced us to do some refactorings and understanding a complex visitor structure.
 Moreover, it was a good introduction for the ==RBProgramNodeVisitor== class.
 
 In this section we will implement a visitor that does require different treatment per node: a node search.
@@ -395,14 +395,14 @@ SearchVisitor >> visitVariableNode: aNode [
 
 !!!! Searching in message nodes
 
-Mesage nodes will match a search if their selector begins with the searched token.
+Message nodes will match a search if their selector begins with the searched token.
 In addition, to follow the specification children of the message need to be iterated in depth first in-order.
 This means the receiver should be iterated first, then the message node itself, finally the arguments.
 
 [[[language=smalltalk
 SearchVisitor >> visitMessageNode: aNode [
   ^ (aNode receiver acceptVisitor: self),
-    ((selector beginsWith: token)
+    ((aNode selector beginsWith: token)
       ifTrue: [ { aNode } ]
       ifFalse: [ #() ]),
     (aNode arguments gather: [ :each | each acceptVisitor: self ])
@@ -434,8 +434,8 @@ SearchVisitor >> visitNode: aNode [
 ]
 ]]]
 
-Another design would be to store the collection holding the rest inside the visitor and to avoid the temporary copies. 
-We let you refactor your code to implement it. 
+Another design would be to store the collection holding the rest inside the visitor and to avoid the temporary copies.
+We let you refactor your code to implement it.
 
 !!! Conclusion
 
