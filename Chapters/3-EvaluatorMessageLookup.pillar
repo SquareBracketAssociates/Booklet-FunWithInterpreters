@@ -102,18 +102,22 @@ CHInterpreter >> lookup: aSymbol fromClass: aClass [
 ]
 ]]]
 
-We should call the method ==lookup:fromClass:== from the ==visitMessageNode:==
+We should call the method ==lookup:fromClass:== from the ==visitMessageNode:== and our test will pass.
+
+
+
 
 !!! The Case of Super
 
-Many people gets confused by the semantics of ==super==. The ==super== variable has two different roles in the execution of an object oriented language. When the ==super== variable is read, its value is the receiver of the message as we saw it in the first chapter, it has the same value as ==self==.
+Many people gets confused by the semantics of ==super==. The ==super== variable has two different roles in the execution of an object-oriented language. 
+When the ==super== variable is read, its value is the receiver of the message as we saw it in the first chapter, it has the same value as ==self==.
 
-The second role of the ==super== variable is to alter the method lookup when ==super== is used as the receiver of the message send. Whe ==super== is used as the receiver of a message send, the method lookup does not start at the class of the receiver, but at the class where the method is installed instead, allowing it to go up higher and higher in the hierarchy.
+The second role of the ==super== variable is to alter the method lookup when ==super== is used as the receiver of the message send. 
+When ==super== is used as the receiver of a message send, the method lookup does not start at the class of the receiver, but at the class where the method is installed instead, allowing it to go up higher and higher in the hierarchy.
 
-We define a method ==superMessageSend==. 
+We define a method ==doesSuperLookupFromSuperclass== below. 
  It is not really good since it uses ==super== while it is not needed. 
- We will see with the handling of overridden messages better 
- tests. 
+The handling of overridden messages will present better tests.
  
 [[[
 CHInterpretableSuperclass >> isInSuperclass [
@@ -129,6 +133,10 @@ CHInterpretable >> doesSuperLookupFromSuperclass [
 ]
 ]]]
 
+
++A simple hierarchy for super-send lookup testing.>file://figures/HierarchyForSuper.pdf|width=80|label=fighierarchySuper+
+
+
 Once these methods defined, we can now test that the ==isInSuperclass== message activates the method in the superclass, returning ==true==.
 
 [[[
@@ -137,13 +145,14 @@ CHInterpreterTest >> testLookupSuperMessage [
 ]
 ]]]
 
-The ==super== variable changes the method lookup described above.
+The ==super== variable changes the method lookup described previously.
 When the receiver is ==super==, the lookup does not start from the class of the receiver, but from the superclass of the class defining the method of the current frame. 
-This implies that we need a way to access the method that is being current executed, and the class where it is defined.
+This implies that we need a way to access the method that is being currently executed, and the class where it is defined.
 
 We can again store this information in the current frame during the method's activation.
-We will add it for now as a fake temporary variable in the frame, with the name ==\_\_\_method==.
-By prefixing the variable's name with ==\_\_\_== we make it less probable this fake variable creates a conflict with a real variable. If we would have just named it e.g., ==method==, any method with a normal normal temporary called ==method== would be broken.
+We add it for now as a fake temporary variable in the frame, with the name ==\_\_\_method==.
+By prefixing the variable's name with ==\_\_\_== we make it less probable this fake variable creates a conflict with a real variable. 
+If we would have just named it e.g., ==method==, any method with a normal normal temporary called ==method== would be broken.
 
 [[[
 CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection [
@@ -158,7 +167,8 @@ CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aColl
 ]
 ]]]
 
-We also define a convenience accessor method ==currentMethod==, to get the current method stored in the current frame. In the future, if we want to change this implementation, we will have less places to change if we hide the access to the method behind an accessor.
+We also define a convenience accessor method ==currentMethod==, to get the current method stored in the current frame. 
+In the future, if we want to change this implementation, we will have less places to change if we hide the access to the method behind an accessor.
 
 [[[
 CHInterpretable >> currentMethod [
@@ -166,7 +176,9 @@ CHInterpretable >> currentMethod [
 ]
 ]]]
 
-Note that using the current frame to store the current method will work, even if we have several messages in sequence. When a message is sent a new frame is pushed with a new method, and upon return the frame is popped along with its method. So the top frame in the stack will be always contain the method it executes.
+Note that using the current frame to store the current method will work, even if we have several messages in sequence. 
+When a message is sent a new frame is pushed with a new method, and upon return the frame is popped along with its method. 
+So the top frame in the stack will be always contain the method it executes.
 Finally, we redefine the ==visitMessageNode:== method to change class where to start looking for the method. 
 
 [[[
@@ -186,9 +198,11 @@ CHInterpreterTest >> visitMessageNode: aMessageNode [
 
 !!! Overridden Messsages
 
-We have made sure that sending a message to ==super== starts looking methods in the superclass of the class defining the method. Now we would like to make sure that the lookup works even in presence of overridden methods. 
+We have made sure that sending a message to ==super== starts looking methods in the superclass of the class defining the method. 
+Now we would like to make sure that the lookup works even in presence of overridden methods.
 
-Let's define the method ==overriddenMethod== in a superclass returning a value, and in a subclass just doing a super send with the same selector. If our implementation is correct, sending the ==overriddenMethod== message to our test receiver should return ==5==. If it is not, the test should fail, or worse, loop infinitely.
+Let's define the method ==overriddenMethod== in a superclass returning a value, and in a subclass just doing a super send with the same selector. 
+
 
 [[[
 CHInterpretableSuperClass >> overriddenMethod [
@@ -200,6 +214,9 @@ CHInterpretable >> overriddenMethod [
 ]
 ]]]
 
+If our implementation is correct, sending the ==overriddenMethod== message to our test receiver should return ==5==. 
+If it is not, the test should fail, or worse, loop infinitely.
+
 Then we check that our test returns the correct value. If the test loops infinitely the test will timeout.
 
 [[[
@@ -208,12 +225,15 @@ CHInterpreterTest >> testLookupRedefinedMethod [
 ]
 ]]]
 
-If our previous implementation was correct, this test should run green.
+If our previous implementation was correct, this test should pass.
 
 
 !!! Checking Correct Semantics
 
-To ensure that the method lookup is correctly implemented, especially in the presence of ==super== messages, we need to verify an extra condition. Lot of material wrongly defines that ==super== messages look up methods starting from the superclass of the class of the receiver. This definition, illustrated in the code snippet below, is incorrect: it only works when the inheritance depth is limited to two classes, a class and its superclass. In other cases, this definition will create an infinite loop.
+To ensure that the method lookup is correctly implemented, especially in the presence of ==super== messages, we need to verify an extra condition. 
+Lot of material wrongly defines that ==super== messages look up methods starting from the superclass of the class of the receiver. 
+This definition, illustrated in the code snippet below, is incorrect: it only works when the inheritance depth is limited to two classes, a class and its superclass. 
+In other cases, this definition will create an infinite loop.
 
 [[[
 CHInterpreter >> visitMessageNode: aMessageNode [
@@ -222,28 +242,28 @@ CHInterpreter >> visitMessageNode: aMessageNode [
 	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
 
 	lookupClass := aMessageNode receiver isSuper
-    ifTrue: [ newReceiver class superclass ]
-    ifFalse: [ newReceiver class ].
+		ifTrue: [ newReceiver class superclass ]
+		ifFalse: [ newReceiver class ].
 	method :=  self lookup: aMessageNode selector fromClass: lookupClass.
 
 	^ self executeMethod: method withReceiver: newReceiver andArguments: args
 ]
 ]]]
 
-A scenario showing such problem is shown in Figure *@fighierarchyFull*.
-In this scenario, our inheritance depth is of three classes and we will create two methods with the same selector.
-In the higher class in the hierarchy the method returns a value.
+A scenario showing such a problem is shown in Figure *@fighierarchyFullWrong*.
+In this scenario, our inheritance depth is of three classes and we create two methods with the same selector.
+In the highest class, the method returns a value.
 In the middle class, the first method is overridden doing a super send.
 
-+The full hierarchy of setup tests.>file://figures/hierarchy.pdf|width=80|label=fighierarchyFull+
++A simple situation making wrongly defined super loop endlessly: sending the message ==redefinedMethod== to an instance of the class ==CHInterpretable== loops forever.>file://figures/WrongSuperLoopsHierarchy.pdf|width=100|label=fighierarchyFullWrong+
 
 [[[
-CHInterpretableSecondSuperClass >> redefinedMethodAtThreeLevels [
+CHInterpretableSecondSuperClass >> redefinedMethod [
 	^ 5
 ]
   
-CHInterpretableSuperClass >> redefinedMethodAtThreeLevels [
-	^ super redefinedMethodAtThreeLevels
+CHInterpretableSuperClass >> redefinedMethod [
+	^ super redefinedMethod
 ]
 ]]]
 
@@ -251,14 +271,15 @@ To finish our scenario, we create an instance of the lower subclass in the hiera
 
 [[[
 CHInterpreterTest >> testLookupSuperMessageNotInReceiverSuperclass [
-	self assert: (self executeSelector: #redefinedMethodAtThreeLevels) equals: 5
+	self assert: (self executeSelector: #redefinedMethod) equals: 5
 ]
 ]]]
 
-With the incorrect semantics, our test will start by activating ==CHInterpretableSuperclass>>#redefinedMethodAtThreeLevels==.
-When our evaluator finds the super send, it will start the lookup from the superclass of the receiver's class: ==CHInterpretableSuperclass==. Starting the lookup from this class will again find and activate ==CHInterpretableSuperclass>>#redefinedMethodAtThreeLevels==, which will lead to activating the same method over and over again...
+With the incorrect semantics, our test will start by activating ==CHInterpretableSuperclass>>#redefinedMethod==.
+When the interpreter finds the super send, it will start the lookup from the superclass of the receiver's class: ==CHInterpretableSuperclass==. 
+Starting the lookup from this class will again find and activate ==CHInterpretableSuperclass>>#redefinedMethod==, which will lead to activating the same method over and over again...
 
-Coming back to our previous, correct, definition works properly, and makes our test green:
+Coming back to our previous correct definition, it works properly, and makes our test pass:
 
 [[[
 CHInterpreterTest >> visitMessageNode: aMessageNode [
@@ -275,10 +296,13 @@ CHInterpreterTest >> visitMessageNode: aMessageNode [
 ]
 ]]]
 
-!!! Does not understand and Reifications
+!!! Does not understand and Message Reification
 
-To finish this chapter we will implement in our interpreter support for the ==doesNotUnderstand:== feature.
-In Pharo, when an object receives a message for which the lookup does not find a corresponding method, it will send instead the ==doesNotUnderstand:== message to that object, with the "original message" as argument. This original message is not only the selector but it comprises the arguments too. The interpreter should take selector and arguments to create an object representation of the message. We say the interpreter reifies the message.
+To finish this chapter we will implement support for the ==doesNotUnderstand:== feature.
+In Pharo, when an object receives a message for which the lookup does not find a corresponding method, it sends instead the ==doesNotUnderstand:== message to that object, with the "original message" as argument. The same mechanism exists in many other languages.
+This original message is not only the selector but it comprises the arguments too. 
+The interpreter should take selector and arguments to create an object representation of the message. 
+We say the interpreter reifies the message.
 
 !!!!! About Reification.
 Reification is the process of making concrete something that was not. In the case of the interpreter of a programming language, many of the operations of the language are implicit and hidden in the interpreter execution. For example, the implementation of message-sends and assignments are hidden to the developer. While information hiding in interpreters is important to make languages safe and sound, the language has no way to manipulate those abstractions. Reifications enter in the game to enable those manipulations: interpreter concepts are concretized as objects in the interpreted language, they are "lifted-up" from the interpreter level to the application.
