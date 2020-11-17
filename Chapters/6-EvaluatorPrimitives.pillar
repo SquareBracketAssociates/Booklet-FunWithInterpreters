@@ -26,7 +26,7 @@ In Pharo the design of primitives is split in three different parts: ''messages'
 
 !!!!!! Primitives invoked as Messages.
 The first thing to note is that in Pharo programs primitive behavior is invoked through standard message sends.
-Indeed sending the message == 1 + 2 == is handled as a message, but the method ==\+== on ==Integer== is a primitive (during Pharo execution it calls primitive functions transparently from the developer).
+Indeed sending the message == 1 \+ 2 == is handled as a message, but the method ==\+== on ==Integer== is a primitive (during Pharo execution it calls primitive functions transparently from the developer).
 
 This management of primitives as messages allows developers to define operators such as ==\+== as non-primitives on their own classes, by just implementing methods with the corresponding selectors and without any additional syntax. 
 
