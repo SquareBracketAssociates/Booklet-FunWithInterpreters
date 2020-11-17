@@ -36,7 +36,7 @@ With this new schema, we can now rewrite the access to the receiver to just acce
 
 [[[language=pharo
 CHInterpreter >> receiver [
-	^ self topFrame at: #self
+	^ self topFrame receiver
 ]
 
 CHInterpreter >> topFrame [
@@ -49,20 +49,34 @@ The final step is to set up a frame when the execution starts, which happened so
 [[[language=pharo
 CHInterpreter >> execute: anAST withReceiver: anObject [
 	self pushNewFrame.
-	self topFrame at: #self  put: anObject.
+	self topFrame receiver: anObject.
 	^ self visitNode: anAST
 ]
 ]]]
 
 The last piece in the puzzle is the method ==pushNewFrame==, which creates a new frame and pushes it on the top of the stack. 
-For now, let's represent a frame as a dictionary that will store key-value pairs representing the variables defined in the current method execution: ==self==, and later the arguments and temporaries.
+Since methods define a scope with their temporary variables and arguments, we represent frames using a new kind of scope: a method scope.
+The method scope will for now store the current receiver, and later its parent scope, and a set of key-value pairs representing the variables defined in the current method execution: the arguments and temporaries.
 
 [[[
 CHInterpreter >> pushNewFrame [
 	| newTop |
-	newTop := Dictionary new.
+	newTop := CHMethodScope new.
 	stack push: newTop.
 	^ newTop
+]
+
+Object subclass: #CHMethodScope
+	instanceVariableNames: 'receiver variables'
+	classVariableNames: ''
+	package: 'Champollion-Core'
+
+CHMethodScope >> receiver: aCHInterpretable [
+	receiver := aCHInterpretable
+]
+
+CHMethodScope >> receiver [
+	^ receiver
 ]
 ]]]
 
@@ -127,7 +141,7 @@ Indeed, we also said that our initial implementation of the stack only grows: as
 [[[language=pharo
 CHInterpreter >> executeMethod: anAST withReceiver: anObject [
 	self pushNewFrame.
-	self topFrame at: #self  put: anObject.
+	self topFrame receiver: anObject.
 	^ self visitNode: anAST
 ]
 ]]]
@@ -196,7 +210,7 @@ This is what the new implementation of ==executeMethod:withReceiver:==is doing.
 [[[language=pharo
 CHInterpreter >> executeMethod: anAST withReceiver: anObject [
 	self pushNewFrame.
-	self topFrame at: #self  put: anObject.
+	self topFrame receiver: anObject.
 	result := self visitNode: anAST.
 	self popFrame.
 	^ result
@@ -295,12 +309,39 @@ Implementing argument support requires two main changes:
 - On the callee side, when an argument access is evaluated, those accesses will not re-evaluate the expressions in the caller. Instead, argument access will just read the variables pre-stored in the current frame.
 
 Let's start with the second step (the callee side) by defining the method ==visitArgumentNode:== to implement how a method accesses an argument. 
-We implement this as a look-up in the current frame using the name of the argument.
+Since all variable reads are concentrated on the scope lookup, we need to add the method scope in the scope chain, and define a ==read:== method for it.
 
-SD this is visitTemporaryNode: or visitArgumentNode: 
 [[[
-CHInterpreter >> visitTemporaryNode: aRBArgumentNode [
-	^ self topFrame at: aRBArgumentNode name
+CHInterpreter >> execute: anAST withReceiver: anObject [
+	| result |
+  self pushNewFrame.
+
+  "Set up the scope chain"
+  self topFrame parentScope: (CHInstanceScope new
+		receiver: anObject;
+		parentScope: globalScope;
+		yourself);
+	yourself.
+
+  self topFrame receiver: anObject.
+  result := self visitNode: anAST.
+  self popFrame.
+  ^ result
+
+]
+CHInterpreter >> currentScope [
+	^ self topFrame
+]
+
+CHMethodScope >> scopeDefining: aString [
+	(variables includesKey: aString)
+		ifTrue: [ ^ self ].
+
+	^ self parentScope scopeDefining: aString
+]
+
+CHMethodScope >> read: aString [
+	^ variables at: aString
 ]
 ]]]
 
@@ -326,8 +367,16 @@ SD - Guille why not adding parameter to the AST like that the book is "correct" 
 [[[
 CHInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection [
 	| result |
-	self pushNewFrame.
-	self tempAt: #self put: anObject.
+  self pushNewFrame.
+
+  "Set up the scope chain"
+  self topFrame parentScope: (CHInstanceScope new
+		receiver: anObject;
+		parentScope: globalScope;
+		yourself);
+	yourself.
+
+	self topFrame receiver: anObject.
 	anAST arguments 
 		with: aCollection
 		do: [ :arg :value | self topFrame at: arg name put: value ]. 
@@ -354,21 +403,27 @@ Our tests should all pass now.
 
 Let's now refactor a bit the existing code to clean it up and expose some existing but hidden functionality. Let us extract the code that accesses ==self== and the frame parameters into two other methods that make more intention revealing that we are accessing values in the current frame.
 
-[[[
-CHInterpreter >> tempAt: aSymbol [
-	^ self topFrame at: aSymbol
-]
-]]]
+@@note GP this section does not make too much sense as it is now with the new scopes. But we could refactor the scope creation.
+
 [[[
 CHInterpreter >> tempAt: aSymbol put: anInteger [
 	self topFrame at: aSymbol put: anInteger
 ]
 ]]]
+
 [[[
 CHInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection [
 	| result |
 	self pushNewFrame.
-	self tempAt: #self put: anObject.
+  
+  "Set up the scope chain"
+  self topFrame parentScope: (CHInstanceScope new
+		receiver: anObject;
+		parentScope: globalScope;
+		yourself);
+	yourself.
+  
+	self topFrame receiver: anObject.
 	anAST arguments 
 		with: aCollection
 		do: [ :arg :value | self tempAt: arg name put: value ].
@@ -377,17 +432,99 @@ CHInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 	^ result
 ]
 ]]]
+
+!!! Handling Temporaries
+
+Temporary variables, or local variables, are variables that live within the scope of a method's ""execution"".
+Memory for such variables is allocated when a method is activated, and released when the method returns.
+Because of this property, temporary variables are also called automatic variables in languages like C.
+
+The usual way to implement such temporary variables is to allocate them in the method execution's frame.
+This way, when the method returns, the frame is popped and all the values allocated in temporaries are discarded and can be reclaimed.
+In other words, we will manage temporaries the same way as we manage parameters.
+
+Our first scenario introducing temporaries will verify the default value of temporaries.
+Indeed when temporaries are allocated in Pharo, the execution engine (in this case our evaluator) should make sure these variables are correctly initialized to a default value, in this case ==nil==.
+
+Notice that temporaries cannot be observed from outside the execution of a method unless we halt the evaluation of a method in the middle of the evaluation. Since our testing approach is more like a black-box approach, we need to make our scenarios visible from the outside somehow. Because of these reasons, our tests will rely on returns again, as we did before with literal objects.
+
 [[[
-CHInterpreter >> receiver [
-	^ self tempAt: #self
+CHInterpretable >> returnUnassignedTemp [
+	| temp |
+	^ temp
 ]
 ]]]
 
+The companion test verifies that the value of a uninitialized temporary is ==nil==.
+
 [[[
-CHInterpreter >> visitTemporaryNode: aRBTemporaryNode [
-	^ self tempAt: aRBTemporaryNode name
+CHInterpreterTest >> testUnassignedTempHasNilValue [
+	self
+		assert: (self executeSelector: #returnUnassignedTemp)
+		equals: nil
 ]
 ]]]
+
+The current subset of Pharo that we interpret does not contain blocks and their local/temporary variables (We will implement blocks and more complex lexical scopes in a subsequent chapter).
+Therefore the temporary variable management we need to implement so far is rather simple.
+
+To make our test pass, we modify the ==execute:withReceiver:andArguments:== method to define the temporaries needed with ==nil== as value.
+
+[[[
+CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection [
+  | result thisFrame |	
+  self pushNewFrame.
+  self topFrame parentScope: (CHInstanceScope new
+		receiver: anObject;
+		parentScope: globalScope;
+		yourself);
+	yourself.
+  
+	self topFrame receiver: anObject.
+	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ].
+	anAST temporaryNames do: [ :tempName | self tempAt: tempName name put: nil ].
+	result := self visitNode: anAST body.
+	self popFrame.
+	^ result
+]
+]]]
+
+The tests should be pass.
+
+!!! Implementing Temporary Variable Writes
+
+Finally we test that writes to temporary variables are working too.
+We define our scenario method ==writeTemporaryVariable==, which defines a temporary variable, assigns to it and returns it. 
+An optimizing compiler for this code would be smart enough to do constant propagation of the literal integer and then realize that the temporary is dead code and remove it, leaving us with a method body looking like == ^ 100 ==. 
+However, since the parser does not do such optimizations by itself, we are sure that the AST weget contains both the temporary definition, the assignment, and the temporary return.
+
+[[[
+CHInterpretable >> writeTemporaryVariable [
+	| temp |
+	temp := 100.
+	^ temp
+]
+]]]
+
+Its companion test checks that evaluating this method does effectively return 100, meaning that the temporary variable write succeeded, and that ==temp== means the same variable in the assignment and in the access.
+
+[[[
+CHInterpreterTest >> testWriteTemporaryVariable [
+	self
+		assert: (self executeSelector: #writeTemporaryVariable)
+		equals: 100
+]
+]]]
+
+
+Since temporary variable name resolution is already managed by our method scopes, we just need to implement ==write:withValue:== in it to make all our tests pass.
+
+[[[
+  CHMethodScope >> write: aString withValue: aValue [
+  	variables at: aString put: aValue
+]
+]]]
+
 
 !!! Evaluation Order
 
@@ -476,8 +613,6 @@ CHInterpreterTests >> testEvaluationOrder [
 ]
 ]]]
 
-
-
 To make this test green we need to implement previously some new support in our interpreter: writing to temporary variables and dynamic literal arrays.
 
 @@note OK, writing to temporaries is broken in P9. We should do it with an extension method? This is the same problem as before with name resolution...
@@ -503,93 +638,6 @@ CHInterpreter >> visitMessageNode: aMessageNode [
 	^ self executeMethod: method withReceiver: newReceiver andArguments: args
 ]
 ]]]
-
-!!! Handling Temporaries
-
-Temporary variables, or local variables, are variables that live within the scope of a method's ""execution"".
-Memory for such variables is allocated when a method is activated, and released when the method returns.
-Because of this property, temporary variables are also called automatic variables in languages like C.
-
-The usual way to implement such temporary variables is to allocate them in the method execution's frame.
-This way, when the method returns, the frame is popped and all the values allocated in temporaries are discarded and can be reclaimed.
-In other words, we will manage temporaries the same way as we manage parameters.
-
-Our first scenario introducing temporaries will verify the default value of temporaries.
-Indeed when temporaries are allocated in Pharo, the execution engine (in this case our evaluator) should make sure these variables are correctly initialized to a default value, in this case ==nil==.
-
-Notice that temporaries cannot be observed from outside the execution of a method unless we halt the evaluation of a method in the middle of the evaluation. Since our testing approach is more like a black-box approach, we need to make our scenarios visible from the outside somehow. Because of these reasons, our tests will rely on returns again, as we did before with literal objects.
-
-[[[
-CHInterpretable >> returnUnassignedTemp [
-	| temp |
-	^ temp
-]
-]]]
-
-The companion test verifies that the value of a uninitialized temporary is ==nil==.
-
-[[[
-CHInterpreterTest >> testUnassignedTempHasNilValue [
-	self
-		assert: (self executeSelector: #returnUnassignedTemp)
-		equals: nil
-]
-]]]
-
-The current subset of Pharo that we interpret does not contain blocks and their local/temporary variables (We will implement blocks and more complex lexical scopes in a subsequent chapter).
-Therefore the temporary variable management we need to implement so far is rather simple.
-
-To make our test pass, we modify the ==execute:withReceiver:andArguments:== method to define the temporaries needed with ==nil== as value.
-
-[[[
-CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection [
-	| result |
-	self pushNewFrame.
-	self tempAt: #self put: anObject.
-	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ].
-	anAST temporaryNames do: [ :tempName | self tempAt: tempName name put: nil ].
-	result := self visitNode: anAST body.
-	self popFrame.
-	^ result
-]
-]]]
-
-@@note Guille: this we already implemented it above because arguments are temps...!!!!
-And the value of a temporary variable is simply to return the value associated to the variable name in the current frame.
-[[[
-CHInterpreter >> visitTemporaryNode: aRBTemporaryNode [
-	^ self tempAt: aRBTemporaryNode name
-]
-]]]
-
-The tests should be pass.
-
-!!! Implementing Temporary Variable Writes
-
-Finally we test that writes to temporary variables are working too.
-We define our scenario method ==writeTemporaryVariable==, which defines a temporary variable, assigns to it and returns it. 
-An optimizing compiler for this code would be smart enough to do constant propagation of the literal integer and then realize that the temporary is dead code and remove it, leaving us with a method body looking like == ^ 100 ==. 
-However, since the parser does not do such optimizations by itself, we are sure that the AST weget contains both the temporary definition, the assignment, and the temporary return.
-
-[[[
-CHInterpretable >> writeTemporaryVariable [
-	| temp |
-	temp := 100.
-	^ temp
-]
-]]]
-
-Its companion test checks that evaluating this method does effectively return 100, meaning that the temporary variable write succeeded, and that ==temp== means the same variable in the assignment and in the access.
-
-[[[
-CHInterpreterTest >> testWriteTemporaryVariable [
-	self
-		assert: (self executeSelector: #writeTemporaryVariable)
-		equals: 100
-]
-]]]
-
-@@note Guille: again this is weird from a reader point of view, we did not implement anything for it. The store:... is hiding so much stuff, and we did not even really talk about it... Indeed the store is really magic here. I do not really like it. 
 
 !!! About Name Conflict Resolution
 
