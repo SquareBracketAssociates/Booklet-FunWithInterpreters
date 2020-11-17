@@ -623,6 +623,9 @@ SD: I will write something here
 
 !!! Conclusion
 
+Supporting message sends and in particular method execution is the core of the computation in an object-oriented language and this is what this chapter covered.
+
 Implementing messages implied modelling the call-stack and keeping it balanced on method returns.
 We have seen that a call-stack is made up of frames, each frame representing the activation of a method: it stores the method, receiver, arguments, and temporaries of the method that is executing. When a message takes place, receiver and arguments are evluated in order from left to right, a new frame is created and all values are stored in the frame.
+
 
