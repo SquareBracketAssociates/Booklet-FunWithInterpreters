@@ -21,12 +21,18 @@ We will then visit some of the essential primitives we need to make work to exec
 
 !!! Primitives in Pharo
 
-In Pharo the design of primitives is split in three different parts: messages, primitive methods, and the primitive itself which is provided by the interpreter. 
+In Pharo the design of primitives is split in three different parts: ''messages'', ''primitive methods'' (the Pharo method that is annotated), and the ''primitive'' itself which is provided by the interpreter (in our case this is a method that implements the primitive behavior. In the case of a Virtual Machine it would be a C function). 
 
-!!!!!!About Messages.
+
+!!!!!! Primitives invoked as Messages.
 The first thing to note is that in Pharo programs primitive behavior is invoked through standard message sends.
-This allows developers to define operators such as ==\+== as non-primitives on their own classes, by just implementing methods with the corresponding selectors and without any additional syntax. 
-With some terminology abuse we could think of this as "operator redefinition", although it is no such, it is just a standard method re/definition. This operator redefinition feature is useful for example when creating internal domain specific languages (DSLs), or to have polymorphism between integers and floats.
+Indeed sending the message == 1 + 2 == is handled as a message, but the method ==\+== on ==Integer== is a primitive (during Pharo execution it calls primitive functions transparently from the developer).
+
+This management of primitives as messages allows developers to define operators such as ==\+== as non-primitives on their own classes, by just implementing methods with the corresponding selectors and without any additional syntax. 
+
+With some terminology abuse we could think of this as "operator redefinition", although it is no such, it is just a standard method re/definition. This operator redefinition feature is useful for example when creating internal domain specific languages (DSLs), or to have polymorphism between integers and floats. 
+
+This is why in Pharo it is possible to define a new method ==\+== on any class as follows:
 
 [[[
 MyClass >> + anArgument [
@@ -35,12 +41,13 @@ MyClass >> + anArgument [
 ]
 ]]]
 
+
 !!!!!!Primitive annotation.
-To define primitive behavior, Pharo relies on special methods called primitive methods.
-Primitive methods are normal Pharo methods with a ==primitive== annotation.
+To define primitive behavior, Pharo relies on special methods called ''primitive methods'':
+Primitive methods are normal Pharo methods with a ==primitive== annotation. 
+This annotation identifies that the method is special.
+
 For example, let us consider the code snipped below, which is an excerpt of the ==SmallInteger>>\+== method.
-This method looks like a normal method with selector ==\+==, and with a normal method body doing ==^super \+ aNumber==.
-The only difference between this method and a normal one is that this method also has an annotation, or pragma, indicating that it is the primitive number 1.
 
 [[[
 SmallInteger >> + aNumber [
@@ -49,29 +56,38 @@ SmallInteger >> + aNumber [
 ]
 ]]]
 
+This method looks like a normal method with selector ==\+==, and with a normal method body doing ==^super \+ aNumber==.
+The only difference between this method and a normal one is that this method also has an annotation, or pragma, indicating that it is the primitive number 1.
+
+The body if the method is normally not executed, in its place the primitive 1 is executed.
+The method body will only be executed if the primitive failed.
+
+Note that in Pharo some primitives called essential such as the object allocation cannot be executed from Pharo. 
+For such methods, implementors added a method body to describe what the primitive is doing if it could be 
+written in Pharo.
+
 !!!!!!Interpreter primitives.
-Before diving into how primitive methods are executed, let us introduce the third component in place: the interpreter primitives.
-The interpreter or evaluator, defines a set of supported primitives with unique ids.
+Before diving into how ''primitive methods'' are executed, let us introduce the third component in place: the ''interpreter primitives''.
+Primitives are code defined in the interpreter that will be executed when a primitive method is executed. 
+This is what the Pharo virtual machine is doing (when a primitive method is executed a C-function is executed).
+
+The interpreter defines a set of supported primitives with unique ids.
 In our case for example, the primitive with id ==1== implements the behavior that adds up two integers.
 
-When a primitive method is activated, it first looks-up what primitive to execute from its primitive id number, and executes it.
+When a primitive method is activated, it first looks-up what ''primitive'' to execute from its primitive id number, and executes it.
 The primitive performs some validations if required, executes the corresponding behavior, and returns either with a success if everything went ok, or a failure if there was a problem. If the execution was a success, the method execution returns with the value computed by the primitive. If the execution was a failure, the body of the method is executed instead. Because of this, the body of a primitive method is also named the "fall-back code".
 
-!!! About Primitive Methods
+!!! Infrastructure for Primitives
 
 To implement primitives in our evaluator we only need to change how methods are activated.
-Indeed, as we have seen above, the method lookup nor other special nodes are required for the execution, and the AST already supports pragma nodes, from which we need to extract the method's primitive id.
+Indeed, as we have seen above, the method lookup nor other special nodes are required for the execution of primitives, and the AST already supports pragma nodes, from which we need to extract the method's primitive id.
 
-Inside the activation of a method, we need to look for the primitive to execute, and check for failures.
-A simple way to implement the primitives is as methods in our evaluator.
-We then need to map primitive ids to those methods in our evaluator.
-We will implement such mapping using a table with the form ==<id, evaluator_selector>==.
-Upon primitive method execution, we extract the primitive id from the pragma, get the selector of that id from the table, and use ==perform:== on the interpreter with that selector to execute the primitive.
-We need to also take care of sending the receiver and arguments of the message to the primitive, so it can manipulate them.
+We will extend the method evalution in a simple way:
+During the activation of a primitive method, we need to look for the primitive to execute, and check for failures.
 
-Let's start by setting up our testing scenario: adding up two numbers.
-We make sure to work with small enough numbers in this test, to not care about primitive failures yet.
-Doing ==1 \+ 5== the primitive should always be a success and return ==6==.
+Therefore we need to map primitive ids to primitive methods in our evaluator.
+We implement such a mapping using a table with the form ==<id, evaluator_selector>==. 
+The ==primitives== instance variable is initialized to a dictionary.
 
 [[[
 CHInterpreter >> initialize [
@@ -80,11 +96,25 @@ CHInterpreter >> initialize [
 	primitives := Dictionary new.
 	self initializePrimitiveTable.
 ]
+]]]
 
+Then we define the method ==initializePrimitiveTable== to initialize the mapping between the primitive id and the Pharo method to be executed. 
+
+[[[
 CHInterpreter >> initializePrimitiveTable [
 	primitives at: 1 put: #primitiveSmallIntegerAdd
 ]
 ]]]
+
+
+
+Let's start by setting up our testing scenario: adding up two numbers.
+We make sure to work with small enough numbers in this test, to not care about primitive failures yet.
+Doing ==1 \+ 5== the primitive should always be a success and return ==6==.
+
+
+
+
 
 [[[
 CHInterpretable >> smallintAdd [
@@ -98,12 +128,16 @@ CHInterpreterTests >> testSmallIntAddPrimitive [
 ]
 ]]]
 
-!!! First Implementation
+!!! Implementation Primitives
 
 In our first iteration we will not care about optimizing our evaluator, for which we had already and we will have tons of opportunities.
 To have a simple implementation to work on we will start by executing the primitive after creating the method's frame, in the ==visitMethodNode:== method.
 This way the primitive has a simple way to access the receiver and the arguments by reading the frame.
 We will leave primitive failures management for our second iteration.
+
+Upon primitive method execution, we extract the primitive id from the pragma, get the selector of that id from the table, and use ==perform:== on the interpreter with that selector to execute the primitive.
+
+We also need to take care of sending the receiver and arguments of the message to the primitive, so it can manipulate them.
 
 [[[
 CHInterpreter >> visitMethodNode: aMethodNode [	
@@ -113,17 +147,21 @@ CHInterpreter >> visitMethodNode: aMethodNode [
 	
 	^ self visitNode: aMethodNode body
 ]
+]]]
 
+[[[
 CHInterpreter >> executePrimitiveMethod: anAST [
 	| primitiveNumber |
 	primitiveNumber := anAST pragmas
 		detect: [ :each | each isPrimitive ]
 		ifFound: [ :aPragmaPrimitive | aPragmaPrimitive arguments first value ]
 		ifNone: [ self error: 'Not a primitive method' ].
-		
+
 	^ self perform: (primitives at: primitiveNumber)
 ]
+]]]
 
+[[[
 CHInterpreter >> primitiveSmallIntegerAdd [
 	| receiver argument |
 	receiver := self receiver.
@@ -151,7 +189,9 @@ CHInterpretable >> failingPrimitive [
 CHInterpretable >> callingFailingPrimitive [
 	^ self failingPrimitive
 ]
+]]]
 
+[[[
 CHInterpreterTests >> testFailingPrimitive [
 	self
 		assert: (self executeSelector: #callingFailingPrimitive)
@@ -177,7 +217,9 @@ CHInterpreter >> primitiveSmallIntegerAdd [
 CHInterpreter >> argumentAt: anInteger [
 	^ self tempAt: (self currentMethod arguments at: anInteger) name
 ]
+]]]
 
+[[[
 CHInterpreter >>visitMethodNode: aMethodNode [
 	[aMethodNode isPrimitive ifTrue: [ 
 		"Do not handle primitive failures for now"
@@ -292,7 +334,9 @@ CHInterpreter >> initializePrimitiveTable [
 	primitives at: 111 	put: #primitiveNotIdentical.
 	...
 ]
+]]]
 
+[[[
 CHInterpreter >> primitiveSmallIntegerLessThan [
 	| receiver argument result |
 	self numberOfArguments < 1
@@ -308,7 +352,9 @@ CHInterpreter >> primitiveSmallIntegerLessThan [
 
 	^ receiver < argument
 ]
+]]]
 
+[[[
 CHInterpreter >> primitiveIdentical [
 	self numberOfArguments < 1
 		ifTrue: [ CHPrimitiveFail signal ].
@@ -334,14 +380,18 @@ CHInterpreter >> initializePrimitiveTable [
 	primitives at: 64 	put: #primitiveStringAtPut.
 	...
 ]
+]]]
 
+[[[
 CHInterpreter >> primitiveSize [
 	self receiver class classLayout isVariable
 		ifFalse: [ CHPrimitiveFail signal ].
 		
 	^ self receiver basicSize
 ]
+]]]
 
+[[[
 CHInterpreter >> primitiveAt [
 	self numberOfArguments < 1
 	  ifTrue: [ CHPrimitiveFail signal ].
@@ -393,13 +443,17 @@ CHInterpreter >> initializePrimitiveTable [
 	primitives at: 71 	put: #primitiveBasicNewVariable.
 	...
 ]
+]]]
 
+[[[
 CHInterpreter >> primitiveBasicNew [
 	self receiver isClass
 		ifFalse: [ CHPrimitiveFail signal ].
 	^ self receiver basicNew
 ]
+]]]
 
+[[[
 CHInterpreter >> primitiveBasicNewVariable [
 	self numberOfArguments < 1
 		ifTrue: [ CHPrimitiveFail signal ].
