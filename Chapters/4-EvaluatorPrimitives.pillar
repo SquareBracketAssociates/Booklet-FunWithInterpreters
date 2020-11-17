@@ -1,23 +1,32 @@
 !! Primitive Operations
 
-Our interpreter does not yet handle many essential behavior that prevent us to evaluate complex programs.
+Our interpreter does not handle yet any essential behavior such as basic number operations. 
+This prevents us to evaluate complex programs.
 This chapter introduces the concept of primitive methods in Pharo.
 We call primitive behavior the behaviour that needs to be implemented in the interpreter or evaluator because it cannot be purely expressed in the programming language, Pharo in this case.
 Let's consider for example the operation of adding up two numbers (==\+==).
 We cannot express in a pure and concise way a normal method executing an addition.
 Along with arithmetics, other examples of primitive operations are object allocation and reflective object access.
-Such primitive behavior in Pharo is expressed as special methods, namely ""primitive methods"" in Pharo, whose behavior is defined in the interpreter or evaluator.
+Such primitive behavior is expressed as special methods, namely ""primitive methods"" in Pharo, whose behavior is defined in the interpreter.
 
-Differently from languages such as Java or C, that express arithmetics as special operators that are compiled/interpreted differently, Pharo maintains the message-send metaphore for primitive behaviour. Indeed, in Pharo ==\+== is a message, which triggers a look-up and a method activation. This separation makes redefining operators as simple as implementing a method with the selector ==\+== in our own class, without the need for special syntax for it.
+Differently from languages such as Java or C, that express arithmetics as special operators that are compiled/interpreted differently, Pharo maintains the message-send metaphore for primitive behavior. 
+Indeed, in Pharo ==\+== is a message, which triggers a look-up and a method activation. 
+This separation makes redefining operators as simple as implementing a method with the selector ==\+== in our own class, without the need for special syntax for it.
 
-In addition of essential behaviour, primitive behaviour can be used to implement performance-critical code in a much more efficient way, since primitives are implemented in the implementation language and do not suffer the interpretation overhead.
+In addition of essential behavior, primitive behavior is often used to implement performance-critical code in a much more efficient way, since primitives are implemented in the implementation language and do not suffer the interpretation overhead.
 
-In this chapter we will study how primitive methods work, and how they should be properly implemented, including the evaluation of their fallback code. We will then visit some of the essential primitives we need to make work to execute complex examples.
+In this chapter we will study how primitive methods work, and how they should be properly implemented, including the evaluation of their fallback code (i.e., what happens when a primitive fails). 
+We will then visit some of the essential primitives we need to make work to execute complex examples.
 
 
 !!! Primitives in Pharo
 
-In Pharo the design of primitives is split in three different parts: messages, primitive methods, and the primitive itself which is provided by the interpreter. The first thing to note is that in Pharo programs primitive behavior is invoked through standard message sends. This allows developers to define operators as non-primitives on their own classes, by just implementing methods with the corresponding selectors and without any additional syntax. With some terminology abuse we could think of this as "operator redefinition", although it is no such, it is just a standard method re/definition. This operator redefinition feature is useful for example when creating internal domain specific languages (DSLs), or to have polymorphism between integers and floats.
+In Pharo the design of primitives is split in three different parts: messages, primitive methods, and the primitive itself which is provided by the interpreter. 
+
+!!!!!!About Messages.
+The first thing to note is that in Pharo programs primitive behavior is invoked through standard message sends.
+This allows developers to define operators such as ==\+== as non-primitives on their own classes, by just implementing methods with the corresponding selectors and without any additional syntax. 
+With some terminology abuse we could think of this as "operator redefinition", although it is no such, it is just a standard method re/definition. This operator redefinition feature is useful for example when creating internal domain specific languages (DSLs), or to have polymorphism between integers and floats.
 
 [[[
 MyClass >> + anArgument [
@@ -26,8 +35,9 @@ MyClass >> + anArgument [
 ]
 ]]]
 
+!!!!!!Primitive annotation.
 To define primitive behavior, Pharo relies on special methods called primitive methods.
-Primitive methods are normal Pharo methods with a special ==primitive== annotation.
+Primitive methods are normal Pharo methods with a ==primitive== annotation.
 For example, let us consider the code snipped below, which is an excerpt of the ==SmallInteger>>\+== method.
 This method looks like a normal method with selector ==\+==, and with a normal method body doing ==^super \+ aNumber==.
 The only difference between this method and a normal one is that this method also has an annotation, or pragma, indicating that it is the primitive number 1.
@@ -39,6 +49,7 @@ SmallInteger >> + aNumber [
 ]
 ]]]
 
+!!!!!!Interpreter primitives.
 Before diving into how primitive methods are executed, let us introduce the third component in place: the interpreter primitives.
 The interpreter or evaluator, defines a set of supported primitives with unique ids.
 In our case for example, the primitive with id ==1== implements the behavior that adds up two integers.
@@ -46,10 +57,10 @@ In our case for example, the primitive with id ==1== implements the behavior tha
 When a primitive method is activated, it first looks-up what primitive to execute from its primitive id number, and executes it.
 The primitive performs some validations if required, executes the corresponding behavior, and returns either with a success if everything went ok, or a failure if there was a problem. If the execution was a success, the method execution returns with the value computed by the primitive. If the execution was a failure, the body of the method is executed instead. Because of this, the body of a primitive method is also named the "fall-back code".
 
-!!! Implementing Primitive Methods
+!!! About Primitive Methods
 
-To implementing primitives in our evaluator we need to only change how methods are activated.
-Indeed, as we have seen above, the method lookup nor other special nodes are required for the execution, and the AST already supports pragma nodes, which we need to extract the method's primitive id.
+To implement primitives in our evaluator we only need to change how methods are activated.
+Indeed, as we have seen above, the method lookup nor other special nodes are required for the execution, and the AST already supports pragma nodes, from which we need to extract the method's primitive id.
 
 Inside the activation of a method, we need to look for the primitive to execute, and check for failures.
 A simple way to implement the primitives is as methods in our evaluator.
@@ -60,7 +71,7 @@ We need to also take care of sending the receiver and arguments of the message t
 
 Let's start by setting up our testing scenario: adding up two numbers.
 We make sure to work with small enough numbers in this test, to not care about primitive failures yet.
-Doing ==1 \+ 5== the primitive should always be a success and return `6`.
+Doing ==1 \+ 5== the primitive should always be a success and return ==6==.
 
 [[[
 CHInterpreter >> initialize [
@@ -73,8 +84,6 @@ CHInterpreter >> initialize [
 CHInterpreter >> initializePrimitiveTable [
 	primitives at: 1 put: #primitiveSmallIntegerAdd
 ]
-
-
 ]]]
 
 [[[
@@ -83,11 +92,13 @@ CHInterpretable >> smallintAdd [
 ]
 
 CHInterpreterTests >> testSmallIntAddPrimitive [
-  	self
-      assert: (self executeSelector: #smallintAdd)
-      equals: 6
+	self
+		assert: (self executeSelector: #smallintAdd)
+		equals: 6
 ]
 ]]]
+
+!!! First Implementation
 
 In our first iteration we will not care about optimizing our evaluator, for which we had already and we will have tons of opportunities.
 To have a simple implementation to work on we will start by executing the primitive after creating the method's frame, in the ==visitMethodNode:== method.
@@ -180,7 +191,7 @@ CHInterpreter >>visitMethodNode: aMethodNode [
 
 With these changes, everything should work fine now.
   
-!!!! Typical Primitive Failure Cases
+!!! Typical Primitive Failure Cases
 
 For primitives to work properly, and for Pharo to be a safe language, primitives should properly do a series of checks.
 This is specially important when the interpreter fully controls all other aspects of the language, such as the memory.
@@ -195,11 +206,9 @@ CHInterpretable >> failingPrimitive [
 ]
 ]]]
 
-!!! Essential Primitives
+In the following sections, we will implement a series of essential primitives, that will make it possible to execute a large range of Pharo programs.
 
-In this section we will implement a series of essential primitives, that will make it possible to execute a large range of Pharo programs.
-
-!!!! Arithmetic Primitives
+!!! Essential Primitives: Arithmetic Primitives 
 
 The basic arithmetic primitive are small integer addition, substraction, multiplication and division.
 They all require a small integer receiver, a small integer argument, and that the result is also a small integer.
@@ -257,7 +266,7 @@ CHInterpreter >> primitiveSmallIntegerDivide [
 ]
 ]]]
 
-!!!! Comparison primitives
+!!! Essential Primitives:  Comparison primitives
 
 Comparison primitives span in two different sets. The first set contains the primitives implementing number comparisons such as less than or greater or equals than. The second set contains the primitives for object identity comparison: identity equals to and identity not equals to.
 All number comparisons all require a small integer receiver, a small integer argument.
@@ -304,7 +313,7 @@ CHInterpreter >> primitiveIdentical [
 ]
 ]]]
 
-!!!! Array Manipulation Primitives
+!!! Essential Primitives:  Array Manipulation Primitives
 
 So far our interpreter is able to manipulate only objects with instance variables, but not arrays or their variants e.g., strings.
 Arrays are special objects whose state is accessed with primitives, usually in methods named ==at:== and ==at:put:== and ==size==.
@@ -364,7 +373,7 @@ CHInterpreter >> primitiveStringAt [
 ]
 ]]]
 
-!!!! Object Allocation Primitives
+!!!  Essential Primitives:  Object Allocation Primitives
 
 Object allocation is implemented by primitives ==new== and ==new:==.
 The method ==new== allocates a new object from a fixed-slot class.
