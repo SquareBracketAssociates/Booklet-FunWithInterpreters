@@ -667,10 +667,17 @@ In the scope of these first chapters we will not manage conflict resolution expl
 
 !!! About Return
 
-SD: I will write something here
+As a reader you may wonder why we did not do anything for return expression and this is an interesting question. 
+Up to know interpreting a return is just return the value of the interpretation of the return expression. 
+In fact up until now a method execution has a single path of execution: it means that the complete method body
+should be executed and that we did not introduce different condition control flow. 
+This is when we will introduce block closure and conditional control flow that we will have to revisit the interpretation of return. 
 
 !!! Conclusion
 
+Supporting message sends and in particular method execution is the core of the computation in an object-oriented language and this is what this chapter covered.
+
 Implementing messages implied modelling the call-stack and keeping it balanced on method returns.
 We have seen that a call-stack is made up of frames, each frame representing the activation of a method: it stores the method, receiver, arguments, and temporaries of the method that is executing. When a message takes place, receiver and arguments are evluated in order from left to right, a new frame is created and all values are stored in the frame.
+
 

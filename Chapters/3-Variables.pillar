@@ -19,8 +19,8 @@ Scope objects will act as adapters for the real storage locations of variables, 
 
 To start working with variables, we begin with a method returning ==self== as the one below.
 There is now a big difference between this scenario and the previous ones about literals.
-Previous scenarii did always evaluate to the same value regardless how or when they were executed.
-In this case, however, evaluating this method will return a different object if the the receiver of the message changes.
+Previous scenarios did always evaluate to the same value regardless how or when they were executed.
+In this case, however, evaluating this method will return a different object if the receiver of the message changes.
 
 [[[
 CHInterpretable >> returnSelf [
@@ -30,15 +30,18 @@ CHInterpretable >> returnSelf [
 
 !!!! Writing a Red Test
 
-To properly test how ==self== behaves we need to specify a receiver object, and then assert that the returned object is that same object with an identity check. 
-For this purpose we use as receiver a new object instance of ==Object==, which  implement equality as identity, guaranteeing that the object will be not only equals, but also the same.
+To properly test how ==self== behaves we need to specify a receiver object, and then assert that the returned object is that same object with an identity check.
+For this purpose we use as receiver a new object instance of ==Object==, which  implement equality as identity, guaranteeing that the object will be not only equals, but also the same. We use an explicit identity check in our test to convey our intention.
 
 [[[
 CHInterpreterTest >> testReturnSelf [
 	| receiver |
 	receiver := Object new.
-	self assert: 
-		(self executeSelector: #returnSelf withReceiver: receiver) == receiver
+  "Convey our intention of checking identity by using an explicit identity check"
+	self assert: (self
+      executeSelector: #returnSelf
+      withReceiver: receiver)
+          == receiver
 ]
 ]]]
 
@@ -47,8 +50,7 @@ CHInterpreterTest >> testReturnSelf [
 In this section we implement a first version of an execution context to introduce receiver objects.
 This first support will get us up and running to implement initial variable support, but it will run short to properly implement message sends. This set up will be extended to support to message sends and block temporaries.
 
-This initial support requires that the evaluator gets access to the receiver object of a message that would lead to the evaluation of the method 
-actually evaluated.
+This initial support requires that the evaluator gets access to the receiver object of a message that would lead to the evaluation of the method actually evaluated.
 For now we add an instance variable in our evaluator called ==receiver==.
 
 [[[
@@ -86,8 +88,8 @@ CHInterpreterTest >> executeSelector: aSymbol [
 
 CHInterpreterTest >> executeSelector: aSymbol withReceiver: aReceiver [
 	| ast |
-	ast := (CHInterpretable >> aSymbol) ast.
-	^ self interpreter executeMethod: ast withReceiver: aReceiver
+	ast := (CHInterpretable >> aSymbol) parseTree.
+	^ self interpreter execute: ast withReceiver: aReceiver
 ]
 ]]]
 
@@ -101,7 +103,7 @@ Implementing it is simple, it just returns the value of the receiver stored in t
 Note that this method does not access the ==receiver== variable directly, but uses instead the accessor, leaving us the possibility of redefining that method without breaking the visit.
 
 [[[
-CHInterpretable >> visitSelfNode: aRBNode [
+CHInterpretable >> visitSelfNode: aNode [
 	^ self receiver
 ]
 ]]]
@@ -109,7 +111,7 @@ CHInterpretable >> visitSelfNode: aRBNode [
 !!!! Introducing ==super==
 
 Following the same logic as for ==self==, we improve our evaluator to support ==super==.
-We start by defining a method using ==super== and its companion test. 
+We start by defining a method using ==super== and its companion test.
 
 [[[
 CHInterpretable >> returnSuper [
@@ -121,17 +123,20 @@ CHInterpretable >> returnSuper [
 CHInterpreterTest >> testReturnSuper [
   | receiver |
   receiver := Object new.
-	self 
-		assert: (self executeSelector: #returnSuper withReceiver: receiver) 
-		equals: receiver
+  "Convey our intention of checking identity by using an explicit identity check"
+	self assert: (self
+      executeSelector: #returnSuper
+      withReceiver: receiver)
+          == receiver
 ]
 ]]]
 
-What is interesting is that the interpretation of ==super== show is that this variable is also the receiver of the message. 
-So contrary to a common and wrong believe, ==super== is not the superclass or an instance of the superclass. It is just the receiver:
+What the interpretation of ==super== shows is that this variable is also the receiver of the message.
+Contrary to a common and wrong belief, ==super== is not the superclass or an instance of the superclass.
+It simply is the receiver:
 
 [[[
-CHInterpreter >> visitSuperNode: aRBNode [
+CHInterpreter >> visitSuperNode: aNode [
 	^ self receiver
 ]
 ]]]
@@ -165,9 +170,11 @@ CHInterpreter >> visitVariableNode: aVariableNode [
 ]
 
 CHInterpreter >> visitAssignmentNode: anAssignmentNode [
-	| value | 
+	| value |
 	value := (self visitNode: anAssignmentNode value).
-	(self scopeDefining: anAssignmentNode variable name) write: anAssignmentNode variable name withValue: value.
+	(self scopeDefining: anAssignmentNode variable name)
+    write: anAssignmentNode variable name
+    withValue: value.
 	^ value
 ]
 ]]]
@@ -285,15 +292,19 @@ And finally we rewrite all our test methods using an explicit receiver:
 
 [[[
 CHInterpreterTest >> testReturnSelf [
-	self 
-		assert: (self executeSelector: #returnSelf) 
-		equals: receiver
+  "Convey our intention of checking identity by using an explicit identity check"
+  self assert: (self
+    executeSelector: #returnSelf
+    withReceiver: receiver)
+        == receiver
 ]
 
 CHInterpreterTest >> testReturnSuper [
-	self 
-		assert: (self executeSelector: #returnSuper) 
-		equals: receiver
+  "Convey our intention of checking identity by using an explicit identity check"
+  self assert: (self
+    executeSelector: #returnSelf
+    withReceiver: receiver)
+        == receiver
 ]
 
 CHInterpreterTest >> testReturnInstanceVariableRead [
@@ -307,19 +318,19 @@ CHInterpreterTest >> testReturnInstanceVariableRead [
 !!! Instance Variable Writes
 
 Now that we have support for instance variable reads, we keep on going with instance variable writes.
-In our scenario, a method writes a literal integer into an instance variable ==x== and then returns the value of the assignment. This scenario has two observable behaviors that we will test separately.
+In our scenario, a method writes a literal integer into an instance variable ==x== and then returns the value of the assignment. This scenario has two observable behaviors that we will be tested separately.
 First, such an assignment should be observable from the outside by reading that variable.
-Second, an assignment is an expression whose value is the assigned value, thus the return value should be also the assigned value.
+Second, an assignment is an expression whose value is the assigned value, thus the return value should also be the assigned value.
 
 [[[
 CHInterpretable >> store100IntoX [
 	^ x := 100
-]	
+]
 ]]]
 
-To test this behavior, we evaluate the method above and then we validate that effectively the instance variable was mutated. 
-To make sure the value was modified, we set an initial value to the variable before the evaluation. 
-After the evaluation we should not keep that value. 
+To test this behavior, we evaluate the method above and then we validate that effectively the instance variable was mutated.
+To make sure the value was modified, we set an initial value to the variable before the evaluation.
+After the evaluation we should not keep that value.
 The case of the return is similar to our previous tests.
 
 [[[
@@ -356,8 +367,8 @@ CHInterpreter >> visitAssignmentNode: anAssignmentNode [
 ]
 ]]]
 
-Evaluating an assignment node with the form ==variable := expression== requires that we evaluate the ==expression== and then set that value to the left-side variable. 
-Notice that the variable we are assigning into does not need to be evaluated/visited: the evaluation of a variable is equivalent to reading its value. 
+Evaluating an assignment node with the form ==variable := expression== requires that we evaluate the ==expression== and then set that value to the left-side variable.
+Notice that the variable we are assigning into does not need to be evaluated/visited: the evaluation of a variable is equivalent to reading its value.
 And in the left part of an assignment, we do not care about the value of the variable, but about the location of the variable.
 Our visit method then looks as follows: we recursively visit the right-side of the assignment (got through the ==value== accessor), we set that value to the variable by delegating to the scope, and we finally return the stored value.
 To set the value to the variable, we implement ==write:withValue:== in our instance scope.
@@ -375,8 +386,8 @@ Now the tests should pass.
 !!! Evaluating Variables: Global Reads
 
 We finish this chapter with the reading of global variables, which cover two cases: proper global variables, and the access to classes.
-To better control our testing environment, we decided to not use the Pharo environment by default. 
-Instead, the interpreter will know its global scope in an instance variable and lookup globals in it using a simple API, making it possible to use the system's global environment instead if we wanted to. 
+To better control our testing environment, we decided to not use the Pharo environment by default.
+Instead, the interpreter will know its global scope in an instance variable and lookup globals in it using a simple API, making it possible to use the system's global environment instead if we wanted to.
 We also leave outside of the scope of this chapter the writing to global variables.
 The case of global variable writing is similar to the instance variable assignment.
 
@@ -394,7 +405,7 @@ We define a test which specifies that the interpreter' environment has a binding
 CHInterpreterTest >> testReturnGlobal [
 	| globalObject |
 	globalObject := Object new.
-	interpreter globalScopeAt: #Global put: globalObject. 
+	interpreter globalEnvironmentAt: #Global put: globalObject.
 	self assert: (self executeSelector: #returnGlobal) equals: globalObject
 ]
 ]]]
@@ -422,7 +433,7 @@ Object subclass: #CHInterpreter
 	category: 'Champollion-Core'
 
 CHInterpreter >> initialize [
-	super initialize. 
+	super initialize.
 	globalScope := CHGlobalScope new
 ]
 ]]]
@@ -438,16 +449,16 @@ CHGlobalScope >> at: aKey put: aValue [
 ]
 ]]]
 
-We decided that trying to access a global that is not defined will raise an error in the interpreter and halt the interpretation. 
-An alternative design would return a default value instead such as ==nil==. 
-A more complex design would have been to throw an exception in the interpreted program. 
+We decided that trying to access a global that is not defined will raise an error in the interpreter and halt the interpretation.
+An alternative design would return a default value instead such as ==nil==.
+A more complex design would have been to throw an exception in the interpreted program.
 For the moment, halting the interpreter with an error suffices for our job.
 
 [[[
 CHInterpreter >> visitGlobalNode: aRBGlobalNode [
 	^ self globalEnvironment
-		at: aRBGlobalNode name 
-		ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
+      at: aRBGlobalNode name
+      ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
 ]
 ]]]
 
