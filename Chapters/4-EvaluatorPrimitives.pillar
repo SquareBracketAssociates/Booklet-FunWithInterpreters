@@ -75,10 +75,10 @@ Doing ==1 \+ 5== the primitive should always be a success and return ==6==.
 
 [[[
 CHInterpreter >> initialize [
-  	super initialize. 
-  	stack := Stack new.
-  	primitives := Dictionary new.
-  	self initializePrimitiveTable.
+	super initialize. 
+	stack := Stack new.
+	primitives := Dictionary new.
+	self initializePrimitiveTable.
 ]
 
 CHInterpreter >> initializePrimitiveTable [
@@ -144,18 +144,18 @@ To produce one of such failing cases, we can implement primitive 1 in our ==CHIn
 
 [[[
 CHInterpretable >> failingPrimitive [
-  <primitive: 1>
-  ^ 'failure'
+	<primitive: 1>
+	^ 'failure'
 ]
 
 CHInterpretable >> callingFailingPrimitive [
-  ^ self failingPrimitive
+	^ self failingPrimitive
 ]
 
 CHInterpreterTests >> testFailingPrimitive [
-  	self
-      assert: (self executeSelector: #callingFailingPrimitive)
-      equals: 'failure'
+	self
+		assert: (self executeSelector: #callingFailingPrimitive)
+		equals: 'failure'
 ]
 ]]]
 
@@ -201,8 +201,8 @@ Among the basic checks that primitives should do, they should not only verify th
 
 [[[
 CHInterpretable >> failingPrimitive [
-  <primitive: 1>
-  ^ 'failure'
+	<primitive: 1>
+	^ 'failure'
 ]
 ]]]
 
@@ -218,35 +218,39 @@ For shortness we did not include substraction and multiplication, they are imple
 
 [[[
 CHInterpreter >> initializePrimitiveTable [
-    ...
-  	primitives at: 1 	  put: #primitiveSmallIntegerAdd.
-  	primitives at: 2 	  put: #primitiveSmallIntegerMinus.
-  	primitives at: 9 	  put: #primitiveSmallIntegerMultiply.
-  	primitives at: 10 	put: #primitiveSmallIntegerDivide.
-    ...
+	...
+	primitives at: 1 	  put: #primitiveSmallIntegerAdd.
+	primitives at: 2 	  put: #primitiveSmallIntegerMinus.
+	primitives at: 9 	  put: #primitiveSmallIntegerMultiply.
+	primitives at: 10 	put: #primitiveSmallIntegerDivide.
+	...
 ]
+]]]
 
+[[[
 CHInterpreter >> primitiveSmallIntegerAdd [
-  | receiver argument result |
+	| receiver argument result |
 	self numberOfArguments < 1
 		ifTrue: [ CHPrimitiveFail signal ].
 
-  receiver := self receiver.
-  receiver class = SmallInteger
-  	ifFalse: [ CHPrimitiveFail signal ].
+	receiver := self receiver.
+	receiver class = SmallInteger
+		ifFalse: [ CHPrimitiveFail signal ].
 
-  argument := self argumentAt: 1.
-  argument class = SmallInteger
-  	ifFalse: [ CHPrimitiveFail signal ].
+	argument := self argumentAt: 1.
+	argument class = SmallInteger
+		ifFalse: [ CHPrimitiveFail signal ].
 
-  result := receiver + argument.
-  result class = SmallInteger
-  	ifFalse: [ CHPrimitiveFail signal ].
-  ^ result
+	result := receiver + argument.
+	result class = SmallInteger
+		ifFalse: [ CHPrimitiveFail signal ].
+	^ result
 ]
+]]]
 
+[[[
 CHInterpreter >> primitiveSmallIntegerDivide [
-  | receiver argument result |
+	| receiver argument result |
 	self numberOfArguments < 1
 		ifTrue: [ CHPrimitiveFail signal ].
 
@@ -254,10 +258,10 @@ CHInterpreter >> primitiveSmallIntegerDivide [
 	receiver class = SmallInteger
 		ifFalse: [ CHPrimitiveFail signal ].
 	
-  argument := self argumentAt: 1.
-  (argument class = SmallInteger
-    and: [ argument ~= 0 ])
-    	ifFalse: [ CHPrimitiveFail signal ].
+	argument := self argumentAt: 1.
+	(argument class = SmallInteger
+		and: [ argument ~= 0 ])
+			ifFalse: [ CHPrimitiveFail signal ].
 
 	result := receiver / argument.
 	result class = SmallInteger
@@ -275,18 +279,18 @@ The following code snippet illustrates both kind of methods with small integer l
 
 [[[
 CHInterpreter >> initializePrimitiveTable [
-    ...
-    primitives at: 3 	put: #primitiveSmallIntegerLessThan.
-    primitives at: 4 	put: #primitiveSmallIntegerGreaterThan.
-    primitives at: 5 	put: #primitiveSmallIntegerLessOrEqualsThan.
-    primitives at: 6 	put: #primitiveSmallIntegerGreaterOrEqualsThan.
+	...
+	primitives at: 3 	put: #primitiveSmallIntegerLessThan.
+	primitives at: 4 	put: #primitiveSmallIntegerGreaterThan.
+	primitives at: 5 	put: #primitiveSmallIntegerLessOrEqualsThan.
+	primitives at: 6 	put: #primitiveSmallIntegerGreaterOrEqualsThan.
 
-    primitives at: 7 	put: #primitiveSmallIntegerEqualsThan.
-    primitives at: 8 	put: #primitiveSmallIntegerNotEqualsThan.
-    
-    primitives at: 110 	put: #primitiveIdentical.
-    primitives at: 111 	put: #primitiveNotIdentical.
-    ...
+	primitives at: 7 	put: #primitiveSmallIntegerEqualsThan.
+	primitives at: 8 	put: #primitiveSmallIntegerNotEqualsThan.
+
+	primitives at: 110 	put: #primitiveIdentical.
+	primitives at: 111 	put: #primitiveNotIdentical.
+	...
 ]
 
 CHInterpreter >> primitiveSmallIntegerLessThan [
@@ -306,10 +310,10 @@ CHInterpreter >> primitiveSmallIntegerLessThan [
 ]
 
 CHInterpreter >> primitiveIdentical [
-  self numberOfArguments < 1
-	  ifTrue: [ CHPrimitiveFail signal ].
+	self numberOfArguments < 1
+		ifTrue: [ CHPrimitiveFail signal ].
 
-  ^ self receiver == (self argumentAt: 1)
+	^ self receiver == (self argumentAt: 1)
 ]
 ]]]
 
@@ -322,24 +326,24 @@ The following code snippet illustrates Array access primitives for general Array
 
 [[[
 CHInterpreter >> initializePrimitiveTable [
-    ...
-    primitives at: 60 	put: #primitiveAt.
-    primitives at: 61 	put: #primitiveAtPut.
-    primitives at: 62 	put: #primitiveSize.
-    primitives at: 63 	put: #primitiveStringAt.
-    primitives at: 64 	put: #primitiveStringAtPut.
-    ...
+	...
+	primitives at: 60 	put: #primitiveAt.
+	primitives at: 61 	put: #primitiveAtPut.
+	primitives at: 62 	put: #primitiveSize.
+	primitives at: 63 	put: #primitiveStringAt.
+	primitives at: 64 	put: #primitiveStringAtPut.
+	...
 ]
 
 CHInterpreter >> primitiveSize [
 	self receiver class classLayout isVariable
 		ifFalse: [ CHPrimitiveFail signal ].
-	    
+		
 	^ self receiver basicSize
 ]
 
 CHInterpreter >> primitiveAt [
-  self numberOfArguments < 1
+	self numberOfArguments < 1
 	  ifTrue: [ CHPrimitiveFail signal ].
 
 	self receiver class classLayout isVariable
@@ -348,26 +352,28 @@ CHInterpreter >> primitiveAt [
 	((self argumentAt: 1) isKindOf: SmallInteger)
 		ifFalse: [ CHPrimitiveFail signal ].
 		
-    "Bounds check"
-    self receiver size < (self argumentAt: 1)
-      ifTrue: [ CHPrimitiveFail signal ].
-    
+	"Bounds check"
+	self receiver size < (self argumentAt: 1)
+		ifTrue: [ CHPrimitiveFail signal ].
+		
 	^ self receiver basicAt: (self argumentAt: 1)
 ]
+]]]
 
+[[[
 CHInterpreter >> primitiveStringAt [
-  self numberOfArguments < 1
-	  ifTrue: [ CHPrimitiveFail signal ].
-  
-  self receiver class classLayout isBytes
+	self numberOfArguments < 1
+		ifTrue: [ CHPrimitiveFail signal ].
+		
+	self receiver class classLayout isBytes
 		ifFalse: [ CHPrimitiveFail signal ].
 	
 	((self argumentAt: 1) isKindOf: SmallInteger)
 		ifFalse: [ CHPrimitiveFail signal ].
-    
-  "Bounds check"
-  self receiver size < (self argumentAt: 1)
-    ifTrue: [ CHPrimitiveFail signal ].
+	"Bounds check"
+	
+	self receiver size < (self argumentAt: 1)
+		ifTrue: [ CHPrimitiveFail signal ].
 	
 	^ self receiver at: (self argumentAt: 1)
 ]
@@ -382,26 +388,26 @@ In addition ==new:== does check that there is an argument, it is a small integer
 
 [[[
 CHInterpreter >> initializePrimitiveTable [
-    ...
-    primitives at: 70 	put: #primitiveBasicNew.
-    primitives at: 71 	put: #primitiveBasicNewVariable.
-    ...
+	...
+	primitives at: 70 	put: #primitiveBasicNew.
+	primitives at: 71 	put: #primitiveBasicNewVariable.
+	...
 ]
 
 CHInterpreter >> primitiveBasicNew [
-  self receiver isClass
+	self receiver isClass
 		ifFalse: [ CHPrimitiveFail signal ].
 	^ self receiver basicNew
 ]
 
 CHInterpreter >> primitiveBasicNewVariable [
-  self numberOfArguments < 1
-    ifTrue: [ CHPrimitiveFail signal ].
+	self numberOfArguments < 1
+		ifTrue: [ CHPrimitiveFail signal ].
 
 	self receiver isClass
 		ifFalse: [ CHPrimitiveFail signal ].
-  self receiver class classLayout isVariable
-  		ifFalse: [ CHPrimitiveFail signal ].
+	self receiver class classLayout isVariable
+		ifFalse: [ CHPrimitiveFail signal ].
 	
 	((self argumentAt: 1) isKindOf: SmallInteger)
 		ifFalse: [ CHPrimitiveFail signal ].
