@@ -132,12 +132,12 @@ CHInterpreterTests >> testSmallIntAddPrimitive [
 ]
 ]]]
 
-!!! Implementation Primitives
+!!! Primitives Implementation
 
 In our first iteration we will not care about optimizing our evaluator, for which we had already and we will have tons of opportunities.
-To have a simple implementation to work on we  start by executing the primitive after creating the method's frame, in the ==visitMethodNode:== method.
+To have a simple implementation to work on, we execute the primitive after the method's frame creation, in the ==visitMethodNode:== method.
 This way the primitive has a simple way to access the receiver and the arguments by reading the frame.
-We leave primitive failures management for our second iteration.
+We leave primitive failure management for our second iteration.
 
 Upon primitive method execution, we extract the primitive id from the pragma, get the selector of that id from the table, and use ==perform:== method on the interpreter with that selector to execute the primitive.
 
