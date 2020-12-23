@@ -410,7 +410,7 @@ CHInterpreterTest >> testReturnGlobal [
 ]
 ]]]
 
-We introduce a new global scope class ==CHGlobalScope, and an instance variable named ==globalScope== in the class ==CHInterpreter== initialized to a global scope.
+We introduce a new global scope class ==CHGlobalScope==, and an instance variable named ==globalScope== in the class ==CHInterpreter== initialized to a global scope.
 
 [[[
 Object subclass: #CHGlobalScope
