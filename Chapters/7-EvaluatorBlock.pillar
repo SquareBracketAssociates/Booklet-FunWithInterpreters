@@ -1,16 +1,19 @@
 !! Block Closures and Control Flow Statements
 
 In this chapter we will extend our evaluator to manage block closures.
-Blocks closures, lambda functions, lambda expressions, anonymous functions, or just blocks, are an important concept in most modern programming languages, including Pharo.
-Block closures are functions without a name, thus anonymous, that allow developers to abstract general algorithms from their particular details. For example, a sorting algorithm can be separated from its sorting criteria by making the sorting criteria a block closure passed as argument to it. This allows developers to have the sorting algorithm defined and tested in a single place, and being able to reuse it with multiple criterion in different contexts.
+Blocks closures, also named lexical closures, or just blocks in Pharo, are an important concept in most modern programming languages, including Pharo. In Pharo, block are lexical closures i.e., basically functions without a name that capture the environment in which they are defined. 
 
-Block closures are at the center of the Pharo language, because Pharo leverages block closures to define its control-flow instructions: conditionals, iterations, early returns. This means that implementing block closures is enough to support all kind of control flow statements in Pharo.
+Closures allow developers to abstract general algorithms from their particular details. For example, a sorting algorithm can be separated from its sorting criteria by making the sorting criteria a block closure passed as argument to it. This allows developers to have the sorting algorithm defined and tested in a single place, and being able to reuse it with multiple criterion in different contexts.
+
+Lexical closures are at the center of the Pharo language, because Pharo leverages closures to define its control-flow instructions: conditionals, iterations, and early returns. This means that implementing block closures is enough to support all kind of control flow statements in Pharo.
 Moreover, Pharo libraries make usage of block closures to define library-specific control flow instructions, such as the ==do:== and ==select:== messages understood by collections.
-Fevelopers are also encouraged to define their own control flow statements, to hide implementation details of their libraries from their users.
+Developers are also encouraged to define their own control flow statements, to hide implementation details of their libraries from their users.
+
 
 This chapter starts by explaining what blocks are and how they are evaluated.
-Block evaluation, beign a core part of the language definition, is a service that is requested to the evaluator/interpreter through a primitive.
-We then dive into the lexical capture feature of blocks: when a block closure is created, it captures its defining context, namely its enclosing context. This makes blocks able to read and write not only it's own temporary variables but also all the variables accessible to its enclosing context.
+Block evaluation, being a core part of the language definition, is a service that is requested to the evaluator/interpreter through a primitive.
+We then dive into the lexical capture feature of blocks: when a block closure is created, it captures its defining context, namely its enclosing context. This makes blocks able to read and write not only its own temporary variables but also all the variables accessible to its enclosing context
+and to maintain such link even when passed around.
 Finally, we implement non-local returns: return instructions that make the enclosing method context to return instead of the block's one. Non-local returns are usually used as early returns like ==break== statements in other languages.
 
 !!! Representing a Block Closure

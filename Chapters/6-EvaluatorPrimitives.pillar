@@ -185,7 +185,8 @@ For example, following Pharo's specification, primitive 1 fails when the receive
 To produce one of such failing cases, we can implement primitive 1 in our ==CHInterpretable== class, which should fail because the receiver should be a small integer.
  When it fails, the fallback code should execute.
 
- We define two methods to support the test of failing primitive.
+ We define two methods ==failingPrimitive== and ==callingFailingPrimitive== to support the test of failing primitive.
+ 
 [[[
 CHInterpretable >> failingPrimitive [
 	<primitive: 1>
@@ -205,7 +206,7 @@ CHInterpreterTests >> testFailingPrimitive [
 ]
 ]]]
 
-To add primitive failures in a clean way, let's introduce them as exceptions.
+To add primitive failures in a clean way, we introduce them as exceptions.
 We define a new subclass of ==Exception== named ==CHPrimitiveFail==
 
 In the primitive ==primitiveSmallIntegerAdd==, if we detect a failure condition, we raise a ==CHPrimitiveFail== error.
@@ -222,11 +223,10 @@ CHInterpreter >> primitiveSmallIntegerAdd [
 ]
 ]]]
 
-
 We then need to modify the way we evaluate methods to handle ==CHPrimitiveFail== exceptions and continue evaluating the body.
 [[[
 CHInterpreter >>visitMethodNode: aMethodNode [
-	[aMethodNode isPrimitive ifTrue: [ 
+	[ aMethodNode isPrimitive ifTrue: [ 
 		"Do not handle primitive failures for now"
 		^ self executePrimitiveMethod: aMethodNode ]]
 		on: CHPrimitiveFail do: [ :err | 
@@ -250,8 +250,8 @@ This check is particularly important because developers may wrongly define primi
 If we don't properly check the arguments trying to access it could cause an interpreter failure, while the proper behaviour should be to just fail the primitive and let the fallback code carry on the execution.
 
 
-In the following sections, we  implement a series of essential primitives. 
-With such primitives it will be possible to execute a large range of Pharo programs.
+In the following sections, we  implement a series of essential primitives taking care of typical failure cases. 
+With such primitives, it will be possible to execute a large range of Pharo programs.
 
 !!! Essential Primitives: Arithmetic 
 
