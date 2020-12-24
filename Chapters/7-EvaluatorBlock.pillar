@@ -1,20 +1,23 @@
 !! Block Closures and Control Flow Statements
 
 In this chapter we will extend our evaluator to manage block closures.
-Blocks closures, also named lexical closures, or just blocks in Pharo, are an important concept in most modern programming languages, including Pharo. In Pharo, block are lexical closures i.e., basically functions without a name that capture the environment in which they are defined. 
+Block closures, also named lexical closures, or just blocks in Pharo, are an important concept in most modern programming languages, including Pharo. 
+A lexical closure is an anonymous functions that captures its definition environment. 
 
 Closures allow developers to abstract general algorithms from their particular details. For example, a sorting algorithm can be separated from its sorting criteria by making the sorting criteria a block closure passed as argument to it. This allows developers to have the sorting algorithm defined and tested in a single place, and being able to reuse it with multiple criterion in different contexts.
 
-Lexical closures are at the center of the Pharo language, because Pharo leverages closures to define its control-flow instructions: conditionals, iterations, and early returns. This means that implementing block closures is enough to support all kind of control flow statements in Pharo.
-Moreover, Pharo libraries make usage of block closures to define library-specific control flow instructions, such as the ==do:== and ==select:== messages understood by collections.
+In Pharo, blocks are ''lexical'' closures i.e., basically functions without a name that capture the environment in which they are defined. 
+Lexical closures are at the center of the Pharo language, because Pharo leverages closures to define its ''control-flow'' instructions: conditionals, iterations, and early returns. This means that implementing block closures is enough to support all kind of control flow statements in Pharo.
+Moreover, Pharo libraries make usage of block closures to define library-specific control flow instructions, such as the ==do:== and ==select:== messages understood by collections. Pharo developers often use closures in the Domain Specific languages that they design. 
 Developers are also encouraged to define their own control flow statements, to hide implementation details of their libraries from their users.
 
 
 This chapter starts by explaining what blocks are and how they are evaluated.
 Block evaluation, being a core part of the language definition, is a service that is requested to the evaluator/interpreter through a primitive.
-We then dive into the lexical capture feature of blocks: when a block closure is created, it captures its defining context, namely its enclosing context. This makes blocks able to read and write not only its own temporary variables but also all the variables accessible to its enclosing context
-and to maintain such link even when passed around.
-Finally, we implement non-local returns: return instructions that make the enclosing method context to return instead of the block's one. Non-local returns are usually used as early returns like ==break== statements in other languages.
+We then dive into the lexical capture feature of blocks: when a block closure is created, it captures its defining context, namely its enclosing context (i.e., the visible variables that the block can see). This makes blocks able to read and write not only its own temporary variables but also all the variables accessible to its enclosing context and to maintain such a link even when passed around.
+Finally, we implement non-local returns: return instructions that return to the block ''definition context'' instead of the current one. 
+Non-local returns are really important in Pharo since they are used to express early returns (the fact that the execution of a method can be stopped at a given point) a frequent language feature similar to ==break== statements in other languages.
+Without non-local return it would difficult to quit the current execution.
 
 !!! Representing a Block Closure
 
@@ -22,7 +25,7 @@ When a block expression is executed ==[ 1\+2 ]==, the instructions inside the bl
 Instead, a block object is created, containing those instructions.
 The execution of those instructions is delayed until we send the message ==value== to the block object.
 
-This means that from our evaluator point of view, the evaluation of the closure will be different from the evaluation of its execution. Evaluating a block node will return a block object, and the method ==value== will require a primitive to request the interpreter the block's execution. This means that we need a way to represent a closure object in our evaluator, and that closure should store the code it is supposed to evaluate later when receiving the ==value== message.
+This means that from the evaluator point of view, the evaluation of the closure will be different from the evaluation of its execution. Evaluating a block node will return a block object, and the method ==value== will require a primitive to request the interpreter the block's execution. This means that we need a way to represent a closure object in our evaluator, and that closure should store the code it is supposed to evaluate later when receiving the ==value== message.
 
 Let us define the class ==CHBlock== to represent a block.
 It has an instance variable ==code== to hold the block's AST, instance of the ==RBBlockNode== class.
@@ -50,7 +53,13 @@ CHBlock >> code [
 
 @@note did we explain before that a method with no return returns self? I think we did not, we should add it! :)
 
-Differently from the execution of a method that implicitly returns ==self== when it has no explicit return statement, a block without return statement implicitly returns the result of its last expression. Let us write a testing scenario for this case: evaluating the following block should return ==5== as it is its last expression. 
+!!! Blocks Return their last Expression
+
+
+
+Differently from the execution of a method that implicitly returns ==self== when it has no explicit return statement, a block without return statement implicitly returns the result of its last expression. 
+
+Let us write a testing scenario for this case: evaluating the following block should return ==5== as it is its last expression. 
 
 [[[
 CHInterpretable >> returnBlockValue [
@@ -64,7 +73,7 @@ CHInterpreterTest >> testBlockValueIsLastStatementValue [
 ]
 ]]]
 
-When the interpreter encounters a block node, it create a block object for it.
+When the interpreter encounters a block node, it creates a block object for it.
 We define the method ==visitBlockNode:== as follows: 
 
 [[[
@@ -75,10 +84,15 @@ CHInterpreter >> visitBlockNode: aRBBlockNode [
 ]
 ]]]
 
-Closures are executed when they receive the message ==value== or one of its variants.
+Closures are executed when they receive the message ==value== or one of its variants such as value ==value:==, ==value:value:==...
 On the reception of such messages, their bodies should be executed.
-Pharo does not define a way to request the execution of the block's body, unless we relied on our same interpreter.
-However, since we still want this to be an implementation detail, we will define method evaluation as in normal Pharo, with primitive id ==201==.
+
+%Pharo does not define a way to request the execution of the block's body, unless we relied on our same interpreter.
+%However, since we still want this to be an implementation detail, we will define method evaluation as in normal Pharo, with primitive id ==201==.
+%SD: two previous last sentence are unclear 
+
+We follow the design of Pharo and we add a new primitive responsible for the block body execution. 
+We define the method ==value== on the class ==CHBlock== as a primitive number 201. 
 
 [[[
 CHBlock >> value [
@@ -89,9 +103,10 @@ CHBlock >> value [
 ]
 ]]]
 
-We now need to implement the new primitive in our evaluator.
-A first version of it could just visit the body of the block's code.
-Remember that primitives are executed in their own frame already, so the block's body will share the frame created for the primitive method.
+We now need to implement the new primitive in the evaluator.
+A first version of it is to just visit the body of the block's code.
+Remember that primitives are executed in their own frame already, so the block's body will share the frame 
+created for the primitive method.
 
 [[[
 CHInterpreter >> initializePrimitiveTable [
@@ -105,7 +120,10 @@ CHInterpreter >> primitiveBlockValue [
 ]
 ]]]
 
-!!!! Closure temporaries
+So far we implemented only a simple version of closures. 
+We will extend it in the following sections. 
+
+!!! Closure temporaries
 
 Our simplified closure implementation does not yet have support for closure temporaries.
 Indeed, a closure such as the following will fail with an interpreter failure because ==temp== is not defined in the frame.
@@ -119,13 +137,26 @@ As a first attempt to make our test green, let's declare block temporaries once 
 
 [[[
 CHInterpreter >> primitiveBlockValue [
-  "Initialize all temporaries in nil"
-  aSequenceNode temporaryNames do: [ :e | self tempAt: e put: nil ].		
+	"Initialize all temporaries to nil"
+	aSequenceNode temporaryNames do: [ :e | self tempAt: e put: nil ].
 	^ self visitNode: self receiver code body
 ]
 ]]]
 
-This is however, very similart to a sequence of messages we wrote when activating a normal method.
+We are now able to execute the following expression
+
+[[[
+	[ | a b |
+		a := 1.
+		b := 2.
+		a + b ] value
+]]]
+
+
+
+!!! Removing Logic Repetition
+
+The handling of temporaries in ==primitiveBlockValue== is very similary to a sequence of messages we wrote when activating a normal method in method ==executeMethod:withReceiver:andArguments:== below:
 
 [[[
 CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection [
@@ -140,25 +171,28 @@ CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aColl
 ]
 ]]]
 
-One way to solve this repetition is by moving temporary initialization to the ==visitSequenceNode:== method, since both method nodes and block nodes have sequence nodes inside them.
+We solve this repetition by moving temporary initialization to the ==visitSequenceNode:== method, since both method nodes and block nodes have sequence nodes inside them.
 
 [[[
 CHInterpreter >> visitSequenceNode: aSequenceNode [
-  "Initialize all temporaries in nil"
-  aSequenceNode temporaryNames do: [ :e | self tempAt: e put: nil ].		
+	"Initialize all temporaries to nil"
 
-  "Visit all but the last statement without caring about the result"
-  aSequenceNode statements allButLast 
-  	do: [ :each | self visitNode: each ].
-  
-  "Return the result of visiting the last statement"
-  ^ self visitNode: aSequenceNode statements last
+	aSequenceNode temporaryNames do: [ :e | self tempAt: e put: nil ].
+
+	"Visit all but the last statement without caring about the result"
+	aSequenceNode statements allButLast 
+		do: [ :each | self visitNode: each ].
+	"Return the result of visiting the last statement"
+	^ self visitNode: aSequenceNode statements last
 ]
+]]]
 
+[[[
 CHInterpreter >> primitiveBlockValue [
 	^ self visitNode: self receiver code body
 ]
-
+]]]
+[[[
 CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection [
 	| result |
 	self pushNewFrame.
@@ -170,18 +204,23 @@ CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aColl
 ]
 ]]]
 
+The resulting code is nicer and simpler. This is a clear identication that the refactoring was a good move.
+
 !!! Lexical Closures
 
-As we stated before, block closures capture their defining context, namely its enclosing context.
+As we stated before, block closures capture their ''defining'' context or enclosing context, i.e., the context in which they are created.
 Blocks are able to read and write their own temporary variables, but also all the variables accessible to its enclosing context.
-In this section we will make evolve our closure execution infrastructure to support closure temporaries, and to provide access to the enclosing environment.
+In this section we evolve our closure execution infrastructure to support closure temporaries and to provide access to the enclosing environment.
 
 !!!! Capturing the Defining Context
 
-When a closure is created, it does not capture the defining method but the defining execution context.
+When a closure is created, it does not capture the method that defines it but the defining execution context.
+For example, the temporaries that exist during the method execution. 
+
 The defining execution context gives the closure access to that context's receiver, arguments and temporaries.
 Moreover, it is a fairly common mistake to think that the captured context is the caller context, and not the defining context.
-This is the case in the example above, where the context where the block closure is defined is both the defined and the caller. However, as soon as we work on more complex scenarios, where blocks are sent as arguments of methods, or stored in temporary variables, this does not hold anymore.
+This is the case, in the example above, where the context where the block closure is defined is both the defined and the caller. 
+However, as soon as we work on more complex scenarios, where blocks are sent as arguments of methods, or stored in temporary variables, this does not hold anymore.
 
 A first scenario to check that our block properly captures the defining context is to evaluate ==self== inside a block.
 In our current design, the receiver specified in the block's frame is the block itself.
@@ -198,10 +237,12 @@ CHInterpreterTest >> testReadSelfInBlock [
 ]
 ]]]
 
-To make this test work, we need to implement two different things in our evaluator. First we need to capture the defining context at block creation time in ==visitBlockNode:==. Second we need to use that captured context to resolve variables.
+To make this test pass, we need to implement two different things in the evaluator.
+- First we need to capture the defining context at block ''definition'' time in ==visitBlockNode:==. 
+- Second we need to use ''that'' captured context to resolve variables.
 
-Calturing the defining context is as simple as storing the current ==topFrame== at the moment of the method creation, as follows.
-We extend ==CHBlock== with a ==definingContext== instance variable and corresponding accessors.
+Capturing the defining context is as simple as storing the current ==topFrame== at the moment of the method creation, as follows:
+We extend ==CHBlock== with a ==definingContext== instance variable and corresponding accessors (omitted here after).
 
 [[[
 Object subclass: #CHBlock
@@ -212,16 +253,8 @@ Object subclass: #CHBlock
 CHInterpreter >> visitBlockNode: aRBBlockNode [
 	^ CHBlock new
 		code: aRBBlockNode;
-    definingContext: self topFrame;
+		definingContext: self topFrame;
 		yourself
-]
-
-CHInterpreter >> definingContext: aContext	[
-	definingContext := aContext
-]
-
-CHInterpreter >> definingContext	[
-	^ definingContext
 ]
 ]]]
 
