@@ -206,16 +206,13 @@ CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aColl
 
 The resulting code is nicer and simpler. This is a clear identication that the refactoring was a good move.
 
-!!! Lexical Closures
 
-As we stated before, block closures capture their ''defining'' context or enclosing context, i.e., the context in which they are created.
-Blocks are able to read and write their own temporary variables, but also all the variables accessible to its enclosing context.
+!!! Capturing the Defining Context
+
+As we stated before, a closure is not just a function, it is a function that captures the context (set of variables that can be accessible) of its definition.  Block closures capture their ''defining'' context or enclosing context, i.e., the context in which they are created.
+Blocks are able to read and write their own temporary variables, but also all the variables accessible to its enclosing context such as a temporary variable accessible during the block definition. 
+
 In this section we evolve our closure execution infrastructure to support closure temporaries and to provide access to the enclosing environment.
-
-!!!! Capturing the Defining Context
-
-When a closure is created, it does not capture the method that defines it but the defining execution context.
-For example, the temporaries that exist during the method execution. 
 
 The defining execution context gives the closure access to that context's receiver, arguments and temporaries.
 Moreover, it is a fairly common mistake to think that the captured context is the caller context, and not the defining context.
@@ -246,10 +243,10 @@ We extend ==CHBlock== with a ==definingContext== instance variable and correspon
 
 [[[
 Object subclass: #CHBlock
-  instanceVariableNames: 'code definingContext'
-  classVariableNames: ''
-  package: 'Champollion-Core'
-    
+	instanceVariableNames: 'code definingContext'
+	classVariableNames: ''
+	package: 'Champollion-Core'
+
 CHInterpreter >> visitBlockNode: aRBBlockNode [
 	^ CHBlock new
 		code: aRBBlockNode;
@@ -258,17 +255,21 @@ CHInterpreter >> visitBlockNode: aRBBlockNode [
 ]
 ]]]
 
-Resolving the block variables is a bit more tricky case, as it can be resolved in many different ways.
-For now we will choose to set the correct values and override the incorrect ones in the current frame upon block activation.
+
+!!! Accessing Captured Receiver
+
+Resolving the block variables is a trickier case, as it can be resolved in many different ways.
+For now we choose to set the correct values and override the incorrect ones in the current frame upon block activation.
+SD: unclear to me.
 This solution will work as far as this primitive does not fail.
 We leave for the reader to think what happens in such a case.
 
 [[[
 CHInterpreter >> primitiveBlockValue [
-  | theBlock |
-  theBlock := self receiver.
-  self receiver: theBlock definingContext receiver.
-  ^ self visitNode: self receiver code body
+	| theBlock |
+	theBlock := self receiver.
+	self receiver: theBlock definingContext receiver.
+	^ self visitNode: self receiver code body
 ]
 
 CHInterpreter >> receiver: aValue [
@@ -279,21 +280,22 @@ CHInterpreter >> receiver: aValue [
 Now that we can correctly resolve the receiver, instance variable reads and writes should work properly too.
 We leave as an exercise for the reader to verify their correctness.
 
-!!!! Looking up Temporaries in Lexical Contexts
+!!! Looking up Temporaries in Lexical Contexts
 
 A problem we have not solved yet involves the reads and writes of temporary variables that are not part of the current frame.
 This is the case when a block tries to access a temporary of a parent lexical scope, such as another surrounding scope, or the home method.
+The method ==increaseEnclosingTemporary== is an example of such a situation: the block ==[ temp := temp + 1 ]== during it execution will access the temporary variable that is defined outside of the block. Note that the execution of the block could happen in another method and still be block should be able to access the temporary variable ==temp==.
 
 Our next scenario checks that blocks can correctly read and write temporaries of the enclosing contexts.
 In our test, the enclosing environment creates a temporary. The block reads that value and increases it by one.
-When the block returns, the value of its temporary should have been updated from 0 to 1.
+When the block executes and returns, the value of its temporary should have been updated from 0 to 1.
 
 [[[
 CHInterpretable >> increaseEnclosingTemporary [
-  | temp |
-  temp := 0.
+	| temp |
+	temp := 0.
 	[ temp := temp + 1 ] value.
-  ^ temp
+	^ temp
 ]
 
 CHInterpreterTest >> testIncreaseEnclosingTemporary [
@@ -301,7 +303,7 @@ CHInterpreterTest >> testIncreaseEnclosingTemporary [
 ]
 ]]]
 
-This scenario is resolved by implementing a temporary variable lookup in the block's defining context.
+This scenario is resolved by implementing a temporary variable lookup in the block's ''defining'' context.
 Of course, a block could be defined inside another's block context, so our lookup needs to be recursive.
 The final case of our recursion is when the current lookup context does not have a defining context i.e., it is a method and not a block.
 
@@ -317,13 +319,15 @@ CHInterpreter >> primitiveBlockValue [
 	self tempAt: #__definingContext put: theBlock definingContext.
 	^ self visitNode: theBlock code body
 ]
+]]]
 
+[[[
 CHInterpreter >> lookupFrameDefiningTemporary: aName [
-  | currentLookupFrame |
-  currentLookupFrame := self topFrame.
-  [ currentLookupFrame includesKey: aName ]
-    whileFalse: [ currentLookupFrame := currentLookupFrame at: #__definingContext ].
-  ^ currentLookupFrame
+	| currentLookupFrame |
+	currentLookupFrame := self topFrame.
+	[ currentLookupFrame includesKey: aName ]
+		whileFalse: [ currentLookupFrame := currentLookupFrame at: #__definingContext ].
+	^ currentLookupFrame
 ]
 ]]]
 
@@ -333,21 +337,23 @@ Temporary writes need to lookup the frame where the variable is defined and writ
 
 [[[
 CHInterpreter >> visitTemporaryNode: aTemporaryNode [
-  | definingFrame |
-  definingFrame := self lookupFrameDefiningTemporary: aTemporaryNode name.
-  ^ definingFrame at: aTemporaryNode name
+	| definingFrame |
+	definingFrame := self lookupFrameDefiningTemporary: aTemporaryNode name.
+	^ definingFrame at: aTemporaryNode name
 ]
 
 CHInterpreter >> visitAssignmentNode: aRBAssignmentNode [
-  | rightSide |
-  rightSide := self visitNode: aRBAssignmentNode value.
-  aRBAssignmentNode variable variable isTempVariable
-    ifTrue: [ | definingFrame |
-      definingFrame := self
-        lookupFrameDefiningTemporary: aRBAssignmentNode variable name.
-        definingFrame at: aRBAssignmentNode variable name put: rightSide ]
-    ifFalse: [ aRBAssignmentNode variable variable write: rightSide to: self receiver ].
-  ^ rightSide
+	| rightSide |
+	rightSide := self visitNode: aRBAssignmentNode value.
+	aRBAssignmentNode variable variable isTempVariable
+		ifTrue: [ | definingFrame |
+			definingFrame := self
+				lookupFrameDefiningTemporary: aRBAssignmentNode variable name.
+			definingFrame at: aRBAssignmentNode variable name put: rightSide ]
+		ifFalse: [ aRBAssignmentNode variable variable 
+					write: rightSide 
+					to: self receiver ].
+	^ rightSide
 ]
 ]]]
 
@@ -359,8 +365,8 @@ For example, let's consider a method using ==ifTrue:== to implement a guard whic
 
 [[[
 CHInterpretable >> methodWithGuard
-  true ifTrue: [ ^ nil ].
-  ^ self doSomethingExpensive
+	true ifTrue: [ ^ nil ].
+	^ self doSomethingExpensive
 ]]]
 
 @@note put a figure here to show the stack, the blocks, their relationships.
@@ -373,15 +379,17 @@ To implement non-local returns, we will first start by defining a new helper met
 
 [[[
 CHInterpreter >> homeFrame [
-  | currentLookupFrame |
-  currentLookupFrame := self topFrame.
-  [ currentLookupFrame includesKey: #__definingContext ]
-    whileTrue: [ currentLookupFrame := currentLookupFrame at: #__definingContext ].
-  ^ currentLookupFrame
+	| currentLookupFrame |
+	currentLookupFrame := self topFrame.
+	[ currentLookupFrame includesKey: #__definingContext ]
+		whileTrue: [ currentLookupFrame := currentLookupFrame at: #__definingContext ].
+	^ currentLookupFrame
 ]
 ]]]
 
-A simple way to implement non local returns in Pharo is by using exceptions: exceptions unwind automatically the call-stack, thus short-circuiting the execution of all methods automatically. When we activate a method we then need to prepare ourselves to catch the exception indicating a return, and only manage it if the return is targetting the current method's context:
+A simple way to implement non local returns in Pharo is by using exceptions: exceptions unwind automatically the call-stack, thus short-circuiting the execution of all methods automatically.
+
+When we activate a method we then need to prepare ourselves to catch the exception indicating a return, and only manage it if the return is targetting the current method's context:
 
 [[[
 CHInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection [
@@ -391,7 +399,7 @@ CHInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 	self tempAt: #__method put: anAST.
 	self tempAt: #self put: anObject.
 	anAST arguments with: aCollection
-    do: [ :arg :value | self tempAt: arg name put: value ].
+		do: [ :arg :value | self tempAt: arg name put: value ].
 
 	result := [ self visitNode: anAST ]
 		on: CHReturn "A return statement was executed"
@@ -403,31 +411,41 @@ CHInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 	self popFrame.
 	^ result
 ]
+]]]
 
+[[[
 CHInterpreter >> visitReturnNode: aReturnNode [
   CHReturn new
 		value: (self visitNode: aReturnNode value);
 		homeFrame: self homeFrame;
 		signal
 ]
+]]]
 
+[[[
 Error subclass: #CHReturn
 	instanceVariableNames: 'value homeFrame'
 	classVariableNames: ''
 	package: 'Champollion-Core'
+]]]
 
+[[[
 CHReturn >> homeFrame [
   ^ homeFrame
 ]
+]]]
 
+[[[
 CHReturn >> homeFrame: aFrame [
   homeFrame := aFrame
 ]
-
+]]]
+[[[
 CHReturn >> value [
   ^ value
 ]
-
+]]]
+[[[
 CHReturn >> value: aValue [
   value := aValue
 ]
@@ -436,5 +454,3 @@ CHReturn >> value: aValue [
 !!! Conclusion
 
 In this chapter we have extended our evaluator with block closures. Our block closure implementation required adding a kind of object to our runtime, ==CHBlock==, to represent blocks containing some AST. Then we refined our evaluator to define a block evaluation primitive, and correctly set up the lexical context. Our lexical context implementation gives blocks access to the defining context's receiver and temporaries. We then shown a first implementation of non-local returns, using exceptions to unwind the stack.
-
-
