@@ -238,7 +238,8 @@ To make this test pass, we need to implement two different things in the evaluat
 - First we need to capture the defining context at block ''definition'' time in ==visitBlockNode:==. 
 - Second we need to use ''that'' captured context to resolve variables.
 
-Capturing the defining context is as simple as storing the current ==topFrame== at the moment of the method creation, as follows:
+Capturing the defining context is as simple as storing the current ==topFrame== at the moment of the method creation. 
+
 We extend ==CHBlock== with a ==definingContext== instance variable and corresponding accessors (omitted here after).
 
 [[[
@@ -246,7 +247,14 @@ Object subclass: #CHBlock
 	instanceVariableNames: 'code definingContext'
 	classVariableNames: ''
 	package: 'Champollion-Core'
+]]]
 
+Since a block is created when the block node is visited we extend the previous block creation to store 
+the current context. 
+Note that this is this context that will be let block access to the temporaries and arguments is use at the moment 
+the block is created. 
+
+[[[
 CHInterpreter >> visitBlockNode: aRBBlockNode [
 	^ CHBlock new
 		code: aRBBlockNode;
@@ -261,21 +269,42 @@ CHInterpreter >> visitBlockNode: aRBBlockNode [
 Resolving the block variables is a trickier case, as it can be resolved in many different ways.
 For now we choose to set the correct values and override the incorrect ones in the current frame upon block activation.
 SD: unclear to me.
+
 This solution will work as far as this primitive does not fail.
 We leave for the reader to think what happens in such a case.
+
+The first variable we want to provide access to from a block is ==self== which is the original receiver
+of the method at the time the block was created. 
+The following method is worth explaining
+
+- First we grab the block itself. It is simple since the method ==primitiveBlockValue== is executed during the evaluation of the message ==value== sent to a block. Therefore ==self receiver== returns the block currently executed.
+- Second remmeber that self in a block refers to the receiver of the method at the time the block was created. So we need to set as receiver the receiver that we found in the context of the block creation. This is what ==theBlock definingContext receiver== is returning.
+- Finally we are evaluating the block body.
 
 [[[
 CHInterpreter >> primitiveBlockValue [
 	| theBlock |
 	theBlock := self receiver.
 	self receiver: theBlock definingContext receiver.
-	^ self visitNode: self receiver code body
+	^ self visitNode: theBlock code body
 ]
+]]]
 
+
+[[[
 CHInterpreter >> receiver: aValue [
 	^ self tempAt: #self put: aValue
 ]
 ]]]
+
+Note that in the ==primitiveBlockValue== we use the frame of message ==value== execution. 
+The evaluation of the block body uses this frame. When the evaluation is done such frame is simply 
+pop as any other method evaluations (See ==executeMethod:withReceiver:andArguments:==), therefore
+there is no worries to be made when we changed the value of receiver. 
+==receiver== is not a state of the interpreter but refer to the current frame. 
+
+
+
 
 Now that we can correctly resolve the receiver, instance variable reads and writes should work properly too.
 We leave as an exercise for the reader to verify their correctness.
@@ -284,9 +313,11 @@ We leave as an exercise for the reader to verify their correctness.
 
 A problem we have not solved yet involves the reads and writes of temporary variables that are not part of the current frame.
 This is the case when a block tries to access a temporary of a parent lexical scope, such as another surrounding scope, or the home method.
-The method ==increaseEnclosingTemporary== is an example of such a situation: the block ==[ temp := temp + 1 ]== during it execution will access the temporary variable that is defined outside of the block. Note that the execution of the block could happen in another method and still be block should be able to access the temporary variable ==temp==.
+The method ==increaseEnclosingTemporary== is an example of such a situation: the block ==[ temp := temp + 1 ]==  will access during its execution 
+the temporary variable that was defined outside of the block. 
+Note that the execution of the block could happen in another method and still be block should be able to access the temporary variable ==temp==.
 
-Our next scenario checks that blocks can correctly read and write temporaries of the enclosing contexts.
+Our next scenario checks that blocks can correctly read and write temporaries of their enclosing contexts.
 In our test, the enclosing environment creates a temporary. The block reads that value and increases it by one.
 When the block executes and returns, the value of its temporary should have been updated from 0 to 1.
 
@@ -303,13 +334,17 @@ CHInterpreterTest >> testIncreaseEnclosingTemporary [
 ]
 ]]]
 
+@@note should add some diagrams here
+
 This scenario is resolved by implementing a temporary variable lookup in the block's ''defining'' context.
-Of course, a block could be defined inside another's block context, so our lookup needs to be recursive.
-The final case of our recursion is when the current lookup context does not have a defining context i.e., it is a method and not a block.
+Of course, a block could be defined inside another's block context, so our lookup needs to be lookup through the complete context chain.
+The lookup should stop when the current lookup context does not have a defining context i.e., it is a method and not a block.
 
-To simplify temporary variable lookup let's define first a helper method ==lookupFrameDefiningTemporary:== that returns the frame in which a temporary is defined. This method will return a frame, and will have to walk from a frame to its defining frame up to a method. However, so far the only object in our design knowing the defining frame is the block, and we do not have any way to access a block from its frame.
+To simplify temporary variable lookup we define first a helper method ==lookupFrameDefiningTemporary:== that returns the frame in which a temporary is defined. 
+This method returns a frame. It has to walk from a frame to its defining frame up to a method. 
+However, so far the only object in our design knowing the defining frame is the block (via its instance variable ==definingContext==), and we do not have any way to access a block from its frame.
 
-One possibility is to store a block in its frame when it is activated, and then go from a frame to its block to its defining frame and continue the lookup. Another possibility, which we will implement, is to directly store the defining context in the frame when the block is activated.
+One possibility is to store a block reference in its frame when it is activated, and then go from a frame to its block to its defining frame and continue the lookup. Another possibility, which we will implement, is to directly store the defining context in the frame when the block is activated.
 
 [[[
 CHInterpreter >> primitiveBlockValue [
@@ -330,6 +365,8 @@ CHInterpreter >> lookupFrameDefiningTemporary: aName [
 	^ currentLookupFrame
 ]
 ]]]
+
+@@note should add some diagrams here
 
 Now we need to redefine temporary reads and writes.
 Temporary reads need to lookup the frame where the variable is defined and read the value from it.
