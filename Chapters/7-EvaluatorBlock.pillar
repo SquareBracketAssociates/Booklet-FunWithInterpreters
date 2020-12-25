@@ -370,7 +370,8 @@ CHInterpreter >> lookupFrameDefiningTemporary: aName [
 
 Now we need to redefine temporary reads and writes.
 Temporary reads need to lookup the frame where the variable is defined and read the value from it.
-Temporary writes need to lookup the frame where the variable is defined and write the value to it.
+This is what what the method ==visitTemporaryNode:== does.
+
 
 [[[
 CHInterpreter >> visitTemporaryNode: aTemporaryNode [
@@ -378,7 +379,11 @@ CHInterpreter >> visitTemporaryNode: aTemporaryNode [
 	definingFrame := self lookupFrameDefiningTemporary: aTemporaryNode name.
 	^ definingFrame at: aTemporaryNode name
 ]
+]]]
 
+Temporary writes are similar to read. We need to lookup the frame where the variable is defined and write the value to it.
+
+[[[
 CHInterpreter >> visitAssignmentNode: aRBAssignmentNode [
 	| rightSide |
 	rightSide := self visitNode: aRBAssignmentNode value.
@@ -396,7 +401,17 @@ CHInterpreter >> visitAssignmentNode: aRBAssignmentNode [
 
 !!! Block Non-Local Return
 
-We have seen so far that blocks implicitly return the value of their last expression.
+We have seen so far that blocks implicitly return the value of their last expression. 
+For example the method ==lastExpression== will return 43.
+[[[
+CHInterpretable >> lastExpression
+	| tmp | 
+	tmp := 1.  
+	tmp := true ifTrue: [ tmp := 42. tmp := tmp + 1].
+	^ tmp
+]]]
+
+Now this is a complete different story when a block contains an explicit return statement. 
 Return statements, instead, break the execution of the defining method, namely the home method, and return from it.
 For example, let's consider a method using ==ifTrue:== to implement a guard which should stop the method execution if the guard fails:
 
@@ -408,7 +423,9 @@ CHInterpretable >> methodWithGuard
 
 @@note put a figure here to show the stack, the blocks, their relationships.
 
-In this case, the block is not activated by ==methodWithGuard==. ==methodWithGuard== activates ==ifTrue:== which in turn activates our block. Still, our block knows the context of ==methodWithGuard== as its defining context.
+When executing this method, the message ==doSomethingExpensive== will never be executed. The execution of the method will be stopped by the return in the block ==[^ nil]==. 
+
+More precisely, the block is not activated by ==methodWithGuard==. ==methodWithGuard== executes the message ==ifTrue:== which in turn activates the ==[^ nil]==. Still, this block knows the context of ==methodWithGuard== as its defining context.
 
 If the block executes, the return statement should not return ==nil== to the ==ifTrue:== context: it should return from  ==methodWithGuard== with the ==nil== value, as if it was the return value of the method. Because of this, we call such return inside blocks "non-local returns", because they return from a non-local context, its home context.
 
