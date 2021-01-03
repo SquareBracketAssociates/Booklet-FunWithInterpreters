@@ -423,13 +423,18 @@ CHInterpretable >> methodWithGuard
 
 @@note put a figure here to show the stack, the blocks, their relationships.
 
-When executing this method, the message ==doSomethingExpensive== will never be executed. The execution of the method will be stopped by the return in the block ==[^ nil]==. 
+When executing this method, the message ==doSomethingExpensive== will never be executed. The execution of the method ==methodWithGuard== will be stopped by the return statement in the block ==[^ nil]==.
 
 More precisely, the block is not activated by ==methodWithGuard==. ==methodWithGuard== executes the message ==ifTrue:== which in turn activates the ==[^ nil]==. Still, this block knows the context of ==methodWithGuard== as its defining context.
+When the block executes, the return statement should not return ==nil== to the ==ifTrue:== context: it should return ''from''  ==methodWithGuard== with the ==nil== value, as if it was the return value of the method. 
+Because of this, we call such return inside blocks "non-local returns", because they return from a non-local context, its home context.
 
-If the block executes, the return statement should not return ==nil== to the ==ifTrue:== context: it should return from  ==methodWithGuard== with the ==nil== value, as if it was the return value of the method. Because of this, we call such return inside blocks "non-local returns", because they return from a non-local context, its home context.
+The block may have been passed around, when the block executes a return statement, it will return from the method that created the block. 
+We say that the execution quits the home context of the block (the context of the method that defined it).
 
-To implement non-local returns, we will first start by defining a new helper method: ==homeFrameOf:== that returns the home frame of a frame. Note that the home frame of a normal method frame is itself.
+To implement non-local returns, we will first start by defining a new helper method: ==homeFrameOf:== that returns the home frame of a frame. 
+The home frame is the frame that has a defining context. 
+Note that the home frame of a normal method frame is itself.
 
 [[[
 CHInterpreter >> homeFrame [
@@ -441,41 +446,11 @@ CHInterpreter >> homeFrame [
 ]
 ]]]
 
-A simple way to implement non local returns in Pharo is by using exceptions: exceptions unwind automatically the call-stack, thus short-circuiting the execution of all methods automatically.
+@@note add a diagram
 
-When we activate a method we then need to prepare ourselves to catch the exception indicating a return, and only manage it if the return is targetting the current method's context:
+A simple way to implement non-local returns in Pharo is by using exceptions: exceptions unwind automatically the call-stack, thus short-circuiting the execution of all methods automatically.
 
-[[[
-CHInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection [
-	| result thisFrame |	
-	thisFrame := self pushNewFrame.
-
-	self tempAt: #__method put: anAST.
-	self tempAt: #self put: anObject.
-	anAST arguments with: aCollection
-		do: [ :arg :value | self tempAt: arg name put: value ].
-
-	result := [ self visitNode: anAST ]
-		on: CHReturn "A return statement was executed"
-		do: [ :return | 
-			return homeFrame = thisFrame
-				ifTrue: [ return value ]
-				ifFalse: [ return pass ] ].
-
-	self popFrame.
-	^ result
-]
-]]]
-
-[[[
-CHInterpreter >> visitReturnNode: aReturnNode [
-  CHReturn new
-		value: (self visitNode: aReturnNode value);
-		homeFrame: self homeFrame;
-		signal
-]
-]]]
-
+We define a new exception called ==CHReturn==. It refers to the home frame and a value.
 [[[
 Error subclass: #CHReturn
 	instanceVariableNames: 'value homeFrame'
@@ -504,6 +479,46 @@ CHReturn >> value: aValue [
   value := aValue
 ]
 ]]]
+
+When we activate a method we then need to prepare ourselves to catch the exception indicating a return, and only manage it if the return is targetting the current method's context:
+
+SD: we should explain more the ==returnFrom homeFrame = thisFrame==
+[[[
+CHInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection [
+	| result thisFrame |	
+	thisFrame := self pushNewFrame.
+
+	self tempAt: #__method put: anAST.
+	self tempAt: #self put: anObject.
+	anAST arguments with: aCollection
+		do: [ :arg :value | self tempAt: arg name put: value ].
+
+	result := [ self visitNode: anAST ]
+		on: CHReturn 				"A return statement was executed"
+		do: [ :return | 
+			return homeFrame = thisFrame
+				ifTrue: [ return value ]
+				ifFalse: [ return pass ] ].
+
+	self popFrame.
+	^ result
+]
+]]]
+
+
+When we visit a return we raise a return exception and we pass the context.
+SD: need more explanation.
+
+[[[
+CHInterpreter >> visitReturnNode: aReturnNode [
+  CHReturn new
+		value: (self visitNode: aReturnNode value);
+		homeFrame: self homeFrame;
+		signal
+]
+]]]
+
+
 
 !!! Conclusion
 
