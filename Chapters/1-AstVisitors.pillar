@@ -13,11 +13,11 @@ This piece of code assigns into a variable named ==variable== the result of send
 
 An AST organizes the code above as a tree containing nodes representing variables, assignments, strings, and message sends.
 
-In the first part of this chapter we will study ASTs by looking at the existing AST implementation in Pharo, the RBAST. RBAST is the AST implementation used currently (Pharo 9.0) by many tools in Pharo's tool-chain, such as the compiler, the syntax-highlighter, the auto-completion, the code quality engine and the refactoring engine. As so, it's an interesting piece of engineering, and we will find it provides most of what we will need for our journey to have fun with interpreters.
+This chapter presents ASTs by looking at the existing AST implementation in Pharo, the RBAST. RBAST is the AST implementation used currently (Pharo 9.0) by many tools in Pharo's tool-chain, such as the compiler, the syntax-highlighter, the auto-completion, the code quality engine and the refactoring engine. As so, it's an interesting piece of engineering, and we will find it provides most of what we will need for our journey to have fun with interpreters.
 
 In the following chapter we will study (or re-study, for those who already know it) the Visitor design pattern.
 To be usable by the many tools named before, RBASTs implement a visitor interface.
-Tools performing complex operations on ASTs may then define visitor classes with their algorithm.
+Tools performing complex operations on ASTs may then define visitor classes with their algorithms.
 As we will see in the chapters after this one, one such tool is an interpreter, thus mastering ASTs and visitors is essential.
 
 !!! Pharo Abstract Syntax Trees
@@ -25,28 +25,29 @@ As we will see in the chapters after this one, one such tool is an interpreter, 
 An abstract syntax tree is a tree data structure that represents a program from the syntax point of view.
 In the tree, nodes represent the syntactic elements of the program.
 The edges in the tree represent how those nodes are related.
+To make it concrete, Figure *@ast* shows the AST that represents the code of our previous example: ==variable := 'constant' , self message==. As we will see later, each node in the tree is represented by an object, and different kind of nodes will be instances of diferent classes, forming a composite.
+
++AST representing the code of ==variable := 'constant' , self message==.>file://figures/ast.pdf|width=50|label=ast+
 
 The Pharo standard distribution comes with a pretty complete AST implementation that is used by many tools.
 To get our hands over an AST, we could build it ourselves manually, or as we will do in this chapter, we ask a parser to parse some text and build an AST for us.
 Fortunately, Pharo also includes a parser that does exactly this: the ==RBParser==.
-The ==RBParser== class implements a parser for Pharo.
+The ==RBParser== class implements a parser for Pharo code.
 It has two main modes of working: parsing expressions and parsing methods.
 
-!!!! For the Purists.
-People tend to make the distinction between abstract syntax and concrete program trees.
+!!!! For the Purists: abstract vs concrete trees
+
+People tend to make the distinction between abstract and concrete syntax trees.
 The difference is the following: an abstract syntax tree does not contain information about syntactic elements
 per se. For example an abstract syntax does not contain information about parentheses since the structure of the tree itself reflects it.
-This is similar for variable definition delimiters or period in Pharo.
+This is similar for variable definition delimiters (pipes) or statement delimieters (periods) in Pharo.
 A concrete tree on the other hand keeps such information because tools may need it.
-From that perspective, the Pharo AST are more concrete syntax trees, but because of language abuse we refer to them as
-ASTs.
-
-
+From that perspective, the Pharo AST is in between both. The tree structure contains no information about the concrete elements of the syntax, but these informations are remembered by the nodes so the source code can be rebuilt as similar as the original code as possible. However, we make a bit of language abuse and we refer to them as ASTs.
 
 !!! Parsing Expressions
 
 Expressions are constructs that can be evaluated to a value.
-For example, the program ==17 max: 42== is the message send ==max:== to receiver 17 with argument 42, and can be evaluated to the value 42 (since it is bigger than 17).
+For example, the program ==17 max: 42== is the message-send ==max:== to receiver 17 with argument 42, and can be evaluated to the value 42 (since it is bigger than 17).
 
 [[[language=smalltalk
 | expression |
@@ -61,8 +62,7 @@ expression arguments first formattedCode
 >>> 42
 ]]]
 
-Expressions are a natural instance of Composite pattern where expressions can be combined to build more complex expressions.
-In the following example, the expression ==17 max: 42== is used as the receiver of another message expression, the message ==asString== with no arguments.
+Expressions are a natural instances of the composite pattern, where expressions can be combined to build more complex expressions. In the following example, the expression ==17 max: 42== is used as the receiver of another message expression, the message ==asString== with no arguments.
 
 [[[language=smalltalk
 | expression |
@@ -77,7 +77,7 @@ expression arguments
 >>> #()
 ]]]
 
-Of course, message sends are not the only expressions we have in Pharo.
+Of course, message sends are not the only kind of expressions we have in Pharo.
 Another kind of expression that appeared already in the examples above are literal objects such as numbers.
 
 [[[language=smalltalk
@@ -87,21 +87,21 @@ expression formattedCode
 >>> 17
 ]]]
 
-Pharo is a simple language, the number of nodes that can compose the method ASTs is structured in a class hiearchy.
-Figure *@NodeHierarchy* shows the node inheritance hierarchy of Pharo.
+Pharo is a simple language, the number of different nodes that can compose the method ASTs is structured in a class hiearchy.
+Figure *@NodeHierarchy* shows the node inheritance hierarchy of Pharo rendered as a textual tree.
 
-+Overview of the method node hierarchy (TODO: remove RBPatternPragmaNode - Add RBSelectorNode).>file://figures/RBNodeHierarchy.pdf|label=NodeHierarchy|width=80+
++Overview of the method node hierarchy (TODO: remove RBPatternPragmaNode - Add RBSelectorNode). Indentation implies inheritance. >file://figures/RBNodeHierarchy.pdf|label=NodeHierarchy|width=80+
 
 !!!Literal Nodes
 
-Literal nodes represent literal objects. A literal object is an object that is not created directly by sending the ==new== message to a class.
-Instead, the developer writes directly in the source code the value of that object, and the object is created automatically from it at parse time.
-Literal objects in Pharo are strings, symbols, numbers, characters, booleans (==true==, and  ==false==), ==nil== and literal arrays (==\#()==).
+Literal nodes represent literal objects. A literal object is an object that is not created by sending the ==new== message to a class.
+Instead, the developer writes directly in the source code the value of that object, and the object is created automatically from it (could be at parse time, at compile time, or at runtime, depending on the implementation).
+Literal objects in Pharo are strings, symbols, numbers, characters, booleans (==true== and  ==false==), ==nil== and literal arrays (==\#()==).
 
 Literal nodes in Pharo are instances of the ==RBLiteralValueNode==, and understand the message ==value== which returns the value of the object.
 In other words, literal objects in Pharo are resolved at parse time. Notice that the ==value== message does not return a string representation of the literal object, but the literal object itself.
 
-From then on we will omit the declaration of temporaries in the code snippets for the sake of space.
+From now on we will omit the declaration of temporaries in the code snippets for the sake of space.
 [[[language=smalltalk
 integerExpression := RBParser parseExpression: '17'.
 integerExpression value
@@ -134,7 +134,7 @@ arrayExpression contents first
 >>> RBLiteralValueNode(1)
 ]]]
 
-In addition to messages and literals, Pharo program can contain variables.
+In addition to messages and literals, Pharo programs can contain variables.
 
 !!!! The Variable Node, Self and Super Nodes
 
@@ -163,13 +163,8 @@ These special nodes inherit from ==RBVariableNode== and work as normal variable 
 !!! Assignment Nodes
 
 Assignment nodes in the AST represent assignment expressions using the ==:\=== operator.
-Now there is the question to know if an assignment an expression (i.e., returns a value) or a statement.
-Some languages propose that assignments are not expressions and as such do not return a value.
-
-In Pharo following Smalltalk design, assignments are expressions: their value is the value of the variable after the assignment.
-This allows to chain assignments.
-
-We will see in the next chapter, when implementing an evaluator, why this is important.
+In Pharo, following Smalltalk design, assignments are expressions: their value is the value of the variable after the assignment.
+This allows to chain assignments. We will see in the next chapter, when implementing an evaluator, why this is important.
 
 An assignment node is an instance of ==RBAssignmentNode==.
 If we send it the ==variable== message, it answers the variable it assigns to.
@@ -187,8 +182,8 @@ assignmentExpression value
 
 !!! Message Nodes
 
-Message nodes are the core of Pharo programs, and they are the most common composed expression node we find in the AST.
-Message are instances of ==RBMessageNode== and they have a receiver, a selector and a collection of arguments, obtained through the ==receiver==, ==selector== and ==arguments== messages.
+Message nodes are the core of Pharo programs, and they are the most common composed expression nodes we find in the AST.
+Messages are instances of ==RBMessageNode== and they have a receiver, a selector and a collection of arguments, obtained through the ==receiver==, ==selector== and ==arguments== messages.
 We say that message nodes are composed expressions because the ==receiver== and ==arguments== of a message are expressions in themselves, which can be as simple as literals or variables, or other composed messages too.
 
 [[[language=smalltalk
@@ -197,7 +192,7 @@ messageExpression receiver
 >>> RBLiteralValueNode(17)
 ]]]
 
-Note that the arguments is a normal collection of expressions - in the sense that there is not special node class to represent such a sequence.
+Note that ==arguments== is a normal collection of expressions - in the sense that there is not special node class to represent such a sequence.
 
 [[[language=smalltalk
 messageExpression arguments
@@ -205,7 +200,6 @@ messageExpression arguments
 ]]]
 
 And that the message selector returns also just a symbol.
-We can obtain the object representing the selector using ==selectorNode==.
 
 [[[language=smalltalk
 messageExpression selector
@@ -215,12 +209,12 @@ messageExpression selector
 !!!! A note on message nodes and precedence
 
 For those readers that already master the syntax of Pharo, you remember that there exist three kind of messages: unary, binary and keyword messages.
-Besides their number of parameters, the Pharo syntax accords an order of precedences between them too. i.e., unary messages get to be evaluated before binary messages, which get to be evaluated before keyword messages.
+Besides their number of parameters, the Pharo syntax accords an order of precedence between them too, i.e., unary messages get to be evaluated before binary messages, which get to be evaluated before keyword messages.
 Only parentheses override this precedence.
 Precedence of messages in ASTs is resolved at parse-time.
 In other words, the output of ==RBParser== is an AST respecting the precedence rules of Pharo.
 
-Let's consider a couple of examples illustrating this.
+Let's consider a couple of examples illustrating this, illustrated in Figure *@precedence*.
 If we feed the ==RBParser== with the expression below, it will create a ==RBMessageNode== as we already know it.
 The root of that message node is the ==keyword:== message, and its first argument is the ==argument + 42 unaryMessage== subexpression.
 That subexpression is in turn another message node with the ==\+== binary selector, whose first argument is the ==42 unaryMessage== subexpression.
@@ -235,7 +229,7 @@ Now, let's change the expression adding extra parenthesis as in:
 variable keyword: (argument + 42) unaryMessage
 ]]]
 
-@@todo Add a diagram
++Different precedence results in different ASTs.>file://figures/precedence.pdf|width=80|label=precedence+
 
 The resulting AST completely changed!
 The root is still the ==keyword:== message, but now its first argument is the ==unaryMessage== sent to a (now in parenthesis) ==(argument + 42)== receiver.
@@ -328,7 +322,7 @@ methodNode := RBParser parseMethod: 'myMethod
 	self'
 ]]]
 
-A method node differs from the expression nodes that we have seen before by the fact that method nodes can only be roots in the AST tree. Method nodes cannot be children of other nodes.
+A method node differs from the expression nodes that we have seen before by the fact that method nodes can only be roots in the AST tree. Method nodes cannot be children of other nodes. This differs from other programming languages in block in which method definitions are indeed expressions or statements that can be nested. In Pharo method definitions are not statements: like class definitions, they are top level elements. This is why Pharo is not a block structure language, even if it has closures (named blocks) that can be nested, passed as arguments or stored.
 
 Method nodes have a name or selector, accessed through the ==selector== message, a list of arguments, accessed through the ==arguments== message, and as we will see in the next section they also contain a body with the list of statements in the method.
 
@@ -342,11 +336,9 @@ methodNode selector
 Method nodes have a body, represented as a ==RBSequenceNode==.
 A sequence node is a sequence of instructions or statements.
 All expressions are statements, including all nodes we have already seen such as literals, variables, arrays, assignments and message sends.
-We will introduce later two more instructions that can be included as part of a sequence node: block nodes and return nodes.
+We will introduce later two more kind of nodes that can be included as part of a sequence node: block nodes and return nodes.
 Block nodes are expressions that are syntactically and thus structurally similar to methods.
 Return nodes, representing the return instruction ==\^==, are statement nodes but not expression nodes, i.e., they can only be children of sequence nodes.
-
-@@note for guille I have the impression that using statements is better than instruction. It would be nice also to have a diagram of the inheritance tree. Yes I would to have a expression tree and a statement tree.
 
 If we take the previous example, we can access the sequence node body of our method with the ==body== message.
 
@@ -391,7 +383,7 @@ methodNode body temporaries.
 
 !!! Return Nodes
 
-Return AST nodes represent the instructions that are syntactically identified by the caret character ==^==.
+AST return nodes represent the instructions that are syntactically identified by the caret character ==^==.
 Return nodes, instances of ==RBReturnNode== are not expression nodes, i.e., they can only be found as a direct child of sequence nodes.
 Return nodes represent the fact of returning a value, and that value is an expression, which we is accessible through the ==value== message.
 
@@ -413,9 +405,15 @@ In those cases, the semantics of Pharo specifies that ==self== is implicitly ret
 It is interesting to note that the AST does not contain semantics but only syntax: we will add semantics to the AST when we evaluate it in a subsequent chapter.
 In Pharo this is the compiler that ensures that a method always at the minimum return self.
 
+Also, as we said before, return nodes are not expressions, meaning that we cannot write any of the following:
 
+[[[language=smalltalk
+x := ^ 5
+]]]
 
-
+[[[language=smalltalk
+{ 1 . ^ 4 }
+]]]
 
 !!!! Block Nodes
 
@@ -498,34 +496,96 @@ And we can also ask a node if it is an expression node or not:
 
 - ==isValue==
 
-@@todo Check with latest changes.
+!!! Exercises
 
-!!! Expressions and others
+Draw the AST of the following code, indicating what kind of node is each.
+You can help yourself by parsing and inspecting the expressions in Pharo.
+ 
+!!!! Exercises on expressions
 
-In Pharo, all the nodes are expressions except returns.
-Assignments, literals, messages, block are expressions that return a value.
+# Draw the AST of expression ==true==.
+# Draw the AST of expression ==17==.
+# Draw the AST of expression ==#( 1 2 true )==.
+# Draw the AST of expression ==self yourself==.
+# Draw the AST of expression ==a := b := 7==.
+# Draw the AST of expression ==a + #( 1 2 3 )==.
+# Draw the AST of expression ==a keyword: 'message'==.
+# Draw the AST of expression ==(a max: 1) min: 17==.
+# Draw the AST of expression ==a max: 1 (min: 17)==.
+# Draw the AST of expression ==a max: 1 min: 17==.
+# Draw the AST of expression ==a asParser + b asParser parse: 'sometext' , somethingElse ==.
+# Draw the AST of expression ==(a asParser + b asParser) parse: ('sometext' , somethingElse) ==.
+# Draw the AST of expression ==(a asParser + b asParser parse: 'sometext') , somethingElse ==.
+# Draw the AST of expression ==((a asParser + b() asParser parse: 'sometext') , somethingElse ==.
 
-We cannot write the following
+!!!! Exercises on Blocks
 
-[[[language=smalltalk
-x := ^ 5
+# Draw the AST of block ==[ 1 ]==.
+# Draw the AST of block ==[ :a ]==.
+# Draw the AST of block ==[ :a | a ]==.
+# Draw the AST of block ==[ :a | a + b ]==.
+# Draw the AST of block ==[ :a | a + b . 7 ]==.
+# Draw the AST of block ==[ :a | [ b ] . 7 ]==.
+# Draw the AST of block ==[ :a | | temp | [ ^ b ] . ^ 7 ]==.
+
+!!!! Exercises on Methods
+
+1. Draw the AST of method
+[[[
+someMethod
+  "this is just a comment, ignored by the parser"
 ]]]
 
-[[[language=smalltalk
-{ 1 . ^ 4 }
+2. Draw the AST of method
+[[[
+unaryMethod
+  self
 ]]]
 
-Returns changes the control flow of the language.
+3. Draw the AST of method
+[[[
+unaryMethod
+  ^ self
+]]]
 
-Temporary definitions could be seen as a kind of statements, but a limited one because they are always
-at the beginning of a sequence node.
+4. Draw the AST of method
+[[[
++ argument
+  argument > 0 ifTrue: [ ^ argument ].
+  ^ self
+]]]
 
-Finally in block structure languages, method definitions are expressions or statements and can be nested.
-In Pharo method definitions are not a statement: like class definitions they are top level elements.
-This is why Pharo is not a block structure languages even if it has closures (named block) that
-can be nested, passed as arguments or stored.
+5. Draw the AST of method
+[[[
++ 
+  strange indentation
+]]]
 
+6. Draw the AST of method
+[[[
+foo: arg1 bar: arg2
+  | temp |
+  temp := arg1 bar: arg2.
+  ^ self foo: temp
+]]]
 
+!!!! Exercises on Invalid Code
+
+Explain why the following code snippets (and thus their ASTs) are invalid:
+
+# Explain why this expression is invalid ==(a + 1) := b==.
+# Explain why this expression is invalid ==a + ^ 81==.
+# Explain why this expression is invalid ==a + ^ 81==.
+
+!!!! Exercises on Control Flow
+
+As we have seen so far, there is no special syntax for control flow statements (i.e., conditionals, loops...).
+Instead, Pharo uses normal message-sends for them (==ifTrue:==, ==ifFalse:==, ==whileTrue:== ...).
+This makes the ASTs simpler, and also turns control flow statements into control flow expressions.
+
+# Give an example of an expression using a conditional and its corresponding AST
+# Give an example of an expression using a loop and its corresponding AST
+# What do control flow expressions return in Pharo?
 
 !!! Conclusion
 
