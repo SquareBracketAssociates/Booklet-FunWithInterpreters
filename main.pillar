@@ -5,4 +5,4 @@ ${inputFile:path=Chapters/3-Variables.pillar}$
 ${inputFile:path=Chapters/4-EvaluatorMessageAndArg.pillar}$
 ${inputFile:path=Chapters/5-EvaluatorMessageLookup.pillar}$
 ${inputFile:path=Chapters/6-EvaluatorPrimitives.pillar}$
-${inputFile:path=Chapters/7-EvaluatorBlock.pillar}$
+%${inputFile:path=Chapters/7-EvaluatorBlock.pillar}$
