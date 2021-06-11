@@ -1,15 +1,15 @@
 !! Variables and Name Resolution
 
 In the previous Chapter we wrote a first version of an evaluator managing literals: integers, floats, arrays and booleans.
-This chapter takes introduces in our evaluator the capability of evaluating variables.
+This chapter introduces in our evaluator the capability of evaluating variables.
 Variables are, using a very general definition, storage location associated with a name.
 For example, a global variable in Pharo is stored in a global dictionary of key-value associations, where the association's key is the name of the variable and the its value is the value of the variable respectively.
 Instance variables, on their side, are storage locations inside objects.
 Instance variables in Pharo have each a location in the object, specified by an index, and that index corresponds to the index of the variable's name in its class' instance variable list.
 
 In this chapter we will study how variables are resolved.
-Since basically variable nodes contain only their name, this involves a "name resolution" step: finding where the variable is located, and access it accordingly following the lexical scoping, or static scoping.
-Name resolution using lexical scoping discovers variables using the hierarchy of scopes active at a point in the execution. For example, classes define a scope with variables visible only by their instances; the global scope defines variables that are visible everywhere in the program. 
+Since basically variable nodes contain only their name, this involves a "name resolution" step: finding where the variable is located, and access it accordingly following the lexical scoping (or static scoping) rules.
+Name resolution using lexical scoping discovers variables using the nesting hierarchy of our code, where each nesting level represents a scope. For example, classes define a scope with variables visible only by their instances; the global scope defines variables that are visible everywhere in the program, and classes are nested within the global scope.
 
 In this chapter we will implement name resolution by modelling the program scopes.
 Scope objects will act as adapters for the real storage locations of variables, giving us a polymorphic way to read and write variables. Moreover, scopes will be organized in a chain of scopes, that will model the lexical organization of the program.
@@ -48,9 +48,9 @@ CHInterpreterTest >> testReturnSelf [
 !!!! Introducing Support to Specify a Receiver
 
 In this section we implement a first version of an execution context to introduce receiver objects.
-This first support will get us up and running to implement initial variable support, but it will run short to properly implement message sends. This set up will be extended to support to message sends and block temporaries.
+This first support will get us up and running to implement initial variable support, but it will run short to properly implement message sends. This set up will be extended in later chapters to support to message sends and block temporaries.
 
-This initial support requires that the evaluator gets access to the receiver object of a message that would lead to the evaluation of the method actually evaluated.
+This initial support requires that the evaluator gets access to the object that is the receiver in the current method execution.
 For now we add an instance variable in our evaluator called ==receiver==.
 
 [[[
@@ -171,7 +171,7 @@ CHInterpreter >> visitVariableNode: aVariableNode [
 
 CHInterpreter >> visitAssignmentNode: anAssignmentNode [
 	| value |
-	value := (self visitNode: anAssignmentNode value).
+	value := self visitNode: anAssignmentNode value.
 	(self scopeDefining: anAssignmentNode variable name)
     write: anAssignmentNode variable name
     withValue: value.
@@ -361,13 +361,15 @@ To make this tests pass, let's first see in detail our method ==visitAssignmentN
 [[[
 CHInterpreter >> visitAssignmentNode: anAssignmentNode [
 	| value | 
-	value := (self visitNode: anAssignmentNode value).
-	(self scopeDefining: anAssignmentNode variable name) write: anAssignmentNode variable name withValue: value.
+	value := self visitNode: anAssignmentNode value.
+	(self scopeDefining: anAssignmentNode variable name)
+    write: anAssignmentNode variable name
+    withValue: value.
 	^ value
 ]
 ]]]
 
-Evaluating an assignment node with the form ==variable := expression== requires that we evaluate the ==expression== and then set that value to the left-side variable.
+Evaluating an assignment node with the form ==variable := expression== requires that we evaluate the ==expression== of the assignment, also called the right hand side of the assignment, and then set that value to the left-side variable.
 Notice that the variable we are assigning into does not need to be evaluated/visited: the evaluation of a variable is equivalent to reading its value.
 And in the left part of an assignment, we do not care about the value of the variable, but about the location of the variable.
 Our visit method then looks as follows: we recursively visit the right-side of the assignment (got through the ==value== accessor), we set that value to the variable by delegating to the scope, and we finally return the stored value.

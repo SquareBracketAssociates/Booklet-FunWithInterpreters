@@ -7,7 +7,7 @@ For presentation purposes, we will develop the evaluator in several stages, each
 First, in this chapter, we will show how to implement a structural evaluator, i.e., an evaluator that reads and writes the structures of objects, starting the presentation from constant values.
 Later chapters will incrementally add support for other language features that deserve a chapter for themselves such as messages and blocks.
 
-The presentation of this chapter is done in a somehow-relaxed TDD (test driven development) style.
+This chapter is presented in a somehow-relaxed TDD (test driven development) style.
 For each new feature we first define the scenario we want to cover.
 Since we are developing an evaluator, each scenario will be some code to execute and an expected result.
 We then define a test for the scenario and we make it pass.
@@ -19,7 +19,7 @@ Note that we will write the visitor from scratch but we will reuse the node of t
 !!! Setting Up the Stage
 
 To start writing our Pharo evaluator in TDD style, we will start by creating out test class ==CHInterpreterTest==.
-Our class names are prefix with CH because we named the package of the interpreter Champollion.
+Our class names are prefixed with CH because we named the package of the interpreter Champollion.
 
 [[[
 TestCase subclass: #CHInterpreterTest
@@ -100,8 +100,8 @@ Object subclass: #CHInterpreter
 ]]]
 
 The class ==CHInterpreter==  is the main entry point for our evaluator, and it will implement a visitor pattern over the Pharo method ASTs.  Note that it does not inherit from the default Pharo AST Visitor.
-The Pharo AST visitor already implements generic versions of the ==visitXXX:=== methods that will do nothing instead of failing.
-Not inheriting from it allows us to get problems such as does not understand exceptions that we will implement step by step in the debugger.
+The Pharo AST visitor already implements generic versions of the ==visitXXX:== methods that will do nothing instead of failing.
+Not inheriting from it allows us to make it clear when something is not yet implemented: we will get problems such as does not understand exceptions that we will be able to implement them step by step in the debugger.
 We nevertheless follow the same API as the default AST visitor and we use the nodes' ==accept:== visiting methods.
 
 At this point, re-executing the test fails with a new error: our ==CHInterpreter== instance does not understand the message ==execute:==.

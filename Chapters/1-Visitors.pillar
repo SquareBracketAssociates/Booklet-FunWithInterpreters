@@ -3,7 +3,7 @@
 In the previous Chapter we have seen how to create and manipulate AST nodes.
 The ==RBParser== class implements a parser of expressions and methods that returns AST nodes for the text given as argument.
 With the AST manipulation methods we have seen before, we can already write queries on an AST.
-For example, counting the number of message sends in an AST is as simple as the following loop.
+For example, counting the number of message-sends in an AST is as simple as the following loop.
 
 [[[language=smalltalk
 count := 0.
@@ -20,7 +20,7 @@ In this section we start reviewing the visitor pattern, and we then apply it for
 
 !!! The Visitor Pattern
 
-The Visitor pattern is one of the original design patterns from Gamma et al ${cite:Gamm95a}$, ${cite:Alpe98a}$.
+The Visitor pattern is one of the original design patterns from Gamma et al. ${cite:Gamm95a}$, ${cite:Alpe98a}$.
 The main purpose of the Visitor pattern is to externalize an operation from a data structure.
 For example, let's consider a file system implemented with the composite pattern, where nodes can be files or directories.
 This composite forms a tree, where file nodes are leaf nodes and directory nodes are non-leaf nodes.
@@ -228,7 +228,7 @@ DepthCalculatorVisitor >> visitLiteralValueNode: aRBLiteralValueNode [
 !!! Second refactoring
 
 As a second step, we can refactor further by taking into account a simple intuition: leaf nodes do never have children.
-This means that ==aNode children== always yields an empty collection for leaf nodes, and thus the result of the following expression is always be zero:
+This means that ==aNode children== always yields an empty collection for leaf nodes, and thus the result of the following expression is alwaysa program that zero:
 
 [[[language=smalltalk
 (aNode children
@@ -437,6 +437,28 @@ SearchVisitor >> visitNode: aNode [
 Another design would be to store the collection holding the rest inside the visitor and to avoid the temporary copies.
 We let you refactor your code to implement it.
 
+!!! Exercises
+
+!!!! Exercises on the Visitor Pattern
+
+# Implement mathematical expressions as a tree, to for example model expressions like ==1 + 8 / 3==, and two operations on them using the composite pattern: (a) calculate their final value, and (b) print the tree in pre-order. For example, the result of evaluating the previous expression is 3, and printing it in pre-order yields the string =='/ + 1 8 3'==.
+
+# Re-implement the code above using a visitor pattern.
+
+# Add a new kind of node to our expressions: raised to. Implement it in both the composite and visitor implementations.
+
+# About the difference between a composite and a visitor. What happens to each implementation if we want to add a new operation? And what happens when we want to add a new kind of node?
+
+!!!! Exercises on the AST Visitors
+
+# Implement an AST lineariser, that returns an ordered collection of all the nodes in the AST (similar to the pre-order exercise above).
+
+# Extend your AST lineariser to handle different linearisation orders: breadth-first, depth-first pre-order, depth-first post-order.
+
+# Extend the Node search exercise in the chapter to have alternative search orders. E.g., bottom-up, look not only if the strings begin with them.
+
+# Extend the Node search exercise in the chapter to work as a stream: asking ==next== repeatedly will yield the next occurrence in the tree, or ==nil== if we arrived to the end of the tree. You can use the linearisations you implemented above.
+
 !!! Conclusion
 
 In this chapter we have reviewed the visitor design pattern first on a simple example, then on ASTs.
@@ -445,5 +467,5 @@ The visitor design pattern allows us to extend tree-like structures with operati
 Finally, we implemented two visitors for ASTs: a depth calculator and a node searcher.
 The depth calculator is a visitor that does not require special manipulation per-node, but sees all nodes through a common view. The search visitor has a common case for most nodes, and then implements special search conditions for messages, literals and variables.
 
-In the following chapters we will use the visitor pattern to implement AST interpreters: a program that will specifies how to evaluate an AST. A normal evaluator interpreter yields the result of executing the AST.
+In the following chapters we will use the visitor pattern to implement AST interpreters: a program that specifies how to evaluate an AST. A normal evaluator interpreter yields the result of executing the AST.
 However, we will see that abstract interpreters will evaluate an AST in an abstract way, useful for code analysis.

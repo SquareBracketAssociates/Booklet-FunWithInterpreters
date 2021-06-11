@@ -151,7 +151,7 @@ Variable nodes are used to equally denote temporary, argument, instance, class o
 That is because at parse-time, the parser cannot differentiate when a variable is of one kind or another.
 This is especially true when we talk about instance, class and global variables, because the context to distinguish them has not been made available.
 Instead of complexifying the parser with this kind of information, the Pharo toolchain does it in a pipelined fashion, leaving the tools using the AST decide on how to proceed.
-The parser generates a simple AST that tools can later annotate with semantic information from a context if required.
+The parser generates a simple AST, later tools annotate the AST with semantic information from a context if required.
 An example of this kind of treatment is the compiler, which requires such contextual information to produce the correct final code.
 
 For the matter of this book, we will not consider nor use semantic analysis, and we will stick with normal ==RBVariableNode== objects.
@@ -294,7 +294,7 @@ To delay the execution of the elements in the dynamic array, a dynamic array nod
 ]]]
 
 Dynamic literal arrays nodes are instances of ==RBArrayNode==.
-To access the expressions inside an dynamic array node, they understand the message ==children==
+To access the expressions inside a dynamic array node, they understand the message ==children==
 
 [[[language=smalltalk
 arrayNode := RBParser parseExpression: '{
@@ -403,7 +403,7 @@ Note that as in Pharo return statements are not mandatory in a method, they are 
 Indeed, we can have method ASTs without return nodes.
 In those cases, the semantics of Pharo specifies that ==self== is implicitly returned.
 It is interesting to note that the AST does not contain semantics but only syntax: we will add semantics to the AST when we evaluate it in a subsequent chapter.
-In Pharo this is the compiler that ensures that a method always at the minimum return self.
+In Pharo this is the compiler that ensures that a method always return self when return statements are absent in some execution paths.
 
 Also, as we said before, return nodes are not expressions, meaning that we cannot write any of the following:
 
@@ -468,11 +468,11 @@ Properties stored in a node are indexed by a key, following the API of Pharo dic
 - ==aNode propertyAt: aKey put: anObject==: inserts ==anObject== at ==aKey==, overriding existing values at ==aKey==.
 - ==aNode hasProperty: aKey==: returns a boolean indicting if the node contains a property indexed by ==aKey==.
 - ==aNode propertyAt: aKey==: returns the value associated with ==aKey==. If ==aKey== is not found, fails with an exception.
-- ==aNode propertyAt: aKey ifAbsent: aBlock==: returns the value associated with ==aKey==. If ==aKey== is not found, evaluates the block and returns the its value.
+- ==aNode propertyAt: aKey ifAbsent: aBlock==: returns the value associated with ==aKey==. If ==aKey== is not found, evaluates the block and returns its value.
 - ==aNode propertyAt: aKey ifAbsentPut: aBlock==: returns the value associated with ==aKey==. If ==aKey== is not found, evaluates the block, inserts the value of the block at ==aKey== and returns the value.
-- ==aNode propertyAt: aKey ifPresent: aPresentBlock ifAbsent: anAbsentBlock==: Searches for the value associated with ==aKey==. If ==aKey== is found, evaluates ==aPresentBlock== with the its value. If ==aKey== is not found, evaluates the block and returns the its value.
+- ==aNode propertyAt: aKey ifPresent: aPresentBlock ifAbsent: anAbsentBlock==: Searches for the value associated with ==aKey==. If ==aKey== is found, evaluates ==aPresentBlock== with its value. If ==aKey== is not found, evaluates the block and returns its value.
 - ==aNode removeProperty: aKey==: removes the property at ==aKey==. If ==aKey== is not found, fails with an exception.
-- ==aNode removeProperty: aKey ifAbsent: aBlock==: removes the property at ==aKey==. If ==aKey== is not found, evaluates the block and returns the its value.
+- ==aNode removeProperty: aKey ifAbsent: aBlock==: removes the property at ==aKey==. If ==aKey== is not found, evaluates the block and returns its value.
 
 
 !!!! Testing Methods
@@ -511,12 +511,12 @@ You can help yourself by parsing and inspecting the expressions in Pharo.
 # Draw the AST of expression ==a + #( 1 2 3 )==.
 # Draw the AST of expression ==a keyword: 'message'==.
 # Draw the AST of expression ==(a max: 1) min: 17==.
-# Draw the AST of expression ==a max: 1 (min: 17)==.
+# Draw the AST of expression ==a max: (1 min: 17)==.
 # Draw the AST of expression ==a max: 1 min: 17==.
 # Draw the AST of expression ==a asParser + b asParser parse: 'sometext' , somethingElse ==.
 # Draw the AST of expression ==(a asParser + b asParser) parse: ('sometext' , somethingElse) ==.
 # Draw the AST of expression ==(a asParser + b asParser parse: 'sometext') , somethingElse ==.
-# Draw the AST of expression ==((a asParser + b() asParser parse: 'sometext') , somethingElse ==.
+# Draw the AST of expression ==((a asParser + b) asParser parse: 'sometext') , somethingElse ==.
 
 !!!! Exercises on Blocks
 
