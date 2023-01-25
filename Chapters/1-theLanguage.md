@@ -1,0 +1,128 @@
+## The Language
+
+Implementing an interpreter for a language requires that we decide what language we are going to interpret.
+A too-complex language would take ages to implement. Think of implementing any programming language you know.
+A very simple one would not be interesi
+
+### Why not full Pharo?
+
+### ObjVlisp inspiration
+
+
+ObjVlisp was published the first time in 1986 when the foundation of object-oriented programming was still emerging . ObjVlisp has explicit metaclasses and supports metaclass reuse. It was inspired from the kernel of Smalltalk-78. The IBM SOM-DSOM kernel is similar to ObjVLisp while implemented in C++ . ObjVlisp is a subset of the reflective kernel of CLOS \(Common Lisp Object System\) since CLOS reifies instance variables, generic functions, and method combination . In comparison to ObjVlisp, Smalltalk and Pharo have implicit metaclasses and no metaclass reuse except by basic inheritance . However, they are more stable as explained by Bouraqadi et al .
+
+Studying this kernel is really worth it, since it has the following properties:
+- It unifies class and instances \(there is only one data structure to represent all objects, classes included\),
+- It is composed of only two classes `Class` and `Object` \(it relies on existing elements such as booleans, arrays, and string of the underlying implementation language\),
+- It raises the question of meta-circularity infinite regression \(a class is an instance of another class that is an instance of yet another class, etc.\) and how to resolve it,
+- It requires consideration of allocation, class and object initialization, message passing as well as the bootstrap process,
+- It can be implemented in less than 30 methods in Pharo.
+
+
+Just remember that this kernel is self-described. We will start to explain some aspects, but since everything is linked, you may have to read the chapter twice to fully get it.
+
+### ObjVLisp's six postulates
+
+
+The original ObjVlisp kernel is defined by six postulates . Some of them look a bit dated by modern standards, and the 6th postulate is simply wrong as we will explain later \(a solution is simple to design and implement\).
+
+Here are the six postulates as stated in the paper for the sake of historical perspective.
+
+1. An object represents a piece of knowledge and a set of capabilities.
+1. The only protocol to activate an object is message passing: a message specifies which procedure to apply \(denoted by its name, the selector\) and its arguments.
+1. Every object belongs to a class that specifies its data \(attributes called fields\) and its behavior \(procedures called methods\). Objects will be dynamically generated from this model; they are called instances of the class. Following Plato, all instances of a class have same structure and shape, but differ through the values of their common instance variables.
+1. A class is also an object, instantiated by another class, called its metaclass. Consequently \(P3\), to each class is associated a metaclass which describes its behavior as an object. The initial primitive metaclass is the class Class, built as its own instance.
+1. A class can be defined as a subclass of one \(or many\) other class\(es\). This subclassing mechanism allows sharing of instance variables and methods, and is called inheritance. The class Object represents the most common behavior shared by all objects.
+1. If the instance variables owned by an object define a local environment, there are also class variables defining a global environment shared by all the instances of a same class. These class variables are defined at the metaclass level according to the following equation: class variable \[an-object\] = instance variable \[an-object’s class\].
+
+
+### The Syntax
+
+
+
+### Memory Model
+
+
+If you do not fully grasp the following overview, don't worry. This full chapter is here to make sure that you will understand it.
+Let us get started.
+
+Contrary to a real uniform language kernel, ObjVlisp does not consider arrays, booleans, strings, numbers or any other elementary objects as part of the kernel as this is the case in a real bootstrap such as the one of Pharo. ObjVLisp's kernel focuses on understanding Class/Object core relationships.
+
+Figure *@fig:ObjVlisp@* shows the two core classes of the kernel:
+- `Object` which is the root of the inheritance graph and is instance of `Class`.
+- `Class` is the first class and root of the instantiation tree and instance of itself as we will see later.
+
+
+![The ObjVlisp kernel: a minimal class-based kernel.](figures/ObjVlispMore.pdf width=60&label=fig:ObjVlisp)
+
+
+Figure *@withSing@* shows that the class `Workstation` is an instance of the class `Class` since it is a class and it inherits from `Object` the default behavior objects should exhibit. The class `WithSingleton` is an instance of the class `Class` but in addition it inherits from `Class`, since this is a metaclass: its instances are classes. As such, it changes the behavior of classes. The class `SpecialWorkstation` is an instance of the class `WithSingleton` and inherits from `Workstation`, since its instances exhibits the same behavior as `Workstation`.
+
+ ![The kernel with specialized metaclasses.](figures/ObjVlispSingleton.pdf width=70&label=withSing)
+
+The two diagrams *@fig:ObjVlisp@* and *@withSing@* will be explained step by step throughout this chapter.
+
+!!note The key point of understanding such a reflective architecture is that message passing always looks up methods in the class of the receiver of the message and then follows the inheritance chain \(See Figure *@fig:kernel2@*\).
+
+![Understanding metaclasses using message passing.](figures/ObjVlispSingleton2.pdf width=90&label=fig:kernel2)
+
+Figure *@fig:kernel2@* illustrates two main cases:
+- When we send a message to `BigMac` or `Minna`, the corresponding method is looked up in their corresponding classes `Workstation` or `SpecialWorkstation` and follows the inheritance link up to `Object`.
+- When we send a messsage to the classes `Workstation` or `SpecialWorkstation`, the corresponding method is looked up in their class, the class `Class` and up to `Object`.
+
+
+#### Instances
+
+
+In this kernel, there is only one instantiation link; it is applied at all levels as shown by Figure  *@fig:Instantiation@*:
+% +Simple instances.>file://figures/Ref-Instances.png|width=50|label=fig:Instances+
+- Terminal instances are obviously objects: a workstation named `mac1` is an instance of the class `Workstation`, a point `10@20` is instance of the class `Point`.
+- Classes are also objects \(instances\) of other classes: the class `Workstation` is an instance of the class `Class`, the class `Point` is an instance of the class `Class`.
+
+
+![Chain of instantiation: classes are objects, too.](figures/Ref-InstantiationLink.pdf width=72&label=fig:Instantiation)
+
+In our diagrams, we represent objects \(mainly terminal instances\) as rounded rectangles with the list of instance variable values.
+Since classes are objects, _when we want to stress that classes are objects_ we use the same graphical convention as shown in Figure *@fig:PointClassAsObject@*.
+
+
+The model does not really bring anything new about instance structure when compared with languages such as Pharo or Java.
+
+Instance variables are an ordered sequence of instance variables defined by a class. Such
+instance variables are shared by all instances.
+The values of such instance variables are specific to each instance.
+Figure *@fig:Ref-Instances@* shows that instances of `Workstation` have two values: a name and a next node.
+
+
+![Instances of `Workstation` have two values: their names and their next node.](figures/Ref-Instances.pdf width=60&label=fig:Ref-Instances)
+
+In addition we note that an object has a pointer to its class. As we will see when we discuss inheritance later on, every object possesses an instance variable class \(inherited from `Object`\) that points to its class.
+
+
+Note that this management of a class instance variable defined in `Object` is specific to the model.
+In Pharo for example, the class identification is not managed as a declared instance variable, but as an element part of any object. It is an index in a class table.
+
+#### Classes and Methods
+
+
+Let us continue with basic instance behavior. As in modern class-based languages, this kernel has to represent how methods are stored and looked up.
+
+Methods belong to a class. They define the behavior of all the instances of the class.
+They are stored into a method dictionary that associates a key \(the method selector\) and the method body.
+
+Since methods are stored in a class, the method dictionary should be described in the metaclass. Therefore, the method dictionary of a class is the _value_ of the instance variable `methodDict` defined on the metaclass `Class`. Each class will have its own method dictionary.
+
+
+### The Semantics
+
+
+
+### Conclusion
+
+
+We presented a small kernel composed of two classes: `Object`, the root of the inheritance tree and `Class`, the first metaclass root of the instantiation tree. We revisited all the key points related to method lookup, object and class creation and initialisation. In the subsequent chapter we propose to you how to implement such a kernel.
+
+#### Further readings
+
+
+The kernel presented in this chapter is a kernel with explicit metaclasses and as such it is not a panacea. Indeed it results in problems with metaclass composition as explained in Bouraqadi et al.'s excellent article or  .

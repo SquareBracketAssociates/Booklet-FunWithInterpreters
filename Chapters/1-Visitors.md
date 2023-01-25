@@ -1,4 +1,4 @@
-## AST Visitors
+## Manipulating ASTs with the Visitor Pattern
 
 
 In the previous Chapter we have seen how to create and manipulate AST nodes.

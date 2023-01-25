@@ -1,4 +1,4 @@
-## Method Lookup
+## Late Binding and Method Lookup
 
 
 Method lookup deserves a chapter on its own: it represents the core internal logic of late-binding and it the first part of sending a message. The method-lookup algorithm needs to support normal message-sends as well as 'super' message-sends.  
