@@ -1,34 +1,5 @@
 ## Representing Objects and Memory
 
-### Instance structure
-
-
-The model does not really bring anything new about instance structure when compared with languages such as Pharo or Java.
-
-Instance variables are an ordered sequence of instance variables defined by a class. Such
-instance variables are shared by all instances.
-The values of such instance variables are specific to each instance.
-Figure *@fig:Ref-Instances@* shows that instances of `Workstation` have two values: a name and a next node.
-
-
-![Instances of `Workstation` have two values: their names and their next node.](figures/Ref-Instances.pdf width=60&label=fig:Ref-Instances)
-
-In addition we note that an object has a pointer to its class. As we will see when we discuss inheritance later on, every object possesses an instance variable class \(inherited from `Object`\) that points to its class.
-
-
-Note that this management of a class instance variable defined in `Object` is specific to the model.
-In Pharo for example, the class identification is not managed as a declared instance variable, but as an element part of any object. It is an index in a class table.
-
-
-### About behavior
-
-
-Let us continue with basic instance behavior. As in modern class-based languages, this kernel has to represent how methods are stored and looked up.
-
-Methods belong to a class. They define the behavior of all the instances of the class.
-They are stored into a method dictionary that associates a key \(the method selector\) and the method body.
-
-Since methods are stored in a class, the method dictionary should be described in the metaclass. Therefore, the method dictionary of a class is the _value_ of the instance variable `methodDict` defined on the metaclass `Class`. Each class will have its own method dictionary.
 
 ### Class as an object
 
@@ -54,8 +25,9 @@ Since a class is an object, a class has the instance variable `class` inherited 
 
 #### Example: class Point
 
-
-Figure *@fig:PointClassAsObject@* shows the instance variable values for the class `Point` as declared by the programmer and before class initialization and inheritance take place.
+Figure *@fig:PointClassAsObject@* shows the class `Point` as an instance with all the values taken in its instance variables.
+This graphical representation is the same to the one we used for terminal objects before, except that each variable is now annotated with its meaning.
+The values we show here are those declared by the programmer just before class initialization and inheritance take place.
 - It is an instance of class `Class`: indeed this is a class.
 - It is named `'Point'`.
 - It inherits from class `Object`.
