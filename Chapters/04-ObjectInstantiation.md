@@ -21,7 +21,7 @@ In ObjVLisp,  we have a name to identify the class. As an instance factory, the 
 
 Since a class is an object, a class has the instance variable `class` inherited from `Object` that refers to its class as any object.
 
-![`Point` class as an object.](figures/Ref-PointClassAsObject.pdf width=70&label=fig:PointClassAsObject)
+![`Point` class as an object. %width=70&anchor=fig:PointClassAsObject](figures/Ref-PointClassAsObject.pdf )
 
 #### Example: class Point
 
@@ -36,7 +36,7 @@ The values we show here are those declared by the programmer just before class i
 
 
 
-![`Class` as an object.](figures/Ref-ClassClassAsObject.pdf width=70&label=fig:ClassClassAsObject)
+![`Class` as an object. %width=70&anchor=fig:ClassClassAsObject](figures/Ref-ClassClassAsObject.pdf )
 
 #### Example: class Class
 
@@ -49,7 +49,7 @@ Figure *@fig:ClassClassAsObject@* describes the class `Class` itself. Indeed it 
 - It has a method dictionary.
 
 
-![Through the prism of objects.](figures/Ref-InstanceGlobalPicture.pdf width=70&label=fig:Instanceshier)
+![Through the prism of objects. % width=70&anchor=fig:Instanceshier](figures/Ref-InstanceGlobalPicture.pdf)
 
 #### Everything is an object
 
@@ -57,7 +57,7 @@ Figure *@fig:ClassClassAsObject@* describes the class `Class` itself. Indeed it 
 Figure *@fig:Instanceshier@* describes a typical situation of terminal instances, class and metaclasses when viewed from an object perspective.
 We see three levels of instances: terminal objects \(`mac1` and `mac2` which are instances of `Workstation`\), class objects \(`Workstation` and `Point` which are instances of `Class`\) and the metaclass \(`Class` which is instance of itself\).
 
-![Sending a message is two-step process: method lookup and execution.](figures/InheritanceDiagram-sendingMessage.pdf width=45&label=fig:ToSteps)
+![Sending a message is two-step process: method lookup and execution. % width=45&anchor=fig:ToStep](figures/InheritanceDiagram-sendingMessage.pdfs)
 
 
 ### Object creation
@@ -116,17 +116,17 @@ An implementation could have two different messages to create instances and clas
 
 The following diagram \(Figure *@fig:metaclassrole@*\) shows that despite what one might expect, when we create a terminal instance the metaclass `Class` is involved in the process. Indeed, we send the message `new` to the class, to resolve this message, the system will look for the method in the class of the receiver \(here `Workstation`\) which is the metaclass `Class`. The method `new` is found in the metaclass and applied to the receiver, the class `Workstation`. Its effect is to create an instance of the class `Workstation`.
 
-![Metaclass role during instance creation: Applying plain message resolution.](figures/Ref-InstanceCreationMetaclassRole.pdf width=65&label=fig:metaclassrole)
+![Metaclass role during instance creation: Applying plain message resolution. %width=65&anchor=fig:ClassCreation](figures/Ref-InstanceCreationMetaclassRole.pdf)
 
 The same happens when creating a class. Figure *@fig:ClassCreation@* shows the process. We send a message, now this time, to the class `Class`. The system makes no exception and to resolve the message, it looks for the method in the class of the receiver. The class of the receiver is itself, so the method `new` found in `Class` is applied to `Class` \(the receiver of the message\), and a new class is created.
 
-![Metaclass role during class creation: Applying plain message resolution - the self instantiation link is followed.](figures/Ref-ClassCreation.pdf width=65&label=fig:ClassCreation)
+![Metaclass role during class creation: Applying plain message resolution - the self instantiation link is followed.](figures/Ref-ClassCreation.pdf)
 
 #### new = allocate and initialize
 
-Creating an instance is the composition of two actions: a memory allocation `allocate` message and an object initialisation message `initialize`.
+Creating an instance is the composition of two actions: a memory allocation `allocate` message and an object initialization message `initialize`.
 
-In Pharo syntax it means:
+In Pharo syntax, it means:
 ```
 aClass new: args = (aClass allocate) initialize: args
 ```
@@ -172,7 +172,7 @@ The allocation for an object representing a class allocates six slots: one for c
 Object initialization is the process of passing arguments as key/value pairs and assigning the value\(s\) to the corresponding instance variable\(s\).
 
 This is illustrated in the following snippet. An instance of class `Point` is created and the key/value pairs \(:y 6\) and \(:x 24\) are
-specified. The instance is created and it received the `initialize:` message with the key/value pairs.
+specified. The instance is created and it receives the `initialize:` message with the key/value pairs.
 The `initialize:` method is responsible for setting the corresponding variables in the receiver.
 
 ```

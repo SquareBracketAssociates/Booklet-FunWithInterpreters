@@ -2,7 +2,7 @@
 
 
 In the previous Chapter we have seen how to create and manipulate AST nodes.
-The `RBParser` class implements a parser of expressions and methods that returns AST nodes for the text given as argument.
+The `Parser` class implements a parser of expressions and methods that returns AST nodes for the text given as an argument.
 With the AST manipulation methods we have seen before, we can already write queries on an AST.
 For example, counting the number of message-sends in an AST is as simple as the following loop.
 
@@ -23,7 +23,7 @@ In this section we start reviewing the visitor pattern, and we then apply it for
 ### The Visitor Pattern
 
 
-The Visitor pattern is one of the original design patterns from Gamma et al. , .
+The Visitor pattern is one of the original design patterns from Gamma et al..
 The main purpose of the Visitor pattern is to externalize an operation from a data structure.
 For example, let's consider a file system implemented with the composite pattern, where nodes can be files or directories.
 This composite forms a tree, where file nodes are leaf nodes and directory nodes are non-leaf nodes.
