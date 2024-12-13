@@ -71,9 +71,9 @@ As soon as we restart the example, it will stop again with an exception again, b
 We know that literal nodes have no children, so we can implement the visit method as just returning one.
 
 ```
-DepthCalculatorVisitor >> visitLiteralValueNode: aRBLiteralValueNode [
+DepthCalculatorVisitor >> visitLiteralValueNode: aRBLiteralValueNode 
   ^ 1
-]
+
 ```
 
 
@@ -99,35 +99,32 @@ method acceptVisitor: DepthCalculatorVisitor new.
 To calculate the above, we need to implement three other visiting methods: `visitMethodNode:`, `visitSequenceNode:` and `visitSelfNode:`. Since for the first two kind of nodes we have to iterate over all children in the same way, let's implement these similarly to our `visitMessageNode:`. Self nodes are variables, so they are leafs in our tree, and can be implemented as similarly to literals.
 
 ```
-DepthCalculatorVisitor >> visitMethodNode: aMethodNode [
+DepthCalculatorVisitor >> visitMethodNode: aMethodNode
   ^ 1 + (aMethodNode children
       inject: 0
       into: [ :max :node | max max: (node acceptVisitor: self) ])
-]
+
 ```
 
 
 ```
-DepthCalculatorVisitor >> visitSequenceNode: aSequenceNode [
+DepthCalculatorVisitor >> visitSequenceNode: aSequenceNode
   ^ 1 + (aSequenceNode children
       inject: 0
       into: [ :max :node | max max: (node acceptVisitor: self) ])
-]
 ```
 
 ```
-DepthCalculatorVisitor >> visitSelfNode: aSelfNode [
+DepthCalculatorVisitor >> visitVariableNode: aSelfNode
   ^ 1
-]
 ```
 
 
 ### Refactoring the implementation
 
-
 This simple AST visitor does not actually require a different implementation for each of its nodes.
 We have seen above that we can differentiate the nodes between two kinds: leaf nodes that do not have children, and internal nodes that have children.
-A first refactoring to avoid the repeated code in our solution may extract the repeated methods into a common ones: `visitNodeWithChildren:` and `visitLeafNode:`.
+A first refactoring to avoid the repeated code in our solution may extract the repeated methods into common ones: `visitNodeWithChildren:` and `visitLeafNode:`.
 
 ```
 DepthCalculatorVisitor >> visitNodeWithChildren: aNode 
@@ -139,7 +136,7 @@ DepthCalculatorVisitor >> visitNodeWithChildren: aNode
 
 ```
 DepthCalculatorVisitor >> visitMessageNode: aMessageNode 
-  ^ self visitNodeWithChildren: aRBMessageNode
+  ^ self visitNodeWithChildren: aMessageNode
 
 
 DepthCalculatorVisitor >> visitMethodNode: aMethodNode
@@ -159,9 +156,8 @@ DepthCalculatorVisitor >> visitLeafNode: aSelfNode
 
 ```
 
-
 ```
-DepthCalculatorVisitor >> visitSelfNode: aSelfNode
+DepthCalculatorVisitor >> visitVariableNode: aSelfNode
   ^ self visitLeafNode: aSelfNode
 ```
 
@@ -176,7 +172,7 @@ DepthCalculatorVisitor >> visitLiteralValueNode: aLiteralValueNode
 
 
 As a second step, we can refactor further by taking into account a simple intuition: leaf nodes do never have children.
-This means that `aNode children` always yields an empty collection for leaf nodes, and thus the result of the following expression is alwaysa program that zero:
+This means that `aNode children` always yields an empty collection for leaf nodes, and thus the result of the following expression is always a program that zero:
 
 ```language=smalltalk
 (aNode children
@@ -205,7 +201,7 @@ DepthCalculatorVisitor >> visitMessageNode: aMessageNode
 
 ```
 DepthCalculatorVisitor >> visitMethodNode: aMethodNode 
-  ^ self visitNode: aRBMethodNode
+  ^ self visitNode: aMethodNode
 ```
 
 ```
@@ -215,7 +211,7 @@ DepthCalculatorVisitor >> visitSequenceNode: aSequenceNode
 ```
 
 ```
-DepthCalculatorVisitor >> visitSelfNode: aSelfNode
+DepthCalculatorVisitor >> visitVariableNode: aSelfNode
   ^ self visitNode: aSelfNode
 ```
 
@@ -260,8 +256,8 @@ BaseASTVisitor >> visitSequenceNode: aSequenceNode
 ```
 
 ```
-BaseASTVisitor >> visitSelfNode: aSelfNode
-  ^ self visitNode: aSelfNode
+BaseASTVisitor >> visitVariableNode: aNode
+  ^ self visitNode: aNode
 ```
 
 ```
@@ -285,35 +281,21 @@ DepthCalculatorVisitor >> visitNode: aNode
 ```
 
 
-A more elaborate visitor could provide many more hooks.
-For example, in our example above we could have differentiated `Self` nodes from `VariableNodes`, defining the following.
-
-```language=smalltalk
-BaseASTVisitor >> visitSelfNode: aSelfNode
-  ^ self visitVariableNode: aSelfNode
-```
-
-```
-BaseASTVisitor >> visitVariableNode: aVariableNode
-  ^ self visitNode: aVariableNode
-```
-
-
 Fortunately for us, Pharo's ASTs already provide `ASTProgramNodeVisitor` a base class for our visitors, with many hooks to override in our specific subclasses.
 
 ### Searching the AST for a Token
 
 
 Calculating the depth of an AST is a pretty naïve example for a visitor because we do not need special treatment per node.
-It is however a nice example to introduce the concepts, learn some common patterns, and it furthermore forced us to do some refactorings and understanding a complex visitor structure.
+It is however a nice example to introduce the concepts, learn some common patterns, and it furthermore forced us to do some refactorings and understand a complex visitor structure.
 Moreover, it was a good introduction for the `ASTProgramNodeVisitor` class.
 
-In this section we will implement a visitor that does require different treatment per node: a node search.
+In this section, we will implement a visitor that does require a different treatment per node: a node search.
 Our node search will look for a node in the tree that contains a token matching a string.
 For the purposes of this example, we will keep it scoped to a **begins with** search, and will return all nodes it finds, in a depth-first in-order traversal.
 We leave as an exercise for the reader implementing variants such as fuzzy string search, traversing the AST in different order, and being able to provide a stream-like API to get only the next matching node on demand.
 
-Let's then start to define a new visitor class `SearchVisitor`, subclass of `RBProgramNodeVisitor`.
+Let's then start to define a new visitor class `SearchVisitor`, subclass of `ASTProgramNodeVisitor`.
 This class will have an instance variable to keep the token we are looking for.
 Notice that we need to keep the token as part of the state of the visitor: the visitor API implemented by Pharo's ASTs do not support additional arguments to pass around some extra state. This means that this state needs to be kept in the visitor.
 
