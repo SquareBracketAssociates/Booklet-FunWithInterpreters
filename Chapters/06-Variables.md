@@ -1,23 +1,24 @@
 ## Variables and Name Resolution
+@cha:variable
 
-
-In the previous Chapter we wrote a first version of an evaluator managing literals: integers, floats, arrays and booleans.
+In the previous chapter,  we wrote a first version of an evaluator managing literals: integers, floats, arrays and booleans.
 This chapter introduces in our evaluator the capability of evaluating variables.
 Variables are, using a very general definition, storage location associated with a name.
 For example, a global variable in Pharo is stored in a global dictionary of key-value associations, where the association's key is the name of the variable and its value is the value of the variable respectively.
 Instance variables, on their side, are storage locations inside objects.
 Instance variables in Pharo have each a location in the object, specified by an index, and that index corresponds to the index of the variable's name in its class' instance variable list.
 
-In this chapter we will study how variables are resolved.
-Since basically variable nodes contain only their name, this involves a "name resolution" step: finding where the variable is located, and access it accordingly following the lexical scoping \(or static scoping\) rules.
+In this chapter, we will study how variables are resolved.
+Since basically variable nodes contain only their name, this involves a "name resolution" step: finding where the variable is located, and access it accordingly following the lexical scoping (or static scoping\) rules.
 Name resolution using lexical scoping discovers variables using the nesting hierarchy of our code, where each nesting level represents a scope. For example, classes define a scope with variables visible only by their instances; the global scope defines variables that are visible everywhere in the program, and classes are nested within the global scope.
 
 In this chapter we will implement name resolution by modelling the program scopes.
 Scope objects will act as adapters for the real storage locations of variables, giving us a polymorphic way to read and write variables. Moreover, scopes will be organized in a chain of scopes, that will model the lexical organization of the program.
 
 
-### Starting up with `self` and `super`
 
+
+### Starting up with `self` and `super`
 
 To start working with variables, we begin with a method returning `self` as the one below.
 There is now a big difference between this scenario and the previous ones about literals.
@@ -25,20 +26,19 @@ Previous scenarios did always evaluate to the same value regardless how or when 
 In this case, however, evaluating this method will return a different object if the receiver of the message changes.
 
 ```
-CHInterpretable >> returnSelf [
+CHInterpretable >> returnSelf
 	^ self
-]
 ```
 
 
-#### Writing a Red Test
+### Writing a Red Test
 
 
 To properly test how `self` behaves we need to specify a receiver object, and then assert that the returned object is that same object with an identity check.
-For this purpose we use as receiver a new object instance of `Object`, which  implement equality as identity, guaranteeing that the object will be not only equals, but also the same. We use an explicit identity check in our test to convey our intention.
+For this purpose we use as receiver a new object instance of `Object`, which implements equality as identity, guaranteeing that the object will be not only equals, but also the same. We use an explicit identity check in our test to convey our intention.
 
 ```
-CHInterpreterTest >> testReturnSelf [
+CHInterpreterTest >> testReturnSelf
 	| receiver |
 	receiver := Object new.
   "Convey our intention of checking identity by using an explicit identity check"
@@ -46,23 +46,21 @@ CHInterpreterTest >> testReturnSelf [
       executeSelector: #returnSelf
       withReceiver: receiver)
           == receiver
-]
+
 ```
 
 
-#### Introducing Support to Specify a Receiver
+### Introducing Support to Specify a Receiver
 
-
-In this section we implement a first version of an execution context to introduce receiver objects.
+In this section, we implement a first version of an execution context to introduce receiver objects.
 This first support will get us up and running to implement initial variable support, but it will run short to properly implement message sends. This set up will be extended in later chapters to support to message sends and block temporaries.
 
 This initial support requires that the evaluator gets access to the object that is the receiver in the current method execution.
 For now we add an instance variable in our evaluator called `receiver`.
 
 ```
-Object subclass: #CHInterpreter
-	instanceVariableNames: 'receiver'
-	classVariableNames: ''
+Object << #CHInterpreter
+	slots: { #receiver};
 	package: 'Champollion-Core'
 ```
 
@@ -71,9 +69,8 @@ We define an accessor so that we can easily adapt when we will introduce a bette
 This instance variable is hidden behind this accessor, allowing us to change later on the implementation without breaking users.
 
 ```
-CHInterpreter >> receiver [
+CHInterpreter >> receiver 
 	^ receiver
-]
 ```
 
 
@@ -81,31 +78,28 @@ CHInterpreter >> receiver [
 Then we replace the existing implementation of `execute:` in `CHInterpreter` by `execute:withReceiver:` which allows us to specify the receiver.
 
 ```
-CHInterpreter >> execute: anAST withReceiver: anObject [
+CHInterpreter >> execute: anAST withReceiver: anObject
 	receiver := anObject.
 	^ self visitNode: anAST
-]
 ```
 
 
 And finally, since that change break all our tests, we will create a new helper method in our tests `executeSelector:withReceiver:` and then redefine the method `executeSelector:` to use this new method with a default receiver.
 
 ```
-CHInterpreterTest >> executeSelector: aSymbol [
+CHInterpreterTest >> executeSelector: aSymbol
   ^ self executeSelector: aSymbol withReceiver: nil
-]
 
-CHInterpreterTest >> executeSelector: aSymbol withReceiver: aReceiver [
+CHInterpreterTest >> executeSelector: aSymbol withReceiver: aReceiver
 	| ast |
 	ast := (CHInterpretable >> aSymbol) parseTree.
 	^ self interpreter execute: ast withReceiver: aReceiver
-]
 ```
 
 
 Now we have refactored our code, introduced the possibility to specify a message receiver, and still keep all our previous tests passing. Our new test is still red, but we are now ready to make it pass.
 
-#### Making the test pass: visiting self nodes
+### Making the test pass: visiting self nodes
 
 
 The interpretation of `self` is done in the method `visitSelfNode:`.
@@ -114,27 +108,26 @@ Implementing it is simple, it just returns the value of the receiver stored in t
 Note that this method does not access the `receiver` variable directly, but uses instead the accessor, leaving us the possibility of redefining that method without breaking the visit.
 
 ```
-CHInterpreter >> visitSelfNode: aNode [
+CHInterpreter >> visitSelfNode: aNode
 	^ self receiver
-]
 ```
 
 
-#### Introducing `super`
+### Introducing `super`
 
 
 Following the same logic as for `self`, we improve our evaluator to support `super`.
 We start by defining a method using `super` and its companion test.
 
 ```
-CHInterpretable >> returnSuper [
+CHInterpretable >> returnSuper
 	^ super
-]
+
 ```
 
 
 ```
-CHInterpreterTest >> testReturnSuper [
+CHInterpreterTest >> testReturnSuper
   | receiver |
   receiver := Object new.
   "Convey our intention of checking identity by using an explicit identity check"
@@ -142,7 +135,6 @@ CHInterpreterTest >> testReturnSuper [
       executeSelector: #returnSuper
       withReceiver: receiver)
           == receiver
-]
 ```
 
 
@@ -151,15 +143,13 @@ Contrary to a common and wrong belief, `super` is not the superclass or an insta
 It simply is the receiver:
 
 ```
-CHInterpreter >> visitSuperNode: aNode [
+CHInterpreter >> visitSuperNode: aNode
 	^ self receiver
-]
 ```
 
 
 
 ### Introducing Lexical Scopes
-
 
 Variables in Pharo are of different kinds: instance variables represent variable stored in the evaluated message receiver, temporaries and arguments are variables visible only within a particular method evaluation, shared variables and global variables are variables that are in the global scope and independent of the receiver.
 
@@ -174,28 +164,24 @@ A class scope could be added later to resolve class variables, and class pools.
 The basic structure of our lexical scope implementation introduces the method `scopeDefining:` in our interpreter, that returns the scope defining the given name. The method `scopeDefining:` forwards the search to the current scope, obtained through `currentScope`. Finally, we will extend our interpreter with `visitVariableNode:` and `visitAssignmentNode:` to handle variable reads and writes. Reads \(and writes\) obtain the scope for the read \(written\) variable and delegate the read \(write\) to it. This means our scope objects need to define methods `scopeDefining:` and `read:` and `write:withValue:`.
 
 ```
-CHInterpreter >> scopeDefining: aName [
+CHInterpreter >> scopeDefining: aName
 	^ self currentScope scopeDefining: aName
-]
 
-CHInterpreter >> currentScope [
+CHInterpreter >> currentScope
 	^ ...
-]
 
-CHInterpreter >> visitVariableNode: aVariableNode [
+
+CHInterpreter >> visitVariableNode: aVariableNode
 	^ (self scopeDefining: aVariableNode name) read: aVariableNode name
-]
 
-CHInterpreter >> visitAssignmentNode: anAssignmentNode [
+CHInterpreter >> visitAssignmentNode: anAssignmentNode
 	| value |
 	value := self visitNode: anAssignmentNode value.
 	(self scopeDefining: anAssignmentNode variable name)
     write: anAssignmentNode variable name
     withValue: value.
 	^ value
-]
 ```
-
 
 ### Evaluating Variables: Instance Variable Reads
 
@@ -207,31 +193,27 @@ We then add an instance variable and a getter and setter for it to be able to co
 
 ```
 Object subclass: #CHInterpretable
-  instanceVariableNames: 'x'
-  classVariableNames: ''
+  slots: { #x };
   package: 'Champollion-Tests'
 
-CHInterpretable >> returnX [
+CHInterpretable >> returnX
 	^ x
-]
 
-CHInterpretable >> x: anInteger [
+CHInterpretable >> x: anInteger
 	x := anInteger
-]
 ```
 
 
 To test the correct evaluation of the instance variable read, we check that the getter returns the value in the instance variable, which we can previously set.
 
 ```
-CHInterpreterTest >> testReturnInstanceVariableRead [
+CHInterpreterTest >> testReturnInstanceVariableRead
 	| receiver |
 	receiver := CHInterpretable new.
 	receiver x: 100.
 	self
 		assert: (self executeSelector: #returnX withReceiver: receiver)
 		equals: 100
-]
 ```
 
 
@@ -244,9 +226,8 @@ To make our tests go green, we need to implement instance scopes and the `CHInte
 We will model instance scopes with a new class. This class will know the receiver object, extract the list of instance variables from it, and know how to read and write from/to it.
 
 ```
-Object subclass: #CHInstanceScope
-	instanceVariableNames: 'receiver'
-	classVariableNames: ''
+Object <<#CHInstanceScope
+	slots: {#receiver};
 	package: 'Champollion-Core'
 
 CHInstanceScope >> receiver: anObject [

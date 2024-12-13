@@ -1,4 +1,4 @@
- ## Representing Code with Abstract Syntax Trees
+## Representing Code with Abstract Syntax Trees
 
 To execute actual code on top of our ObjVlisp kernel, we need code to execute.
 And since ObjVlisp does not force a way to represent code, we need to choose one oneselves.
@@ -23,7 +23,7 @@ variable := 'constant' , self message
 
 This chapter presents ASTs by looking at the existing AST implementation in Pharo used currently by many tools in Pharo's tool-chain, such as the compiler, the syntax-highlighter, the auto-completion, the code quality engine, and the refactoring engine. As so, it's an interesting piece of engineering, and we will find it provides most of what we will need for our journey to have fun with interpreters.
 
-In the following chapter, we will study \(or re-study, for those who already know it\) the Visitor design pattern.
+In the following chapter, we will study (or re-study, for those who already know it) the Visitor design pattern.
 To be usable by the many tools named before, ASTs implement a visitor interface.
 Tools performing complex operations on ASTs may then define visitor classes with their algorithms.
 As we will see in the chapters after this one, one such tool is an interpreter, thus mastering ASTs and visitors is essential.
@@ -58,7 +58,7 @@ From that perspective, the Pharo AST is in between both. The tree structure cont
 
 
 Expressions are constructs that can be evaluated to a value.
-For example, the program `17 max: 42` is the message-send `max:` to receiver 17 with argument 42, and can be evaluated to the value 42 \(since it is bigger than 17\).
+For example, the program `17 max: 42` is the message-send `max:` to receiver 17 with argument 42, and can be evaluated to the value 42 (since it is bigger than 17).
 
 ```language=smalltalk
 | expression |
@@ -101,17 +101,18 @@ expression formattedCode
 ```
 
 
-Pharo is a simple language, the number of different nodes that can compose the method ASTs is structured in a class hiearchy.
+Pharo is a simple language, the number of different nodes that can compose the method ASTs is structured in a class hierarchy.
 Figure *@NodeHierarchy@* shows the node inheritance hierarchy of Pharo rendered as a textual tree.
 
-![Overview of the method node hierarchy TODO: remove ASTPatternPragmaNode - Add ASTSelectorNode). Indentation implies inheritance. %anchor=NodeHierarchy&width=80](figures/RBNodeHierarchy.pdf)
+
+![Overview of the method node hierarchy. Indentation implies inheritance. %anchor=NodeHierarchy&width=60](figures/RBNodeHierarchy.pdf)
 
 ### Literal Nodes
 
 
 Literal nodes represent literal objects. A literal object is an object that is not created by sending the `new` message to a class.
-Instead, the developer writes directly in the source code the value of that object, and the object is created automatically from it \(could be at parse time, at compile time, or at runtime, depending on the implementation\).
-Literal objects in Pharo are strings, symbols, numbers, characters, booleans \(`true` and  `false`\), `nil` and literal arrays \(`#()`\).
+Instead, the developer writes directly in the source code the value of that object, and the object is created automatically from it (could be at parse time, at compile time, or at runtime, depending on the implementation).
+Literal objects in Pharo are strings, symbols, numbers, characters, booleans (`true` and  `false`), `nil` and literal arrays (`#()`).
 
 Literal nodes in Pharo are instances of the `ASTLiteralValueNode`, and understand the message `value` which returns the value of the object.
 In other words, literal objects in Pharo are resolved at parse time. Notice that the `value` message does not return a string representation of the literal object, but the literal object itself.
@@ -176,17 +177,14 @@ The parser generates a simple AST, later tools annotate the AST with semantic in
 An example of this kind of treatment is the compiler, which requires such contextual information to produce the correct final code.
 
 For the matter of this book, we will not consider nor use semantic analysis, and we will stick with normal `ASTVariableNode` objects.
-The only exceptions to this are `self`, `super`, and `thisContext` special variables.
-Special variables are variables that are recognized at parse-time, and generating special nodes `ASTSelfNode`, `ASTSuperNode` and `ASTThisContextNode` for them.
-These special nodes inherit from `ASTVariableNode` and work as normal variable nodes for the purposes of this book.
+Later in the book we may do an optimization phase to get a richer tree that will simplify our interpretation.
 
 
 ### Assignment Nodes
 
-
 Assignment nodes in the AST represent assignment expressions using the `:=` operator.
 In Pharo, following Smalltalk design, assignments are expressions: their value is the value of the variable after the assignment.
-This allows to chain assignments. We will see in the next chapter, when implementing an evaluator, why this is important.
+This allows one to chain assignments. We will see in the next chapter, when implementing an evaluator, why this is important.
 
 An assignment node is an instance of `ASTAssignmentNode`.
 If we send it the `variable` message, it answers the variable it assigns to.
@@ -207,8 +205,8 @@ assignmentExpression value
 ### Message Nodes
 
 
-Message nodes are the core of Pharo programs, and they are the most common composed expression nodes we find in the AST.
-Messages are instances of `ASTMessageNode` and they have a receiver, a selector and a collection of arguments, obtained through the `receiver`, `selector` and `arguments` messages.
+Message nodes are the core of Pharo programs, and they are the most commonly composed expression nodes we find in the AST.
+Messages are instances of `ASTMessageNode` and they have a receiver, a selector, and a collection of arguments, obtained through the `receiver`, `selector` and `arguments` messages.
 We say that message nodes are composed expressions because the `receiver` and `arguments` of a message are expressions in themselves, which can be as simple as literals or variables, or other composed messages too.
 
 ```language=smalltalk
@@ -218,7 +216,7 @@ messageExpression receiver
 ```
 
 
-Note that `arguments` is a normal collection of expressions - in the sense that there is not special node class to represent such a sequence.
+Note that `arguments` is a normal collection of expressions - in the sense that there is no special node class to represent such a sequence.
 
 ```language=smalltalk
 messageExpression arguments
@@ -237,10 +235,10 @@ messageExpression selector
 #### A note on message nodes and precedence
 
 
-For those readers that already master the syntax of Pharo, you remember that there exist three kind of messages: unary, binary and keyword messages.
+For those readers that already mastered the syntax of Pharo, you remember that there exist three kinds of messages: unary, binary, and keyword messages.
 Besides their number of parameters, the Pharo syntax accords an order of precedence between them too, i.e., unary messages get to be evaluated before binary messages, which get to be evaluated before keyword messages.
 Only parentheses override this precedence.
-Precedence of messages in ASTs is resolved at parse-time.
+The precedence of messages in ASTs is resolved at parse-time.
 In other words, the output of `Parser` is an AST respecting the precedence rules of Pharo.
 
 Let's consider a couple of examples illustrating this, illustrated in Figure *@precedence@*.
@@ -253,17 +251,17 @@ variable keyword: argument + 42 unaryMessage
 ```
 
 
-Now, let's change the expression adding extra parenthesis as in:
+Now, let's change the expression by adding extra parenthesis as in:
 
 ```
 variable keyword: (argument + 42) unaryMessage
 ```
 
 
-![Different precedence results in different ASTs.](figures/precedence.pdf width=80&label=precedence)
+![Different precedence results in different ASTs. % width=80&anchor=precedence](figures/precedence.pdf)
 
 The resulting AST completely changed!
-The root is still the `keyword:` message, but now its first argument is the `unaryMessage` sent to a \(now in parenthesis\) `(argument + 42)` receiver.
+The root is still the `keyword:` message, but now its first argument is the `unaryMessage` sent to a (now in parenthesis) `(argument + 42)` receiver.
 
 Finally, if we modify the parenthesis again to wrap the keyword message, the root of the resulting AST has changed too.
 It is now the `+` binary message.
@@ -279,7 +277,7 @@ It is now the `+` binary message.
 
 
 Cascade nodes represent cascaded message expressions, i.e., messages sent to the same receiver.
-Cascaded messages are messages separated by semi-colons \(`;`\) such as in the following example.
+Cascaded messages are messages separated by semi-colons (`;`) such as in the following example.
 
 ```language=smalltalk
 OrderedCollection new
@@ -354,7 +352,7 @@ arrayNode children.
 Now that we have studied the basic nodes representing expressions, we can build up methods from them.
 Methods are represented as instances of `ASTMethodNode` and need to be parsed with a variant of the parser we have used so far, a method parser.
 The `Parser` class fulfills the role of a method parser when we use the message `parseMethod:` instead of `parseExpression:`.
-For example, the following piece of code returns a `ASTMethodNode` instance for a method named `myMethod`.
+For example, the following piece of code returns an `ASTMethodNode` instance for a method named `myMethod`.
 
 ```language=smalltalk
 methodNode := Parser parseMethod: 'myMethod
@@ -363,7 +361,7 @@ methodNode := Parser parseMethod: 'myMethod
 ```
 
 
-A method node differs from the expression nodes that we have seen before by the fact that method nodes can only be roots in the AST tree. Method nodes cannot be children of other nodes. This differs from other programming languages in block in which method definitions are indeed expressions or statements that can be nested. In Pharo method definitions are not statements: like class definitions, they are top level elements. This is why Pharo is not a block structure language, even if it has closures \(named blocks\) that can be nested, passed as arguments or stored.
+A method node differs from the expression nodes that we have seen before by the fact that method nodes can only be roots in the AST tree. Method nodes cannot be children of other nodes. This differs from other block-based programming languages in which method definitions are indeed expressions or statements that can be nested. In Pharo, method definitions are not statements: like class definitions, they are top-level elements. This is why Pharo is not a block structure language, even if it has closures (named blocks) that can be nested, passed as arguments, or stored.
 
 Method nodes have a name or selector, accessed through the `selector` message, a list of arguments, accessed through the `arguments` message, and as we will see in the next section they also contain a body with the list of statements in the method.
 
@@ -376,10 +374,10 @@ methodNode selector
 ### Sequence Nodes
 
 
-Method nodes have a body, represented as a `ASTSequenceNode`.
+Method nodes have a body, represented as an `ASTSequenceNode`.
 A sequence node is a sequence of instructions or statements.
 All expressions are statements, including all nodes we have already seen such as literals, variables, arrays, assignments and message sends.
-We will introduce later two more kind of nodes that can be included as part of a sequence node: block nodes and return nodes.
+We will introduce later two more kinds of nodes that can be included as part of a sequence node: block nodes and return nodes.
 Block nodes are expressions that are syntactically and thus structurally similar to methods.
 Return nodes, representing the return instruction `^`, are statement nodes but not expression nodes, i.e., they can only be children of sequence nodes.
 
@@ -430,10 +428,9 @@ methodNode body temporaries.
 
 ### Return Nodes
 
-
 AST return nodes represent the instructions that are syntactically identified by the caret character `^`.
 Return nodes, instances of `ASTReturnNode` are not expression nodes, i.e., they can only be found as a direct child of sequence nodes.
-Return nodes represent the fact of returning a value, and that value is an expression, which we is accessible through the `value` message.
+Return nodes represent the fact of returning a value, and that value is an expression, which is accessible through the `value` message.
 
 ```language=smalltalk
 methodNode := Parser parseMethod: 'myMethod
@@ -451,8 +448,8 @@ returnNode value.
 Note that as in Pharo return statements are not mandatory in a method, they are not mandatory in the AST either.
 Indeed, we can have method ASTs without return nodes.
 In those cases, the semantics of Pharo specifies that `self` is implicitly returned.
-It is interesting to note that the AST does not contain semantics but only syntax: we will add semantics to the AST when we evaluate it in a subsequent chapter.
-In Pharo this is the compiler that ensures that a method always return self when return statements are absent in some execution paths.
+It is interesting to note that the AST does not contain semantics but only syntax: we will give semantics to the AST when we evaluate it in a subsequent chapter.
+In Pharo this is the compiler that ensures that a method always returns self when return statements are absent in some execution paths.
 
 Also, as we said before, return nodes are not expressions, meaning that we cannot write any of the following:
 
@@ -471,11 +468,11 @@ x := ^ 5
 
 Block nodes represent block closure expressions.
 A block closure is an object syntactically delimited by square brackets `[]` that contains statements and can be evaluated using the `value` message and its variants.
-The block node is the syntactic counter-part of a block closure: it is the expression that, when evaluated, will create the block object.
+The block node is the syntactic counterpart of a block closure: it is the expression that, when evaluated, will create the block object.
 
-Block nodes work by most means like method nodes: they have a list of arguments and a sequence node as body containing temporaries and statements.
-They differentiate from methods in two aspects: first, they do not have a selector, second, they are expressions \(and thus can be parsed with `parseExpression:`\).
-They can be stored in variables, passed as message arguments and returned by messages.
+Block nodes work by most means like method nodes: they have a list of arguments and a sequence node as a body containing temporaries and statements.
+They differentiate from methods in two aspects: first, they do not have a selector, second, they are expressions (and thus can be parsed with `parseExpression:`).
+They can be stored in variables, passed as message arguments, and returned by messages.
 
 ```
 blockNode := Parser parseExpression: '[ :arg | | temp | 1 + 1. temp ]'.
@@ -492,15 +489,14 @@ blockNode body statements
 
 ### Basic ASTs Manipulations
 
-
-We have already covered all of Pharo AST nodes, and how to access the information in them.
-Those knowing ASTs for other languages, would have noticed that we have indeed few nodes.
+We have already covered all of Pharo AST nodes, and how to access the information they contain.
+Those knowing ASTs for other languages would have noticed that we have indeed few nodes.
 This is because in Pharo, control-flow statements such as conditionals or loops are expressed as messages, so no special case for them is required in the syntax.
-Because of this, Pharo's syntax fits in a post-card.
+Because of this, Pharo's syntax fits in a postcard.
 
 In this section, we will explore some core-messages of Pharo's AST, that allow common manipulation for all nodes: iterating the nodes, storing meta-data and testing methods.
 Most of these manipulations are rather primitive and simple.
-In the next chapter, we will see how the visitor pattern in conjunction with ASTs empowers us, and gives us the possibility to build more complex applications such as concrete and abstract evaluators as we will see in the next chapters.
+In the next chapter, we will see how the visitor pattern in conjunction with ASTs empower us, and gives us the possibility to build more complex applications such as concrete and abstract evaluators as we will see in the next chapters.
 
 #### Iterating over an AST
 
@@ -517,26 +513,25 @@ ASTs provide several protocols for accessing and iterating any AST node in a gen
 
 #### Storing Properties
 
-
 Some manipulations require storing meta-data associated to AST nodes.
 Pharo ASTs provide a set of messages for storing arbitrary properties inside a node.
 Properties stored in a node are indexed by a key, following the API of Pharo dictionaries.
 
 - `aNode propertyAt: aKey put: anObject`: inserts `anObject` at `aKey`, overriding existing values at `aKey`.
-- `aNode hasProperty: aKey`: returns a boolean indicting if the node contains a property indexed by `aKey`.
+- `aNode hasProperty: aKey`: returns a boolean indicating if the node contains a property indexed by `aKey`.
 - `aNode propertyAt: aKey`: returns the value associated with `aKey`. If `aKey` is not found, fails with an exception.
-- `aNode propertyAt: aKey ifAbsent: aBlock`: returns the value associated with `aKey`. If `aKey` is not found, evaluates the block and returns its value.
-- `aNode propertyAt: aKey ifAbsentPut: aBlock`: returns the value associated with `aKey`. If `aKey` is not found, evaluates the block, inserts the value of the block at `aKey` and returns the value.
-- `aNode propertyAt: aKey ifPresent: aPresentBlock ifAbsent: anAbsentBlock`: Searches for the value associated with `aKey`. If `aKey` is found, evaluates `aPresentBlock` with its value. If `aKey` is not found, evaluates the block and returns its value.
+- `aNode propertyAt: aKey ifAbsent: aBlock`: returns the value associated with `aKey`. If `aKey` is not found, evaluate the block and return its value.
+- `aNode propertyAt: aKey ifAbsentPut: aBlock`: returns the value associated with `aKey`. If `aKey` is not found, evaluate the block, insert the value of the block at `aKey`, and return the value.
+- `aNode propertyAt: aKey ifPresent: aPresentBlock ifAbsent: anAbsentBlock`: Searches for the value associated with `aKey`. If `aKey` is found, evaluate `aPresentBlock` with its value. If `aKey` is not found, evaluate the block and return its value.
 - `aNode removeProperty: aKey`: removes the property at `aKey`. If `aKey` is not found, fails with an exception.
-- `aNode removeProperty: aKey ifAbsent: aBlock`: removes the property at `aKey`. If `aKey` is not found, evaluates the block and returns its value.
+- `aNode removeProperty: aKey ifAbsent: aBlock`: removes the property at `aKey`. If `aKey` is not found, evaluate the block, and return its value.
 
 
 
 #### Testing Methods
 
 
-ASTs provide a testing protocol that can be useful for small applications and writing unit tests.
+ASTs provide a testing protocol that is useful for small applications and writing unit tests.
 All ASTs answer the messages `isXXX` with a boolean `true` or `false`.
 A first set of methods allow us to ask a node if it is of a specified type:
 
@@ -645,7 +640,7 @@ foo: arg1 bar: arg2
 #### Exercises on Invalid Code
 
 
-Explain why the following code snippets \(and thus their ASTs\) are invalid:
+Explain why the following code snippets (and thus their ASTs) are invalid:
 
 1. Explain why this expression is invalid `(a + 1) := b`.
 1. Explain why this expression is invalid `a + ^ 81`.
@@ -655,9 +650,9 @@ Explain why the following code snippets \(and thus their ASTs\) are invalid:
 #### Exercises on Control Flow
 
 
-As we have seen so far, there is no special syntax for control flow statements \(i.e., conditionals, loops...\).
-Instead, Pharo uses normal message-sends for them \(`ifTrue:`, `ifFalse:`, `whileTrue:` ...\).
-This makes the ASTs simpler, and also turns control flow statements into control flow expressions.
+As we have seen so far, there is no special syntax for control flow statements (i.e., conditionals, loops...).
+Instead, Pharo uses normal message-sends for them (`ifTrue:`, `ifFalse:`, `whileTrue:` ...).
+This makes the ASTs simple, and also turns control flow statements into control flow expressions.
 
 1. Give an example of an expression using a conditional and its corresponding AST
 1. Give an example of an expression using a loop and its corresponding AST
@@ -667,5 +662,5 @@ This makes the ASTs simpler, and also turns control flow statements into control
 ### Conclusion
 
 
-In this chapter we have studied AST, short for abstract syntax trees, an object-oriented representation of the syntactic structure of programs. We have also seen an implementation of them: the ASTs. Pharo provides a parser for Pharo methods and expressions that transforms a string into a tree representing the program. We have seen how we can manipulate those ASTs. Any other nodes follow a similar principal.
+In this chapter, we have studied AST, short for abstract syntax trees, an object-oriented representation of the syntactic structure of programs. We have also seen an implementation of them: the ASTs. Pharo provides a parser for Pharo methods and expressions that transforms a string into a tree representing the program. We have seen how we can manipulate those ASTs. Any other nodes follow a similar principle.
 You should have now the basis to understand the concept of ASTs and we can move on to the next chapter.
