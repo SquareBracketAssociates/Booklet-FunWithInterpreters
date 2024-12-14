@@ -112,8 +112,7 @@ CInterpreter >> visitVariableNode: aNode
 
 Note that in Pharo, the compiler performs a pass and enriches the variable node with an instance of the `Variable` hierarchy. 
 It uses then another visit method to be able to avoid such an ugly condition.
-You can see the different in the returned trees by comparing the results of 
- `(CInterpretable >> aSymbol) parseTree` and `Parser parseMethod: (CInterpretable >> aSymbol) sourceCode`.
+You can see the different in the returned trees by comparing the results of  `(CInterpretable >> aSymbol) parseTree` and `Parser parseMethod: (CInterpretable >> aSymbol) sourceCode`.
 
 
 
