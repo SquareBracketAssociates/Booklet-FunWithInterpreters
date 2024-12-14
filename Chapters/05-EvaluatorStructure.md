@@ -1,30 +1,30 @@
 ## Implementing an Evaluator
 
-An evaluator is a kind of interpreter that executes a program. For example a Pharo evaluator is an interpreter that takes as input a Pharo program and executes each one of its statements, finally returning the result of the execution.
+An evaluator is a kind of interpreter that executes a program.  A Pharo evaluator is an interpreter that takes as input a Pharo program and executes each one of its statements, finally returning the result of the execution.
 
-In this chapter and the following ones we will implement a Pharo evaluator as an AST interpreter, using the Visitor pattern we have seen before, meaning that the input of our evaluator will be AST nodes of a program to evaluate.
+In this chapter and the following ones, we will implement a Pharo evaluator as an AST interpreter, using the Visitor pattern we have seen before, meaning that the input of our evaluator will be AST nodes of a program to evaluate.
 
 For presentation purposes, we will develop the evaluator in several stages, each in a different chapter.
 First, in this chapter, we will show how to implement a structural evaluator, i.e., an evaluator that reads and writes the structures of objects, starting the presentation from constant values.
 
 Later chapters will incrementally add support for other language features that deserve a chapter for themselves such as messages and blocks.
 
-This chapter is presented in a somehow-relaxed TDD (Test Driven Development) style.
-For each new feature we first define the scenario we want to cover.
-Since we are developing an evaluator, each scenario will be some code to execute and an expected result.
+This chapter is presented in a somehow relaxed TDD (Test Driven Development) style.
+For each new feature, we first define the scenario we want to cover.
+Since we are developing an evaluator, each scenario will have some code to execute and an expected result.
 We then define a test for the scenario and we make it pass.
 Before going to the next scenario, we do some refactorings to enhance the quality of our code.
 
-During this process we will define and refine an AST visitor.
-Note that we will write the visitor from scratch but we will reuse the node of the Pharo AST and their functionalities.
+During this process, we will define and refine an AST visitor.
+Note that we will write the visitor from scratch but we will reuse the nodes of the Pharo AST and their functionalities.
 
 ### Setting Up the Stage
 
-To start writing our Pharo evaluator in TDD style, we will start by creating out test class `CHInterpreterTest`.
-Our class names are prefixed with CH because we named the package of the interpreter Champollion.
+To start writing our Pharo evaluator in TDD style, we will start by creating out test class `CInterpreterTest`.
+Our class names are prefixed with `C` because we named the package of the interpreter Champollion.
 
 ```
-TestCase << #CHInterpreterTest
+TestCase << #CInterpreterTest
 	package: 'Champollion-Tests'
 ```
 
@@ -33,19 +33,17 @@ This class will, until a change is imperative, host all our test methods.
 
 #### Preparing the Scenarios
 
-
 Our scenarios, made out of classes and methods to be interpreted, need to be written somewhere too.
 We could store those scenarios in strings in our test class, that we will then need to parse and give to our interpreter as input.
-However, for simplicity, and because in this book we do not want to center ourselves in parsing issues, we will write our scenarios as normal Pharo code, in normal Pharo classes.
-This solution is simple enough and versatile to support more complex situations in the future.
-
+We will write our scenarios as normal Pharo code, in normal Pharo classes: 
 We will host our first scenarios as methods in a new class named `CHInterpretable`.
 
+This solution is simple enough and versatile to support more complex situations in the future.
+
 ```
-Object << #CHInterpretable
+Object << #CInterpretable
 	package: 'Champollion-Test'
 ```
-
 
 
 ### Evaluating Literals: Integers
@@ -57,7 +55,7 @@ We have chosen to use return statements, to introduce variables and assignments 
 To start, our first scenario is a method returning an integer, as in the code below:
 
 ```
-CHInterpretable >> returnInteger
+CInterpretable >> returnInteger
 	^ 5
 ```
 
@@ -71,9 +69,9 @@ This first test specifies not only part of the behavior of our interpreter but a
 Below we define a first test for it: `testReturnInteger`.
 
 ```
-CHInterpreterTest >> testReturnInteger
+CInterpreterTest >> testReturnInteger
 	| ast result |
-	ast := (CHInterpretable >> #returnInteger) parseTree.
+	ast := (CInterpretable >> #returnInteger) parseTree.
 	result := self interpreter execute: ast.
 	self assert: result equals: 5
 ```
@@ -87,36 +85,36 @@ Instead of invoking the parser to get an AST from source code, we will use Pharo
 
 
 Executing our first test fails first because our test does not understand `interpreter`, meaning we need to implement a method for it in our test class.
-We implement it as a factory method in our test class, returning a new instance of `CHInterpreter`, and we define the class `CHInterpreter` as follows.
+We implement it as a factory method in our test class, returning a new instance of `CInterpreter`, and we define the class `CInterpreter` as follows.
 
 ```
-CHInterpreterTest >> interpreter
-	^ CHInterpreter new
-```
-
-
-```
-Object << #CHInterpreter
-	package: 'Champollion-Core'
+CInterpreterTest >> interpreter
+	^ CInterpreter new
 ```
 
 
-The class `CHInterpreter`  is the main entry point for our evaluator, and it will implement a visitor pattern over the Pharo method ASTs.  Note that it does not inherit from the default Pharo AST Visitor.
+```
+Object << #CInterpreter
+	package: 'Champollion'
+```
+
+
+The class `CInterpreter`  is the main entry point for our evaluator, and it will implement a visitor pattern over the Pharo method ASTs.  Note that it does not inherit from the default Pharo AST Visitor.
 The Pharo AST visitor already implements generic versions of the `visitXXX:` methods that will do nothing instead of failing.
 Not inheriting from it allows us to make it clear when something is not yet implemented: we will get problems such as does not understand exceptions that we will be able to implement them step by step in the debugger.
 We, nevertheless, follow the same API as the default AST visitor and we use the nodes' `accept:` visiting methods.
 
-At this point, re-executing the test fails with a new error: our `CHInterpreter` instance does not understand the message `execute:`.
+At this point, re-executing the test fails with a new error: our `CInterpreter` instance does not understand the message `execute:`.
 We implement `execute:` to call the visitor main entry point, i.e., the method `visitNode:`.
 
 ```
-CHInterpreter >> execute: anAST
+CInterpreter >> execute: anAST
 	^ self visitNode: anAST
 ```
 
 
 ```
-CHInterpreter >> visitNode: aNode
+CInterpreter >> visitNode: aNode
 	^ aNode acceptVisitor: self
 ```
 
@@ -125,7 +123,7 @@ Since we evaluate a method AST, when we re-execute the test, the execution halts
 A first implementation for this method simply continues the visit on the body of the method.
 
 ```
-CHInterpreter >> visitMethodNode: aMethodNode
+CInterpreter >> visitMethodNode: aMethodNode
 	^ self visitNode: aMethodNode body
 ```
 
@@ -136,9 +134,9 @@ Since our scenario has only a single statement with no temporary variables, a fi
 So we visit all the statements except the last one, and we then visit the last one and return its result.
 
 ```
-CHInterpreter >> visitSequenceNode: aSequenceNode
-	"Visit all but the last statement without caring about the result"
-
+CInterpreter >> visitSequenceNode: aSequenceNode
+	"Visit the sequence and return the result of the last statement. 	Does not look at temporary declaration for now."
+	
 	aSequenceNode statements allButLast
 		do: [ :each | self visitNode: each ].
 	^ self visitNode: aSequenceNode statements last
@@ -150,7 +148,7 @@ This method simply visits the contents of the return node \(invoking recursively
 At this point, the value is not yet covered by the visitor.
 
 ```
-CHInterpreter >> visitReturnNode: aReturnNode
+CInterpreter >> visitReturnNode: aReturnNode
 	^ self visitNode: aReturnNode value
 ```
 
@@ -160,7 +158,7 @@ To handle this node, we define the method `visitLiteralValueNode:`.
 The implementation just returns the value of the node, which is the integer we were looking for.
 
 ```
-CHInterpreter >> visitLiteralValueNode: aLiteralValueNode
+CInterpreter >> visitLiteralValueNode: aLiteralValueNode
 	^ aLiteralValueNode value
 ```
 
