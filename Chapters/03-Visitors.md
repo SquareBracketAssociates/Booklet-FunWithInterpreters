@@ -66,6 +66,25 @@ SizeVisitor >> visitDirectoryNode: aDirectoryNode
   ^ aDirectoryNode children sum: [ :each | each acceptVisitor: self ]
 ```
 
+
+### Exercises
+
+
+#### Exercises on the Visitor Pattern
+
+
+1. Implement mathematical expressions as a tree: define the classes `OpPlus`, `OpMinus`, and `OpNumber`.
+Then model expressions like `1 + 8 / 3`, and two operations on them using the composite pattern: (a) calculate their final value, and (b) print the tree in pre-order. For example, the result of evaluating the previous expression is 3, and printing it in pre-order yields the string `'/ + 1 8 3'`.
+
+
+1. Re-implement the code above using a visitor pattern.
+
+
+1. Add a new kind of node to our expressions: raised to by defining the class `OpRaiseTo`. Implement it in both the composite and visitor implementations.
+
+
+1. About the difference between a composite and a visitor. What happens to each implementation if we want to add a new operation? And what happens when we want to add a new kind of node?
+
 ### Conclusion
 
 In this chapter we have reviewed the visitor design pattern first on a simple example, then on ASTs.

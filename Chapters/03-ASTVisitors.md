@@ -298,111 +298,129 @@ We leave as an exercise for the reader implementing variants such as fuzzy strin
 Let's then start to define a new visitor class `SearchVisitor`, subclass of `ASTProgramNodeVisitor`.
 This class will have an instance variable to keep the token we are looking for.
 Notice that we need to keep the token as part of the state of the visitor: the visitor API implemented by Pharo's ASTs do not support additional arguments to pass around some extra state. This means that this state needs to be kept in the visitor.
+When the search matches the name of a variable or elements, we will store its name into a collection of matched node names. 
 
 ```language=smalltalk
 ASTProgramNodeVisitor << #SearchVisitor
-  slots: { #token};
+  slots: { #token . #matchedNodeNames};
   package: 'VisitorExample'
 
 SearchVisitor >> token: aToken
   token := aToken
+  
+SearchVisitor >> initialize
+  super initialize.
+  matchedNodeNames := OrderedCollection new
 ```
 
 
-The main idea of our visitor is that it will return a collection with all matching nodes.
-If no matching nodes are found, an empty collection is returned.
-
 ### Searching in variables nodes
 
+Let us define a little test
+```
+SearchVisitorTest >> testTokenInVariable
 
-Let's then start implementing the visit methods for variable nodes.
-`ASTProgramNodeVisitor` will already treat special variables as variable nodes, so a single visit method is enough for all four kind of nodes.
+	| tree visitor |
+	tree := Parser parseMethod: 'one 
+
+| pharoVar |
+pharoVar := 0.
+pharoVar := pharoVar + 1.
+^ pharoVar'.
+	visitor := SearchVisitor new.
+	visitor token: 'pharo'.
+	visitor visit: tree.
+	self assert: visitor matchedNodeNames first equals: 'pharoVar'
+```
+
+
+Implement the visit methods for variable nodes. 
 A variable node matches the search if its name begins with the searched token.
 
 ```language=smalltalk
 SearchVisitor >> visitVariableNode: aNode
-  ^ (aNode name beginsWith: token)
-      ifTrue: [ { aNode } ]
-      ifFalse: [ #() ]
+
+	(aNode name beginsWith: token) ifTrue: [
+		matchedNodeNames add: aNode name ]
 ```
+
 
 
 #### Searching in message nodes
 
-
 Message nodes will match a search if their selector begins with the searched token.
 In addition, to follow the specification children of the message need to be iterated in depth first in-order.
-This means the receiver should be iterated first, then the message node itself, finally the arguments.
+This means the receiver should be iterated first, then the message node itself, and finally the arguments.
 
-```language=smalltalk
-SearchVisitor >> visitMessageNode: aNode [
-  ^ (aNode receiver acceptVisitor: self),
-    ((aNode selector beginsWith: token)
-      ifTrue: [ { aNode } ]
-      ifFalse: [ #() ]),
-    (aNode arguments gather: [ :each | each acceptVisitor: self ])
-]
+The following test checks that we identify message selectors. 
+```
+SearchVisitorTest >> testTokenInMessage
+
+	| tree visitor |
+	tree := Parser parseMethod: 'one 
+
+self pharo2 pharoVar: 11.
+'.
+	visitor := SearchVisitor new.
+	visitor token: 'pharo'.
+	visitor visit: tree.
+	self assert: visitor matchedNodeNames first equals: 'pharo2'.
+	self assert: visitor matchedNodeNames second equals: 'pharoVar:'
 ```
 
 
-### Searching in literal nodes
+```language=smalltalk
+SearchVisitor >> visitMessageNode: aNode
 
+	aNode receiver acceptVisitor: self.
+	(aNode selector beginsWith: token) ifTrue: [
+		matchedNodeNames add: aNode selector ].
+	aNode arguments do: [ :each | each acceptVisitor: self ]
+```
+
+### Searching in literal nodes
 
 Literal nodes contain literal objects such as strings, but also booleans or numbers.
 To search in them, we need to transform such values as string and then perform the search within that string.
 
 ```language=smalltalk
-SearchVisitor >> visitLiteralNode: aNode
-  ^ (aNode value asString beginsWith: token)
-      ifTrue: [ { aNode } ]
-      ifFalse: [ #() ]
+SearchVisitor >> testTokenInLiteral
+
+	| tree visitor |
+	tree := Parser parseMethod: 'one 
+
+^ #(''pharoString'')'.
+	visitor := SearchVisitor new.
+	visitor token: 'pharo'.
+	visitor visit: tree.
+	self assert: visitor matchedNodeNames first equals: 'pharoString'
+```
+
+```
+SearchVisitor >> visitLiteralValueNode: aNode
+
+	(aNode value asString beginsWith: token) ifTrue: [
+		matchedNodeNames add: aNode value asString ]
 ```
 
 
-### The rest of the nodes
 
-The rest of the nodes do not contain strings to search in them.
-Instead, they contain children we need to search.
-We can then provide a common implementation for them by simply redefining the `visitNode:` method.
+Another design would be to return the collection of matched nodes instead of storing it inside the visitor state. 
+The visit methods should then return a collection with all matching nodes.
+If no matching nodes are found, an empty collection is returned.
 
-```language=smalltalk
-SearchVisitor >> visitNode: aNode
-  ^ aNode children gather: [ :each | each acceptVisitor: self ]
-```
-
-
-Another design would be to store the collection holding the rest inside the visitor and avoid the temporary copies.
-We let you refactor your code to implement it.
+We let you implement it as an exercise. 
 
 ### Exercises
-
-
-#### Exercises on the Visitor Pattern
-
-
-1. Implement mathematical expressions as a tree, to for example model expressions like `1 + 8 / 3`, and two operations on them using the composite pattern: \(a\) calculate their final value, and \(b\) print the tree in pre-order. For example, the result of evaluating the previous expression is 3, and printing it in pre-order yields the string `'/ + 1 8 3'`.
-
-
-1. Re-implement the code above using a visitor pattern.
-
-
-1. Add a new kind of node to our expressions: raised to. Implement it in both the composite and visitor implementations.
-
-
-1. About the difference between a composite and a visitor. What happens to each implementation if we want to add a new operation? And what happens when we want to add a new kind of node?
-
 
 #### Exercises on the AST Visitors
 
 
-1. Implement an AST lineariser, that returns an ordered collection of all the nodes in the AST \(similar to the pre-order exercise above\).
-
+1. Implement an AST lineariser, that returns an ordered collection of all the nodes in the AST (similar to the pre-order exercise above).
 
 1. Extend your AST lineariser to handle different linearisation orders: breadth-first, depth-first pre-order, depth-first post-order.
 
-
 1. Extend the Node search exercise in the chapter to have alternative search orders. E.g., bottom-up, look not only if the strings begin with them.
-
 
 1. Extend the Node search exercise in the chapter to work as a stream: asking `next` repeatedly will yield the next occurrence in the tree, or `nil` if we arrived at the end of the tree. You can use the linearisations you implemented above.
 
