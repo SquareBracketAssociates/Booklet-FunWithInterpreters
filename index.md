@@ -6,7 +6,8 @@
 %<!inputFile|path=Chapters/04-ObjectInstantiation.md!>
 
 <!inputFile|path=Chapters/05-EvaluatorStructure.md!>
-<!inputFile|path=Chapters/06-Variables.md!>
+<!inputFile|path=Chapters/06-SelfSuper.md!>
+<!inputFile|path=Chapters/06-VariablesAndScopes.md!>
 <!inputFile|path=Chapters/07-EvaluatorMessageAndArg.md!>
 <!inputFile|path=Chapters/08-EvaluatorMessageLookup.md!>
 <!inputFile|path=Chapters/09-EvaluatorPrimitives.md!>
