@@ -173,7 +173,7 @@ Since we already have integer constants working, let's consider next a method re
 We can see such a scenario in the code below:
 
 ```
-CHInterpretable >> returnFloat
+CInterpretable >> returnFloat
 	^ 3.14
 ```
 
@@ -187,9 +187,9 @@ Testing this case is straightforward, we should test that evaluating our method 
 We already defined that our interpreter understands the `execute:`  message, so this test can follow the implementation of our previous test.
 
 ```
-CHInterpreterTest >> testReturnFloat
+CInterpreterTest >> testReturnFloat
 	| ast result |
-	ast := (CHInterpretable >> #returnFloat) parseTree.
+	ast := (CInterpretable >> #returnFloat) parseTree.
 	result := self interpreter execute: ast.
 	self assert: result equals: 3.14
 ```
@@ -200,7 +200,6 @@ Second, some would argue that this test is somehow repeating code from the previ
 
 
 ### Refactor: Improving the Test Infrastructure
-
 
 Since we will write many tests with a similar structure during this book, it comes in handy to share some logic between them. The two tests we wrote so far show a good candidate of logic to share as repeated code we can extract.
 
@@ -217,7 +216,7 @@ CHInterpreterTest >> executeSelector: aSymbol
 And we can now proceed to rewrite our first two tests as follows:
 
 ```
-CHInterpreterTest >> testReturnInteger
+CInterpreterTest >> testReturnInteger
 	self
 		assert: (self executeSelector: #returnInteger)
 		equals: 5
@@ -225,7 +224,7 @@ CHInterpreterTest >> testReturnInteger
 
 
 ```
-CHInterpreterTest >> testReturnFloat
+CInterpreterTest >> testReturnFloat
 	self
 		assert: (self executeSelector: #returnFloat)
 		equals: 3.14
@@ -247,15 +246,12 @@ CHInterpretable >> returnBoolean
 
 Evaluating such a method should return `false`.
 We define a test for our boolean scenario.
-Note that here we do not use `deny:`, because we want to make the result explicit for the reader of the test.
 
 ```
-CHInterpreterTest >> testReturnBoolean
-  "Do not use deny: to make explicit that we expect the value false"
+CInterpreterTest >> testReturnBoolean
 
-	self
-	    assert: (self executeSelector: #returnBoolean)
-	    equals: false
+	self deny: (self executeSelector: #returnBoolean)
+
 ```
 
 
@@ -273,10 +269,10 @@ a message.
 For this scenario, let's define two different test scenarios: an empty literal array and a literal array that has elements.
 
 ```
-CHInterpretable >> returnEmptyLiteralArray
+CInterpretable >> returnEmptyLiteralArray
 	^ #()
 
-CHInterpretable >> returnRecursiveLiteralArray
+CInterpretable >> returnRecursiveLiteralArray
 	^ #(true 1 #('ahah'))
 ```
 
@@ -288,12 +284,12 @@ These two methods should return the respective arrays.
 Writing tests to cover these two scenarios is again straightforward:
 
 ```
-CHInterpreterTest >> testReturnEmptyLiteralArray
+CInterpreterTest >> testReturnEmptyLiteralArray
 	self
 		assert: (self executeSelector: #returnEmptyLiteralArray)
 		equals: #()
 
-CHInterpreterTest >> testReturnRecursiveLiteralArray
+CInterpreterTest >> testReturnRecursiveLiteralArray
 	self
 		assert: (self executeSelector: #returnRecursiveLiteralArray)
 		equals: #(true 1 #('ahah'))
@@ -302,7 +298,6 @@ CHInterpreterTest >> testReturnRecursiveLiteralArray
 
 ### Making the test pass: visiting literal array nodes
 
-
 We have to implement the method `visitLiteralArrayNode:` to visit literal arrays.
 Literal arrays contain an array of literal nodes, representing the elements inside the literal array.
 To make our tests pass, we need to evaluate a literal array node to an array where each element is the value of its corresponding literal node. Moreover, literal arrays are recursive structures: an array can contain other arrays.
@@ -310,7 +305,7 @@ In other words, we should handle the visit of literal arrays recursively.
 Here we return the values returned by the interpretation of the elements.
 
 ```
-CHInterpreter >> visitLiteralArrayNode: aLiteralArrayNode
+CInterpreter >> visitLiteralArrayNode: aLiteralArrayNode
 	^ aLiteralArrayNode contents
 			collect: [ :literalNode | self visitNode: literalNode ]
 			as: Array
@@ -322,9 +317,8 @@ Up until now, we did not consider any form of variable and we should handle them
 
 ### Conclusion
 
-
-In this chapter, we have used the Visitor pattern over AST nodes to implement a first version of a structural evaluator. 
-This evaluator covers the basic literals: integers, floats, booleans and arrays.
+In this chapter, we have used the Visitor pattern over AST nodes to implement the first version of a structural evaluator. 
+This evaluator covers the basic literals: integers, floats, booleans, and arrays.
 Although we have not talked about it explicitly, we also implemented a first version of the visit of statements and return nodes.
 
-We leave for the reader the exercise of extending this prototype with support for dynamic arrays \(e.g., `{ self expression. 1+1 }`\).
+We leave for the reader the exercise of extending this prototype with support for dynamic arrays (e.g., `{ self expression. 1+1 }`).
