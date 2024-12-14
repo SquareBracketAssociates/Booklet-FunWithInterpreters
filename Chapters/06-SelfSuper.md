@@ -145,10 +145,13 @@ Contrary to a common and wrong belief, `super` is not the superclass or an insta
 It simply is the receiver:
 
 ```
-CInterpreter >> visitVariableNode: aNode		aNode name = #self | (aNode name = #super)		ifTrue: [ ^ self receiver ]
+CInterpreter >> visitVariableNode: aNode
+	
+	aNode name = #self | (aNode name = #super)
+		ifTrue: [ ^ self receiver ]
 ```
 
-# Conclusion
+### Conclusion
 
 Handling `self` and `super` as variables is simple. In the following chapter we will look at other variables and propose 
 a way to manage all the different variables by the introduction of scopes. 
