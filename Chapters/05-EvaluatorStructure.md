@@ -135,7 +135,8 @@ So we visit all the statements except the last one, and we then visit the last o
 
 ```
 CInterpreter >> visitSequenceNode: aSequenceNode
-	"Visit the sequence and return the result of the last statement. 	Does not look at temporary declaration for now."
+	"Visit the sequence and return the result of the last statement. 
+	Does not look at temporary declaration for now."
 	
 	aSequenceNode statements allButLast
 		do: [ :each | self visitNode: each ].
@@ -144,7 +145,7 @@ CInterpreter >> visitSequenceNode: aSequenceNode
 
 
 Then the visitor visits the return node, for which we define the `visitReturnNode:` method.
-This method simply visits the contents of the return node \(invoking recursively the visitor\) and returns the obtained value.
+This method simply visits the contents of the return node (invoking recursively the visitor) and returns the obtained value.
 At this point, the value is not yet covered by the visitor.
 
 ```
