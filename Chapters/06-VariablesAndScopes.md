@@ -307,6 +307,12 @@ We start by enriching the class `CInterpreterTest` with an instance variable poi
 CInterpreterTest >> setUp	super setUp.	interpreter := CInterpreter new. 	receiver := CInterpretable new
 ```
 
+This implies that we should modify the getter to be 
+
+```
+CInterpreterTest >> interpreter	^ interpreter
+```
+
 We define a test that specifies that the interpreter's environment has a binding whose key is `#Global` and value is a new object.
 You see here that we parametrize the interpreter so that it has a globalEnvironment that is different from the one its class.
 
@@ -417,34 +423,12 @@ CInstanceScope >> scopeDefining: aString
 	
 	^ self parentScope scopeDefining: aString
 ```
-	
-
-Stef here 
-### Final handling of Global variable
-
-Now we should plug everything. 
-
-We decided that an access to a global that is not defined will raise an error in the interpreter and halt the interpretation.
-An alternative design would return a default value instead such as `nil`.
-A more complex design would have been to throw an exception in the interpreted program.
-For the moment, halting the interpreter with an error suffices for our job.
-
-```
-CInterpreter >> visitGlobalVariableNode: aRBGlobalNode
-	^ self globalEnvironment
-      at: aRBGlobalNode name
-      ifAbsent: [ self error: aRBGlobalNode name, ' not found' ]
-```
-
-
-Finally, we need to chain the global scope to the instance scope, 
-
-
 
 ### Conclusion
 
 In this chapter, we introduced support for variables and name resolution to support instance variables and global variables. 
 This first evaluator serves as a basis for implementing the execution of the main operations in Pharo: messages.
+
 The following chapters will start by decomposing message resolution into method-lookup and apply operations, introduce the execution stack, the management of temporary variables and argument, and 'super' message-sends.
 
 We further invite the reader to explore changing the language semantics by modifying this simple evaluator: How could we implement read-only objects? Log all variable reads and writes?
