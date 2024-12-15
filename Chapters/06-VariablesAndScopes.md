@@ -424,6 +424,8 @@ CInstanceScope >> scopeDefining: aString
 	^ self parentScope scopeDefining: aString
 ```
 
+Now all the tests should be green.
+
 ### Conclusion
 
 In this chapter, we introduced support for variables and name resolution to support instance variables and global variables. 
