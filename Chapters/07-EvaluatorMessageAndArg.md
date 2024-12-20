@@ -46,68 +46,63 @@ All your tests should pass.
 
 
 
-
 ## Implementing Message Sends: The Calling Infrastructure
-@cha:
+@cha:callingInfra
 
-In the previous chapter, we focused on structural evaluation: reading literal objects and reading and writing values from objects and globals. However, the key abstraction in object-oriented programming and in Pharo in particular is message-sending. 
+In the previous chapters, we focused on structural evaluation: reading literal objects and reading and writing values from objects and globals. However, the key abstraction in object-oriented programming and in Pharo in particular is message-sending. 
 The work we did in the previous chapter is nevertheless important to set up the stage: we have a better taste of the visitor pattern, we started a first testing infrastructure, and eventually message-sends need to carry out some work by using literal objects or reading and writing variables.
 
 Message-sends deserve a chapter on their own because they introduce many different concerns. 
-On the one hand, each message-send is resolved in two steps: first the method-lookup searches in the receiver's hierarchy the method to be executed, and second that method is applied on the receiver \(i.e., it is evaluated with self bound to the receiver\). 
-On the other hand, each method application needs to set up an execution context to store the receiver, arguments and temporary variables for that specific method execution.
-These execution contexts form the execution stack or call-stack.
-Sending a message pushes a new context in the call-stack, returning from a method pops a context from the call-stack.
-This is mechanics that we will cover in this chapter, so that in the following chapter we can implement logic and support late-binding.
+On the one hand, each message-send is resolved in two steps: 
+- first the method-lookup searches in the receiver's hierarchy the method to be executed, and 
+- second that method is applied on the receiver (i.e., it is evaluated with self-bound to the receiver). 
 
+On the other hand, each method application needs to set up an execution context to store the receiver, arguments, and temporary variables for that specific method execution.
+These execution contexts form the execution stack or call stack.
+Sending a message pushes a new context in the call stack, returning from a method pops a context from the call stack.
+This is the mechanics that we will cover in this chapter so that in the following chapter we can implement logic and support late-binding.
 
+SD Here!
 ### Introduction to Stack Management
 
-
 The way we managed the receiver so far is overly simplistic.
-Indeed, each time a program will send a message to another object, we should change the receiver and when a method execution ends, we should restore the previous receiver. Moreover, the same happens with method arguments and temporaries. Therefore to introduce the notion of message-send we need a stack. And each element in the stack needs to capture all the execution state require to come back to it later on when a message-send will return. Each element in the call-stack is usually named a stack frame, an activation record, or in Pharo's terminology a context. For the rest of this book we will refer to them as frames, for shortness, and to distinguish them from the reified contexts from Pharo.
+Indeed, each time a program sends a message to another object, we should change the receiver and when a method execution ends, we should restore the previous receiver. Moreover, the same happens with method arguments and temporaries. Therefore to introduce the notion of message-send we need a stack. And each element in the stack needs to capture all the execution state required to come back to it later on when a message-send will return. Each element in the call stack is usually named a stack frame, an activation record, or in Pharo's terminology a context. For the rest of this book we will refer to them as frames, for shortness, and to distinguish them from the reified contexts from Pharo.
 
 A first step to introduce stack management without breaking all our previous tests is to replace the single `receiver` instance variable with a stack that will be initialized when the evaluator is created. The top of the stack will represent the current execution, and thus we will take the current receiver at each moment from the stack top. Moreover, each time we tell our interpreter to execute something we need to initialize our stack with a single frame.
 
-As an example, let us consider Figure *@callstack@*, which presents a call-stack with two methods.
-The first method in the stack \(at its bottom\) is method `foo`. Method `foo` calls method `bar` and thus it follows it in the stack. The current method executing is the one in the top of the stack. When a method returns, we can restore all the state of the previous method just by **popping** the top of the stack.
+As an example, let us consider Figure *@callstack@*, which presents a call stack with two methods.
+The first method in the stack (at its bottom) is method `foo`. Method `foo` calls method `bar` and thus it follows it in the stack. The current method executing is the one in the top of the stack. When a method returns, we can restore all the state of the previous method just by **popping** the top of the stack.
 
-![A call-stack with two frames, executing the method foo which calls bar.](figures/callstack.pdf width=100&label=callstack)
+![A call-stack with two frames, executing the method foo which calls bar. % width=100&anchor=callstack](figures/callstack.pdf)
 
 ```caption=Replace the receiver instance variable by a stack
-Object subclass: #CHInterpreter
-	instanceVariableNames: 'stack'
-	classVariableNames: ''
-	package: 'Champollion-Core'
+Object <<: #CInterpreter
+	slots: { #stack };
+	package: 'Champollion'
 
-CHInterpreter >> initialize [
+CInterpreter >> initialize
 	super initialize. 
 	stack := CTStack new.
-]
 ```
 
 
 With this new schema, we can now rewrite the access to the receiver to just access the value of `#self` of the top frame. 
 
 ```language=pharo
-CHInterpreter >> receiver [
+CInterpreter >> receiver
 	^ self topFrame receiver
-]
 
-CHInterpreter >> topFrame [
+CInterpreter >> topFrame 
 	^ stack top
-]
 ```
-
 
 The final step is to set up a frame when the execution starts, which happened so far in our method `execute:withReceiver:`. We extend the `execute:withReceiver:` to create a new frame and define the receiver as `#self` in the top frames before start the evaluation.
 
 ```language=pharo
-CHInterpreter >> execute: anAST withReceiver: anObject [
+CInterpreter >> execute: anAST withReceiver: anObject
 	self pushNewFrame.
 	self topFrame receiver: anObject.
 	^ self visitNode: anAST
-]
 ```
 
 
@@ -116,25 +111,23 @@ Since methods define a scope with their temporary variables and arguments, we re
 The method scope will for now store the current receiver, and later its parent scope, and a set of key-value pairs representing the variables defined in the current method execution: the arguments and temporaries.
 
 ```
-CHInterpreter >> pushNewFrame [
+CInterpreter >> pushNewFrame
 	| newTop |
 	newTop := CHMethodScope new.
 	stack push: newTop.
 	^ newTop
-]
+```
 
-Object subclass: #CHMethodScope
-	instanceVariableNames: 'receiver variables'
-	classVariableNames: ''
+```
+Object subclass: #CMethodScope
+	slots: { #receiver . #variables };
 	package: 'Champollion-Core'
 
-CHMethodScope >> receiver: aCHInterpretable [
-	receiver := aCHInterpretable
-]
+CMethodScope >> receiver: aCInterpretable
+	receiver := aCInterpretable
 
-CHMethodScope >> receiver [
+CMethodScope >> receiver
 	^ receiver
-]
 ```
 
 
@@ -142,18 +135,18 @@ This refactor kept all the test green, and opened the path to introduce message-
 As the reader may have observed, this stack can only grow.
 We will take care of popping frames from the stack later when we revisit method returns.
 
-### Evaluating a First Message Send
 
+
+### Evaluating a First Message Send
 
 Let's start as usual by defining a new method exhibiting the scenario we want to work on.
 In this case, we want to start by extending our evaluator to correctly evaluate return values of message sends.
 
 Our scenario method `sendMessageReturnX` does a self message-send and returns the value returned by this message send. On the one hand, we want that in our scenario the receiver of both messages is the same. On the other hand, we want that the message send is correctly evaluated to the return value of the activated method.
-
+s
 ```language=pharo
-CHInterpretable >> sendMessageReturnX [
+CInterpretable >> sendMessageReturnX
 	^ self returnX
-]
 ```
 
 
@@ -167,12 +160,11 @@ For this first version we will define a simple and incomplete yet useful method 
 In our first test we want to ensure that in a `self` message-send, the receiver of both the called and callee methods is the same. One way to do that is with a side-effect: if we write one instance variable in one method with some value `x` \(say and we access that value from the other method, we should get the same value `x` \(say\). This will show that the object represented by `self` is the same and that we did not push for example `nil`.
 
 ```language=pharo
-CHInterpreterTest >> testSelfSend [
+CInterpreterTest >> testSelfSend
 	receiver x: 100.
 	self 
 		assert: (self executeSelector: #sendMessageReturnX) 
 		equals: 100
-]
 ```
 
 
@@ -184,18 +176,16 @@ In our first implementation we will just fetch the desired method's AST from the
 Finally, we can activate this method with the receiver using `execute:withReceiver:` the activation will push a new frame to the call-stack with the given receiver, evaluate the method, and eventually return with a value.
 
 ```
-CHInterpreter >> visitMessageNode: aMessageNode [
+CInterpreter >> visitMessageNode: aMessageNode
 	| newReceiver method | 
 	newReceiver := self visitNode: aMessageNode receiver.
 	method := (newReceiver class compiledMethodAt: aMessageNode selector) ast.
 	^ self execute: method withReceiver: newReceiver
-]
 ```
 
 
 
 ### Balancing the Stack
-
 
 We mentioned earlier that when the execution of a method is finished and the execution returns to its caller method, its frame should be also discarded from the stack. The current implementation clearly does not do it.
 Indeed, we also said that our initial implementation of the stack only grows: it is clear by reading our code that we never pop frames from the stack.
@@ -207,22 +197,20 @@ If we make that the caller and callee methods have different receiver instances,
 The following code snippet shows an scenario that fulfills these requirements: it sets an instance variable with some value, sends a message to an object other than `self` and upon its return it accesses its instance variable again before returning it. Assuming the collaborator object does not modify `self`, then the result of evaluating this message should be that 1000 is returned.
 
 ```
-CHInterpretable >> setXAndMessage [
+CHInterpretable >> setXAndMessage
 		x := 1000.
 		collaborator returnX.
 		^ x
-]
 ```
 
 
 Our test `testBalancingStack` executes the message `setXAndMessage` that should return 1000.
 
 ```
-CHInterpreterTest >> testBalancingStack [
+CInterpreterTest >> testBalancingStack
 	self
 		assert: (self executeSelector: #setXAndMessage)
 		equals: 1000
-]
 ```
 
 
@@ -231,29 +219,25 @@ We add a `collaborator` instance variable to the class `CHInterpretable` with it
 This way we will be able to test that the correct object is set and passed around in the example.
 
 ```
-Object subclass: #CHInterpretable
-	instanceVariableNames: 'x collaborator'
-	classVariableNames: ''
+Object << #CHInterpretable
+	slots: { #x . #collaborator };
 	package: 'Champollion-Core'
 
-CHInterpretable >> collaborator [
+CInterpretable >> collaborator
 	^ collaborator
-]
 
-CHInterpretable >> collaborator: anObject [
+CInterpretable >> collaborator: anObject
 	collaborator := anObject
-]
 ```
 
 
 And in the `setUp` method we pass a collaborator to our initial receiver.
 
 ```
-CHInterpreterTest >> setUp [
+CInterpreterTest >> setUp
 	super setUp.
-	receiver := CHInterpretable new.
-	receiver collaborator: CHInterpretable new
-]
+	receiver := CInterpretable new.
+	receiver collaborator: CInterpretable new
 ```
 
 
