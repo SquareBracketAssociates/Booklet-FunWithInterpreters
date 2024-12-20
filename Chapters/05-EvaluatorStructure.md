@@ -1,4 +1,5 @@
 ## Implementing an Evaluator
+@cha:interpreterLiteral
 
 An evaluator is a kind of interpreter that executes a program.  A Pharo evaluator is an interpreter that takes as input a Pharo program and executes each one of its statements, finally returning the result of the execution.
 
@@ -232,11 +233,11 @@ CInterpreterTest >> testReturnFloat
 ```
 
 
-We are ready to efficiently write tests for the other constants.
+We are ready to write tests for the other constants efficiently.
 
 ### Evaluating booleans
 
-Boolean literals are the objects `false` and `true`, typically used for conditionals and control flow statements.
+Boolean literals are the` false` and `true` objects, typically used for conditionals and control flow statements.
 In the previous sections we implemented support for numbers, now we introduce support for returning boolean values as follows:
 
 ```
@@ -323,3 +324,7 @@ This evaluator covers the basic literals: integers, floats, booleans, and arrays
 Although we have not talked about it explicitly, we also implemented a first version of the visit of statements and return nodes.
 
 We leave for the reader the exercise of extending this prototype with support for dynamic arrays (e.g., `{ self expression. 1+1 }`).
+
+### Exercises
+
+Add tests to show that the current interpreter can support other literal objects such as strings and symbols.

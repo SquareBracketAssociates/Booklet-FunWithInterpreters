@@ -1,4 +1,5 @@
 ## Reminder: the Visitor Pattern 
+@cha:visitorReminder
 
 In this chapter, we review the visitor pattern.
 The main purpose of the Visitor pattern is to externalize an operation from a data structure.

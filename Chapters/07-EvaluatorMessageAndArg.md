@@ -1,7 +1,7 @@
-## Implementing Message Sends: Calling Infrastructure
+## Implementing Message Sends: The Calling Infrastructure
 
 
-In the previous chapter we focused on structural evaluation: reading literal objects and reading and writing values from objects and globals. However, the key abstraction in object-oriented programming and in Pharo in particular is message-sending. 
+In the previous chapter, we focused on structural evaluation: reading literal objects and reading and writing values from objects and globals. However, the key abstraction in object-oriented programming and in Pharo in particular is message-sending. 
 The work we did in the previous chapter is nevertheless important to set up the stage: we have a better taste of the visitor pattern, we started a first testing infrastructure, and eventually message-sends need to carry out some work by using literal objects or reading and writing variables.
 
 Message-sends deserve a chapter on their own because they introduce many different concerns. 

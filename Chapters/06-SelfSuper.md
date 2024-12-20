@@ -1,5 +1,5 @@
 ## Simple variables: self and super 
-@cha:variable
+@cha:self
 
 In the previous chapter,  we wrote the first version of an evaluator managing literals: integers, floats, arrays, and booleans.
 This chapter adds to our evaluator the capability of evaluating variables 
