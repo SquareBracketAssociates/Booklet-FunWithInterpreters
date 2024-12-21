@@ -1,56 +1,8 @@
-## Revisiting self and super implementation
-
-We can take advantage of the instance scope to revisit the self and super implementation. 
-Indeed instead of explicitly checking for the variable name in the interpreter, we could define a binding in the instance scope for self and super.
-This way the scope will treat all the variables in a similar way and free the interpreter from this task. 
-
-
-With the current implementation we have still to distinguish between instance variables and self/super. 
-Therefore we introduce a little helper function `isSelfSuper:` to encapsulate this check. 
-
-```
-CInstanceScope >> isSelfSuper: aString	^ #( 'self' 'super' ) includes: aString
-```
-
-Using `isSelfSuper:` we redefine `scopeDefining:` to make sure that this is the instance scope object that we will be used to 
-look for the value of `self` and `super`.
-
-```
-CInstanceScope >> scopeDefining: aString	(self isSelfSuper: aString) ifTrue: [ ^ self ].	(self definedVariables includes: aString) ifTrue: [ ^ self ].	^ self parentScope scopeDefining: aString
-```
-
-We redefine `read:` to take into account the new responsibility. 
-
-```
-CInstanceScope >> read: aString	(self isSelfSuper: aString) ifTrue: [ ^ receiver ].	^ receiver instVarNamed: aString
-```
-
-We could imagine to forbid assignments to `self` and `super` by adapting `write:withValue:` as follows: 
-
-```
-CInstanceScope >> write: aString withValue: anInteger	(self isSelfSuper: aString) ifTrue: [ self error: 'We cannot modify self or super' ].	receiver instVarNamed: aString put: anInteger
-```
-
-But this situation cannot occur since the Pharo parser prevents at the syntactical level the possibility
-to use `self` and `super` as the left part of an assignment.  So redefining `write: aString withValue: anInteger`
-is not necessary. This would be needed if the interpreter would support a kind of reflective API of its own implementation.
-
-FInally we revisit  `visitVariableNode:` as follows: 
-
-```
-visitVariableNode: aVariableNode	^ (self scopeDefining: aVariableNode name) read: aVariableNode name
-```
-Here you see that checking for `self` or `super` is not mandatory anymore. 
-All your tests should pass. 
-
-
-
-
 ## Implementing Message Sends: The Calling Infrastructure
 @cha:callingInfra
 
-In the previous chapters, we focused on structural evaluation: reading literal objects and reading and writing values from objects and globals. However, the key abstraction in object-oriented programming and in Pharo in particular is message-sending. 
-The work we did in the previous chapter is nevertheless important to set up the stage: we have a better taste of the visitor pattern, we started a first testing infrastructure, and eventually message-sends need to carry out some work by using literal objects or reading and writing variables.
+In the previous chapters, we focused on structural evaluation: reading literal objects and reading and writing values from objects and globals. However, the key abstraction in object-oriented programming, and in Pharo in particular is __message-sending__. 
+The work we did in the previous chapter is nevertheless important to set up the stage: we have a better taste of the visitor pattern, we started a first testing infrastructure, and eventually, message-sends need to carry out some work by using literal objects or reading and writing variables.
 
 Message-sends deserve a chapter on their own because they introduce many different concerns. 
 On the one hand, each message-send is resolved in two steps: 
@@ -214,14 +166,14 @@ CInterpreterTest >> testBalancingStack
 ```
 
 
-We then finish our setup by extending `CHInterpretable` to support delegating to a collaborator object.
-We add a `collaborator` instance variable to the class `CHInterpretable` with its companion accessors. 
+We then finish our setup by extending `CInterpretable` to support delegating to a collaborator object.
+We add a `collaborator` instance variable to the class `CInterpretable` with its companion accessors. 
 This way we will be able to test that the correct object is set and passed around in the example.
 
 ```
-Object << #CHInterpretable
+Object << #CInterpretable
 	slots: { #x . #collaborator };
-	package: 'Champollion-Core'
+	package: 'Champollion'
 
 CInterpretable >> collaborator
 	^ collaborator
@@ -243,40 +195,35 @@ CInterpreterTest >> setUp
 
 #### Making the test pass
 
-
 Executing this test breaks because the access to the instance variable `x` returns nil, showing the limits of our current implementation.  This is due to the fact that evaluating message send `returnX` creates a new frame with the collaborator as receiver, and since that frame is not popped from of the stack, when the method returns, the access to the `x` instance variable accesses the one of the uninitialized collaborator instead of the caller object.
 
-To solve this problem, we should pop the frame when a method activation finishes. 
+To solve this problem, we should pop the frame when the activation method finishes. 
 This way the stack is balanced. 
 This is what the new implementation of `executeMethod:withReceiver:` does.
 
 ```language=pharo
-CHInterpreter >> executeMethod: anAST withReceiver: anObject [
+CInterpreter >> executeMethod: anAST withReceiver: anObject
 	self pushNewFrame.
 	self topFrame receiver: anObject.
 	result := self visitNode: anAST.
 	self popFrame.
 	^ result
-]
 
-CHInterpreter >> popFrame [
+CInterpreter >> popFrame
 	stack pop
-]
 ```
 
 
 
 ### Ensuring the receiver is correctly set: an Extra Test
 
-
 Our previous tests did ensure that messages return the correct value, activate the correct methods, and that the stack grows and shrinks. However, we did not ensure yet that the receiver changes correctly on a message send, and since we do not lose any opportunity to strenghten our trust in our implementation with a new test, let's write a test for it.
 
 The scenario, illustrated in `changeCollaboratorX` will ask the collaborator to `store100IntoX`, implemented previosly. In this scenario, we must ensure that the state of the receiver and the collaborator  are indeed separate and that changing the collaborator will not affect the initial receiver's state.
 
 ```
-CHInterpretable >> changeCollaboratorX [
+CInterpretable >> changeCollaboratorX
 	collaborator store100IntoX
-]
 ```
 
 
@@ -284,7 +231,7 @@ Our test for this scenario is as follows.
 If we give some value to the receiver and collaborator, executing our method should change the collaborator but not the initial receiver.
 
 ```
-CHInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSender [
+CInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSender
 	receiver x: 200.
 	collaborator x: 300.
 
@@ -293,29 +240,37 @@ CHInterpreterTest >> testInstanceVariableStoreInMethodActivationDoesNotChangeSen
 
 	self assert: receiver x equals: 200.
 	self assert: collaborator x equals: 100
-]
 ```
 
 
 To make our test run, we will store as a convenience the collaborator object in an instance variable of the test too.
 
 ```
-TestCase subclass: #CHInterpreterTest
-	instanceVariableNames: 'receiver collaborator'
-	classVariableNames: ''
+TestCase << #CInterpreterTest
+	slots: { #receiver . #collaborator };
 	package: 'Champollion-Tests'
 
-CHInterpreterTest >> setUp [
+CInterpreterTest >> setUp
 	super setUp.
-	receiver := CHInterpretable new.
-	collaborator := CHInterpretable new.
+	receiver := CInterpretable new.
+	collaborator := CInterpretable new.
 	receiver collaborator: collaborator
-]
 ```
 
 
 This test passes, meaning that our implementation already covered correctly this case.
 We are ready to continue our journey in message-sends.
+
+
+
+
+
+
+
+## Message Arguments and temporaries
+@cha:messageArgs
+
+
 
 ### Supporting Message Arguments
 
@@ -486,6 +441,15 @@ CHInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 	^ result
 ]
 ```
+
+
+
+
+
+
+
+
+
 
 
 ### Handling Temporaries

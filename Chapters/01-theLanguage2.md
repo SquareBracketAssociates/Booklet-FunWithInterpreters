@@ -15,5 +15,6 @@ define interpreters of increasing level of power:
 - Chapter *@cha:interpreterLiteral@* defines an interpreter of basic literal objects such as integers, floats, booleans, and literal arrays. It sets a little infrastructure to support test definition.
 - Chapter *@cha:self@* extends the previous interpreter with support for variables self and super.
 - Chapter *@cha:scope@* extends the previous interpreter to support instance variables accesses. It introduces the concept of scopes. This concept will be further extended to support method execution. 
--
+- Chapter *@cha:callingInfra@* introduces the infrastructures to support sending messages: a stack as well as a method scope. 
+- Chapter *@cha:messageArgs@* extends the previous one to introduce parameters and temporaries support. 
 

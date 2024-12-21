@@ -7,6 +7,7 @@
 
 <!inputFile|path=Chapters/05-EvaluatorStructure.md!>
 <!inputFile|path=Chapters/06-SelfSuper.md!>
+<!inputFile|path=Chapters/06-RevisitingSelfSuper.md!>
 <!inputFile|path=Chapters/06-VariablesAndScopes.md!>
 <!inputFile|path=Chapters/07-EvaluatorMessageAndArg.md!>
 <!inputFile|path=Chapters/08-EvaluatorMessageLookup.md!>
