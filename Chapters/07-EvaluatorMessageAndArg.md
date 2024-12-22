@@ -110,28 +110,27 @@ As the reader may have observed, this stack can only grow.
 We will take care of popping frames from the stack later when we revisit method returns.
 
 
-Stef here
 ### Evaluating a First Message Send
 
 Let's start as usual by defining a new method exhibiting the scenario we want to work on.
 In this case, we want to start by extending our evaluator to correctly evaluate return values of message sends.
 
-Our scenario method `sendMessageReturnX` does a self message-send and returns the value returned by this message send. On the one hand, we want that in our scenario the receiver of both messages is the same. On the other hand, we want that the message send is correctly evaluated to the return value of the activated method.
+Our scenario method `sendMessageReturnX` does a self-send message and returns the value returned by this message. 
+The scenario stresses two points:
+
+- On the one hand, the receiver of both messages is the same. 
+- On the other hand, the message is correctly evaluated as a return of the value of the activated method.
 
 ```language=pharo
-CInterpretable >> sendMessageReturnX
-	^ self returnX
+CInterpretable >> sendMessageReturnX	^ self returnInstanceVariableX
 ```
 
+Notice that our method `sendMessageReturnX` and `returnInstanceVariableX` are defined in the same class. 
+This means that in this first scenario, we can concentrate on the stack management and return value of the message sends, without caring too much about the details of the method lookup algorithm. 
+For this first version, we will define a simple and incomplete yet useful method lookup algorithm.
 
-Notice that our method `sendMessageReturnX` and the implementation of the message it sends `returnX` live in the same class. 
-This means that in this first scenario we can concentrate on the stack management and return value of the message sends, without caring too much about the details of the method lookup algorithm. 
-For this first version we will define a simple and incomplete yet useful method lookup algorithm.
 
-
-!!todo SD-Guille I do not get the following paragraph - I could not really understand and I could not fix it. 
-
-In our first test we want to ensure that in a `self` message-send, the receiver of both the called and callee methods is the same. One way to do that is with a side-effect: if we write one instance variable in one method with some value `x` \(say and we access that value from the other method, we should get the same value `x` \(say\). This will show that the object represented by `self` is the same and that we did not push for example `nil`.
+Let us define a test named `testSelfSend`
 
 ```language=pharo
 CInterpreterTest >> testSelfSend
@@ -141,22 +140,39 @@ CInterpreterTest >> testSelfSend
 		equals: 100
 ```
 
+In this test we want to ensure that in a `self` message-send, the receiver of both the called and callee methods is the same. One way to do that is with a side-effect: if we write the instance variable `x` in one method and we access that value from the other method, we should get the same value for `x`. This will show that the object represented by `self` is the same and that we did not push for example `nil`.
 
-To make this test green, we need to implement the method `visitMessageNode:`.
-Evaluating a message node requires that we recursively evaluate the receiver node, which may be a literal node or a complex expression such as another message-send.
-From such an evaluation we obtain the actual receiver object. 
-Starting from the receiver, we will lookup the method with the same selector as the message-send. 
-In our first implementation we will just fetch the desired method's AST from the receiver's class. 
+
+Conceptually evaluating a message node requires recursively evaluating the receiver node, which may be a literal node or a complex expression such as another message-send. From such an evaluation we obtain the actual receiver object. 
+Starting from the receiver, we should look up the method with the same selector as the message-send and execute the found method and return the result. 
+
+
+To make this test green, we implement the method `visitMessageNode:`.
+
+In the first implementation proposed hereafter, we just fetch the desired method's AST from the receiver's class. 
 Finally, we can activate this method with the receiver using `execute:withReceiver:` the activation will push a new frame to the call-stack with the given receiver, evaluate the method, and eventually return with a value.
 
 ```
-CInterpreter >> visitMessageNode: aMessageNode
-	| newReceiver method | 
-	newReceiver := self visitNode: aMessageNode receiver.
-	method := (newReceiver class compiledMethodAt: aMessageNode selector) ast.
-	^ self execute: method withReceiver: newReceiver
+CInterpreter >> visitMessageNode: aMessageNode	| newReceiver method ast | 	newReceiver := self visitNode: aMessageNode receiver.	method := newReceiver class compiledMethodAt: aMessageNode selector.	ast := RBParser parseMethod: method sourceCode.	^ self execute: ast withReceiver: newReceiver
 ```
 
+All our tests should pass and in particular `testSelfSend`. 
+
+### Consolidating AST access logic
+
+Pharo provides a way to get an AST from a compiled method, but we do not want to use
+because the AST it returns is different from the one we want for this book (the variables are resolved based on a semantical analysis). 
+This is why we use `RBParser parseMethod: method sourceCode.`
+
+To encapsulate such a decision we define the method `astOf:` and use it. 
+
+```
+astOf: aCompiledMethod 	^ RBParser parseMethod: aCompiledMethod sourceCode.
+```
+
+```
+CInterpreter >> visitMessageNode: aMessageNode	| newReceiver method | 	newReceiver := self visitNode: aMessageNode receiver.	method := newReceiver class compiledMethodAt: aMessageNode selector.	^ self execute: (self astOf: method) withReceiver: newReceiver
+```
 
 
 ### Balancing the Stack
