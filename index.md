@@ -9,7 +9,8 @@
 <!inputFile|path=Chapters/06-SelfSuper.md!>
 %<!inputFile|path=Chapters/06-RevisitingSelfSuper.md!>
 <!inputFile|path=Chapters/06-VariablesAndScopes.md!>
-<!inputFile|path=Chapters/07-EvaluatorMessageAndArg.md!>
+<!inputFile|path=Chapters/07-EvaluatorFirstMessage.md!>
+<!inputFile|path=Chapters/08-EvaluatorMessageArg.md!>
 <!inputFile|path=Chapters/08-EvaluatorMessageLookup.md!>
 <!inputFile|path=Chapters/09-EvaluatorPrimitives.md!>
 <!inputFile|path=Chapters/10-EvaluatorBlock.md!>
