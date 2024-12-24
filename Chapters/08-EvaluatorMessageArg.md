@@ -97,17 +97,17 @@ Previously the method `execute:withReceiver:` was defined as follows
 execute: anAST withReceiver: anObject
 
 	| result |
-	self pushNewFrame.
+	self pushNewMethodFrame.
 	self topFrame receiver: anObject.
 	result := self visitNode: anAST.
 	self popFrame.
 	^ result
 ```
 
-Where `pushNewFrame` was pushing a method scope instance on the stack.
+Where `pushNewMethodFrame` was pushing a method scope instance on the stack.
 
 ```
-pushNewFrame
+pushNewMethodFrame
 	| newTop |
 	newTop := CMethodScope new.
 	stack push: newTop.
@@ -119,7 +119,7 @@ pushNewFrame
 ```
 CInterpreter >> execute: anAST withReceiver: anObject
 	| result |
-	self pushNewFrame.
+	self pushNewMethodFrame.
 
 	"Set up the scope chain"
 	self topFrame parentScope: (CInstanceScope new
@@ -160,7 +160,7 @@ We use the message `with:do:` to iterate both the parameter list and actual argu
 ```
 CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 	| result |
-	self pushNewFrame.
+	self pushNewMethodFrame.
 	"Set up the scope chain"
 	self topFrame parentScope: (CInstanceScope new
 		receiver: anObject;
@@ -219,7 +219,7 @@ CInterpreter >> tempAt: aSymbol put: anInteger
 ```
 CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 	| result |
-	self pushNewFrame.
+	self pushNewMethodFrame.
 	
 	"Set up the scope chain"
 	self topFrame parentScope: (CInstanceScope new
@@ -289,7 +289,7 @@ To make our test pass, we modify the `execute:withReceiver:andArguments:` method
 ```
 CInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
 	| result thisFrame |
-	self pushNewFrame.
+	self pushNewMethodFrame.
 	self topFrame parentScope: (CHInstanceScope new
 		receiver: anObject;
 		parentScope: globalScope;

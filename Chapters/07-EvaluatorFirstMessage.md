@@ -91,16 +91,16 @@ We redefine the `execute:withReceiver:` to create a new frame and define the rec
 
 ```language=pharo
 CInterpreter >> execute: anAST withReceiver: anObject
-	self pushNewFrame.
+	self pushNewMethodFrame.
 	self topFrame receiver: anObject.
 	^ self visitNode: anAST
 ```
 
 
-The last piece in the puzzle is the method `pushNewFrame`, which creates a new frame and pushes it on the top of the stack. 
+The last piece in the puzzle is the method `pushNewMethodFrame`, which creates a new frame and pushes it on the top of the stack. 
 
 ```
-CInterpreter >> pushNewFrame
+CInterpreter >> pushNewMethodFrame
 	| newTop |
 	newTop := CMethodScope new.
 	stack push: newTop.
@@ -264,7 +264,7 @@ This is what the new implementation of `execute:withReceiver:` does.
 ```language=pharo
 CInterpreter >> execute: anAST withReceiver: anObject
 	| result |
-	self pushNewFrame.
+	self pushNewMethodFrame.
 	self topFrame receiver: anObject.
 	result := self visitNode: anAST.
 	self popFrame.
