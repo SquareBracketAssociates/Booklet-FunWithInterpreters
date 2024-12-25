@@ -96,7 +96,7 @@ Another kind of expression that appeared already in the examples above are liter
 
 ```language=smalltalk
 | expression |
-expression := Parser parseExpression: '17'.
+expression := OCParser parseExpression: '17'.
 expression formattedCode
 >>> 17
 ```
@@ -120,14 +120,14 @@ In other words, literal objects in Pharo are resolved at parse time. Notice that
 
 From now on we will omit the declaration of temporaries in the code snippets for the sake of space.
 ```language=smalltalk
-integerExpression := Parser parseExpression: '17'.
+integerExpression := OCParser parseExpression: '17'.
 integerExpression value
 >>> 17
 ```
 
 
 ```language=smalltalk
-trueExpression := Parser parseExpression: 'true'.
+trueExpression := OCParser parseExpression: 'true'.
 trueExpression value
 >>> true
 ```
@@ -135,7 +135,7 @@ trueExpression value
 
 ```language=smalltalk
 "Remember, strings need to be escaped"
-stringExpression := Parser parseExpression: '''a string'''.
+stringExpression := OCParser parseExpression: '''a string'''.
 stringExpression value
 >>> 'a string'
 ```
@@ -146,7 +146,7 @@ Literal array nodes understand the message `value` as any other literal, returni
 However, it allows us to access the sub collection of literals using the message `contents`.
 
 ```language=smalltalk
-arrayExpression := Parser parseExpression: '#(1 2 3)'.
+arrayExpression := OCParser parseExpression: '#(1 2 3)'.
 arrayExpression value
 >>> #(1 2 3)
 
@@ -164,7 +164,7 @@ Variable nodes in the AST tree are used when variables are used or assigned to.
 Variables are instances of `ASTVariableNode` and know their `name`.
 
 ```language=smalltalk
-variableExpression := Parser parseExpression: 'aVariable'.
+variableExpression := OCParser parseExpression: 'aVariable'.
 variableExpression name
 >>> 'aVariable'
 ```
@@ -192,7 +192,7 @@ If we send it the `variable` message, it answers the variable it assigns to.
 The message `value` returns the expression at the right of the assignment.
 
 ```language=smalltalk
-assignmentExpression := Parser parseExpression: 'var := #( 1 2 ) size'.
+assignmentExpression := OCParser parseExpression: 'var := #( 1 2 ) size'.
 assignmentExpression variable
 >>> ASTVariableNode(var)
 ```
@@ -211,7 +211,7 @@ Messages are instances of `ASTMessageNode` and they have a receiver, a selector,
 We say that message nodes are composed expressions because the `receiver` and `arguments` of a message are expressions in themselves, which can be as simple as literals or variables, or other composed messages too.
 
 ```language=smalltalk
-messageExpression := ASTParser parseExpression: '17 max: 42'.
+messageExpression := OCParser parseExpression: '17 max: 42'.
 messageExpression receiver
 >>> ASTLiteralValueNode(17)
 ```
@@ -240,10 +240,10 @@ For those readers that already mastered the syntax of Pharo, you remember that t
 Besides their number of parameters, the Pharo syntax accords an order of precedence between them too, i.e., unary messages get to be evaluated before binary messages, which get to be evaluated before keyword messages.
 Only parentheses override this precedence.
 The precedence of messages in ASTs is resolved at parse-time.
-In other words, the output of `Parser` is an AST respecting the precedence rules of Pharo.
+In other words, the output of `OCParser` is an AST respecting the precedence rules of Pharo.
 
 Let's consider a couple of examples illustrating this, illustrated in Figure *@precedence@*.
-If we feed the `Parser` with the expression below, it will create a `ASTMessageNode` as we already know it.
+If we feed the parser with the expression below, it will create an `OCMessageNode` as we already know it.
 The root of that message node is the `keyword:` message, and its first argument is the `argument + 42 unaryMessage` subexpression.
 That subexpression is in turn another message node with the `+` binary selector, whose first argument is the `42 unaryMessage` subexpression.
 
@@ -272,7 +272,7 @@ It is now the `+` binary message.
 ```
 
 
-`Parser` is a nice tool to play with Pharo expressions and master precedence!
+`OCParser` is a nice tool to play with Pharo expressions and master precedence!
 
 ### Cascade Nodes
 
@@ -309,7 +309,7 @@ They indeed share the same receiver than the cascade.
 In the following chapters we will have to be careful when manipulating cascade nodes, to avoid to wrongly manipulate twice the same receiver.
 
 ```language=smalltalk
-cascadeExpression := Parser parseExpression: 'var msg1; msg2'.
+cascadeExpression := OCParser parseExpression: 'var msg1; msg2'.
 cascadeExpression receiver
 >>> ASTVariableNode(var)
 
@@ -334,7 +334,7 @@ Dynamic literal arrays nodes are instances of `ASTArrayNode`.
 To access the expressions inside a dynamic array node, they understand the message `children`
 
 ```language=smalltalk
-arrayNode := Parser parseExpression: '{
+arrayNode := OCParser parseExpression: '{
   1 + 1 .
   self message .
   anObject doSomethingWith: anArgument + 3 }'.
@@ -352,11 +352,11 @@ arrayNode children.
 
 Now that we have studied the basic nodes representing expressions, we can build up methods from them.
 Methods are represented as instances of `ASTMethodNode` and need to be parsed with a variant of the parser we have used so far, a method parser.
-The `Parser` class fulfills the role of a method parser when we use the message `parseMethod:` instead of `parseExpression:`.
+The `OCParser` class fulfills the role of a method parser when we use the message `parseMethod:` instead of `parseExpression:`.
 For example, the following piece of code returns an `ASTMethodNode` instance for a method named `myMethod`.
 
 ```language=smalltalk
-methodNode := Parser parseMethod: 'myMethod
+methodNode := OCParser parseMethod: 'myMethod
 	1+1.
 	self'
 ```
@@ -385,7 +385,7 @@ Return nodes, representing the return instruction `^`, are statement nodes but n
 If we take the previous example, we can access the sequence node body of our method with the `body` message.
 
 ```language=smalltalk
-methodNode := Parser parseMethod: 'myMethod
+methodNode := OCParser parseMethod: 'myMethod
 	1+1.
 	self'.
 
@@ -418,7 +418,7 @@ This is because temporary variables can be defined inside a block node, as we wi
 We can access the temporary variables of a sequence node by asking it for its `temporaries`.
 
 ```language=smalltalk
-methodNode := Parser parseMethod: 'myMethod
+methodNode := OCParser parseMethod: 'myMethod
   | temporary |
   1+1.
   self'.
@@ -434,7 +434,7 @@ Return nodes, instances of `ASTReturnNode` are not expression nodes, i.e., they 
 Return nodes represent the fact of returning a value, and that value is an expression, which is accessible through the `value` message.
 
 ```language=smalltalk
-methodNode := Parser parseMethod: 'myMethod
+methodNode := OCParser parseMethod: 'myMethod
   1+1.
   ^ self'.
 
@@ -476,15 +476,15 @@ They differentiate from methods in two aspects: first, they do not have a select
 They can be stored in variables, passed as message arguments, and returned by messages.
 
 ```
-blockNode := Parser parseExpression: '[ :arg | | temp | 1 + 1. temp ]'.
+blockNode := OCParser parseExpression: '[ :arg | | temp | 1 + 1. temp ]'.
 blockNode arguments
->>>an OrderedCollection(ASTVariableNode(arg))
+>>>an OrderedCollection(OCVariableNode(arg))
 
 blockNode body temporaries
->>>an OrderedCollection(ASTVariableNode(temp))
+>>>an OrderedCollection(OCVariableNode(temp))
 
 blockNode body statements
->>>an OrderedCollection(ASTMessageNode(1 + 1) ASTVariableNode(temp))
+>>>an OrderedCollection(OCMessageNode(1 + 1) OCVariableNode(temp))
 ```
 
 
@@ -663,5 +663,5 @@ This makes the ASTs simple, and also turns control flow statements into control 
 ### Conclusion
 
 
-In this chapter, we have studied AST, short for abstract syntax trees, an object-oriented representation of the syntactic structure of programs. We have also seen an implementation of them: the ASTs. Pharo provides a parser for Pharo methods and expressions that transforms a string into a tree representing the program. We have seen how we can manipulate those ASTs. Any other nodes follow a similar principle.
+In this chapter, we have studied AST, short for abstract syntax trees, an object-oriented representation of the syntactic structure of programs. We have also presented the implementation of ASTs available in Pharo. Pharo provides a parser for Pharo methods and expressions that transforms a string into a tree representing the program. We have seen how we can manipulate those ASTs. Any other nodes follow a similar principle.
 You should have now the basis to understand the concept of ASTs and we can move on to the next chapter.
