@@ -46,7 +46,7 @@ Let's start by calculating the depth of the expression `1+1`.
 This expression is made of a message node, and two literal nodes.
 
 ```
-expression := Parser parseExpression: '1+1'.
+expression := OCParser parseExpression: '1+1'.
 expression acceptVisitor: DepthCalculatorVisitor new.
 >>> Exception! DepthCalculatorVisitor does not understand visitMessageNode:
 ```
@@ -89,7 +89,7 @@ The second statement, however, has depth of three, because the receiver of the `
 The final depth of the method is then 5: 1 for the method node, 1 for the sequence node, and 3 for the statements.
 
 ```
-method := Parser parseMethod: 'method
+method := OCParser parseMethod: 'method
   1+1.
   self factorial + 2'.
 method acceptVisitor: DepthCalculatorVisitor new.
@@ -289,20 +289,20 @@ Fortunately for us, Pharo's ASTs already provide `ASTProgramNodeVisitor` a base 
 
 Calculating the depth of an AST is a pretty naïve example for a visitor because we do not need special treatment per node.
 It is however a nice example to introduce the concepts, learn some common patterns, and it furthermore forced us to do some refactorings and understand a complex visitor structure.
-Moreover, it was a good introduction for the `ASTProgramNodeVisitor` class.
+Moreover, it was a good introduction for the `OCProgramNodeVisitor` class.
 
 In this section, we will implement a visitor that does require a different treatment per node: a node search.
 Our node search will look for a node in the tree that contains a token matching a string.
 For the purposes of this example, we will keep it scoped to a **begins with** search, and will return all nodes it finds, in a depth-first in-order traversal.
 We leave as an exercise for the reader implementing variants such as fuzzy string search, traversing the AST in different order, and being able to provide a stream-like API to get only the next matching node on demand.
 
-Let's then start to define a new visitor class `SearchVisitor`, subclass of `ASTProgramNodeVisitor`.
+Let's then start to define a new visitor class `SearchVisitor`, subclass of `OCProgramNodeVisitor`.
 This class will have an instance variable to keep the token we are looking for.
 Notice that we need to keep the token as part of the state of the visitor: the visitor API implemented by Pharo's ASTs do not support additional arguments to pass around some extra state. This means that this state needs to be kept in the visitor.
 When the search matches the name of a variable or elements, we will store its name into a collection of matched node names. 
 
 ```language=smalltalk
-ASTProgramNodeVisitor << #SearchVisitor
+OCProgramNodeVisitor << #SearchVisitor
   slots: { #token . #matchedNodeNames};
   package: 'VisitorExample'
 
@@ -322,7 +322,7 @@ Let us define a little test
 SearchVisitorTest >> testTokenInVariable
 
 	| tree visitor |
-	tree := Parser parseMethod: 'one 
+	tree := OCParser parseMethod: 'one 
 
 | pharoVar |
 pharoVar := 0.
@@ -388,7 +388,7 @@ To search in them, we need to transform such values as string and then perform t
 SearchVisitor >> testTokenInLiteral
 
 	| tree visitor |
-	tree := Parser parseMethod: 'one 
+	tree := OCParser parseMethod: 'one 
 
 ^ #(''pharoString'')'.
 	visitor := SearchVisitor new.
@@ -428,10 +428,10 @@ We let you implement it as an exercise.
 
 ### Conclusion
 
-The visitor design pattern allows us to extend tree-like structures with operations without modifying the original implementation. The tree-like structure, in our case the AST, needs only to implement an accept-visit protocol. RB ASTs implement such a protocol and some handy base visitor classes.
+The visitor design pattern allows us to extend tree-like structures with operations without modifying the original implementation. The tree-like structure, in our case the AST, needs only to implement an accept-visit protocol. Opal Compiler's  ASTs implement such a protocol and some handy base visitor classes.
 
 Finally, we implemented two visitors for ASTs: a depth calculator and a node searcher.
 The depth calculator is a visitor that does not require special manipulation per-node, but sees all nodes through a common view. The search visitor has a common case for most nodes, and then implements special search conditions for messages, literals and variables.
 
-In the following chapters we will use the visitor pattern to implement AST interpreters: a program that specifies how to evaluate an AST. A normal evaluator interpreter yields the result of executing the AST.
+In the following chapters, we will use the visitor pattern to implement AST interpreters: a program that specifies how to evaluate an AST. A normal evaluator interpreter yields the result of executing the AST.
 However, we will see that abstract interpreters will evaluate an AST in an abstract way, useful for code analysis.
