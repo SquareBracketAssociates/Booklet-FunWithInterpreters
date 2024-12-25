@@ -72,7 +72,7 @@ Below we define a first test for it: `testReturnInteger`.
 ```
 CInterpreterTest >> testReturnInteger
 	| ast result |
-	ast := Parser parseMethod: (CInterpretable >> #returnInteger) sourceCode.
+	ast := OCParser parseMethod: (CInterpretable >> #returnInteger) sourceCode.
 	result := self interpreter execute: ast.
 	self assert: result equals: 5
 ```
@@ -191,7 +191,7 @@ We already defined that our interpreter understands the `execute:`  message, so 
 ```
 CInterpreterTest >> testReturnFloat
 	| ast result |
-	ast := Parser parseMethod: (CInterpretable >> #returnFloat) sourceCode.
+	ast := OCParser parseMethod: (CInterpretable >> #returnFloat) sourceCode.
 	result := self interpreter execute: ast.
 	self assert: result equals: 3.14
 ```
@@ -210,7 +210,7 @@ The method `executeSelector:` extracts some common logic that will make our test
 ```
 CHInterpreterTest >> executeSelector: aSymbol
 	| ast |
-	ast := Parser parseMethod: (CInterpretable >> aSymbol) sourceCode.
+	ast := OCParser parseMethod: (CInterpretable >> aSymbol) sourceCode.
 	^ self interpreter execute: ast
 ```
 

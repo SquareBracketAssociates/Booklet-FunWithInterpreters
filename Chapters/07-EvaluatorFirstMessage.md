@@ -160,7 +160,7 @@ CInterpreter >> visitMessageNode: aMessageNode
 	| newReceiver method ast | 
 	newReceiver := self visitNode: aMessageNode receiver.
 	method := newReceiver class compiledMethodAt: aMessageNode selector.
-	ast := RBParser parseMethod: method sourceCode.
+	ast := OCParser parseMethod: method sourceCode.
 	^ self execute: ast withReceiver: newReceiver
 ```
 
@@ -170,13 +170,13 @@ All our tests should pass and in particular `testSelfSend`.
 
 Pharo provides a way to get an AST from a compiled method, but we do not want to use
 because the AST it returns is different from the one we want for this book (the variables are resolved based on a semantical analysis). 
-This is why we use `RBParser parseMethod: method sourceCode.`
+This is why we use `OCParser parseMethod: method sourceCode.`
 
 To encapsulate such a decision we define the method `astOf:` and use it. 
 
 ```
 astOf: aCompiledMethod 
-	^ RBParser parseMethod: aCompiledMethod sourceCode.
+	^ OCParser parseMethod: aCompiledMethod sourceCode.
 ```
 
 ```
