@@ -213,13 +213,7 @@ CInterpreter >> executeMethod: anAST withReceiver: anObject
 Our tests should all pass now.
 
 
-
-
-
-
-
 ### Refactoring the Terrain
-@@HERE
 
 Let's now refactor a bit the existing code to clean it up and expose some existing but hidden functionality. Let us extract the code that accesses `self` and the frame parameters into two other methods that make more intention revealing that we are accessing values in the current frame.
 
@@ -228,18 +222,14 @@ CInterpreter >> tempAt: aSymbol put: anInteger
 	self topFrame at: aSymbol put: anInteger
 ```
 
-
 ```
 CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 	| result |
 	self pushNewMethodFrame.
-	
-	"Set up the scope chain"
 	self topFrame parentScope: (CInstanceScope new
 		receiver: anObject;
 		parentScope: globalScope;
-		yourself);
-	yourself.
+		yourself).
   
 	self topFrame receiver: anObject.
 	anAST arguments 
@@ -253,16 +243,7 @@ CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 
 
 
-
-
-
-
-
-
-
-
 ### Handling Temporaries
-
 
 Temporary variables, or local variables, are variables that live within the scope of a method's **execution**.
 Memory for such variables is allocated when a method is activated, and released when the method returns.
@@ -270,12 +251,14 @@ Because of this property, temporary variables are also called automatic variable
 
 The usual way to implement such temporary variables is to allocate them in the method execution's frame.
 This way, when the method returns, the frame is popped and all the values allocated in temporaries are discarded and can be reclaimed.
-In other words, we will manage temporaries the same way as we manage arguments.
+In other words, we can manage temporaries the same way as we manage arguments.
 
 Our first scenario introducing temporaries will verify the default value of temporaries.
-Indeed when temporaries are allocated in Pharo, the execution engine \(in this case our evaluator\) should make sure these variables are correctly initialized to a default value, in this case `nil`.
+Indeed when temporaries are allocated in Pharo, the execution engine (in this case our evaluator) should make sure these variables are correctly initialized to a default value, in this case `nil`.
 
-Notice that temporaries cannot be observed from outside the execution of a method unless we halt the evaluation of a method in the middle of the evaluation. Since our testing approach is more like a black-box approach, we need to make our scenarios visible from the outside somehow. Because of these reasons, our tests will rely on returns again, as we did before with literal objects.
+Notice that temporaries cannot be observed from outside the execution of a method unless we halt the evaluation of a method in the middle of the evaluation. Since our testing approach is more like a black-box approach, we need to make our scenarios visible from the outside. Because of these reasons, our tests will rely on returns again, as we did before with literal objects.
+
+We define the method `returnUnassignedTemp` that simply returns a local variable that is just allocated. 
 
 ```
 CInterpretable >> returnUnassignedTemp
@@ -294,34 +277,33 @@ CInterpreterTest >> testUnassignedTempHasNilValue
 ```
 
 
-The current subset of Pharo that we interpret does not contain blocks and their local/temporary variables \(We will implement blocks and more complex lexical scopes in a subsequent chapter\).
-Therefore the temporary variable management we need to implement so far is rather simple.
+The current subset of Pharo that we interpret does not contain blocks and their local/temporary variables -- We will implement blocks and more complex lexical scopes in a subsequent chapter.
+Therefore the temporary variable management we need to implement is simple.
 
 To make our test pass, we modify the `execute:withReceiver:andArguments:` method to define the temporaries needed with `nil` as value.
 
 ```
 CInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
-	| result thisFrame |
+	| result  |
 	self pushNewMethodFrame.
 	self topFrame parentScope: (CHInstanceScope new
 		receiver: anObject;
 		parentScope: globalScope;
 		yourself);
-	yourself.
   
 	self topFrame receiver: anObject.
 	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ].
-	anAST temporaryNames do: [ :tempName | self tempAt: tempName name put: nil ].
+	anAST temporaryNames do: [ :tempName | self tempAt: tempName put: nil ].
 	result := self visitNode: anAST body.
 	self popFrame.
 	^ result
 ```
 
-
 The tests should pass.
 
-### Implementing Temporary Variable Writes
 
+### Implementing Temporary Variable Writes
+HERE
 
 Finally we test that writes to temporary variables are working too.
 We define our scenario method `writeTemporaryVariable`, which defines a temporary variable, assigns to it and returns it. 
