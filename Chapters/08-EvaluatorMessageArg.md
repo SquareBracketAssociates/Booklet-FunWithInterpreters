@@ -17,7 +17,7 @@ In addition to simply passing arguments, the evaluator needs to care about evalu
 
 #### Initial Argument Setup
 
-To implement some initial support for arguments, our first scenario is to simply send a message with an argument. We already one message with an argument: the `x:` setter. We  defines the method `changeCollaboratorWithArgument` which uses it.
+To implement some initial support for arguments, our first scenario is to simply send a message with an argument. We already one message with an argument: the `x:` setter. We define the method `changeCollaboratorWithArgument` which uses it.
 
 ```language=smalltalk
 CInterpretable >> changeCollaboratorWithArgument

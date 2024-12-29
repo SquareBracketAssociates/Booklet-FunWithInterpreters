@@ -33,7 +33,7 @@ Figure *@callstack@* presents a call stack with two methods. The first method in
 
 
 
-### Putting in place the stack
+### Putting in Place the Stack
 
 We will use the stack implementation available at github://pharo-containers/.
 
@@ -166,7 +166,7 @@ CInterpreter >> visitMessageNode: aMessageNode
 
 All our tests should pass and in particular `testSelfSend`. 
 
-### Consolidating AST access logic
+### Consolidating AST Access Logic
 
 Pharo provides a way to get an AST from a compiled method, but we do not want to use
 because the AST it returns is different from the one we want for this book (the variables are resolved based on a semantical analysis). 
@@ -253,7 +253,7 @@ CInterpreterTest >> setUp
 ```
 
 
-#### Making the test pass
+#### Making the Test Pass
 
 Executing this test breaks because the access to the instance variable `x` returns nil, showing the limits of our current implementation.  This is due to the fact that evaluating message send `returnInstanceVariableX` creates a new frame with the collaborator as receiver, and since that frame is not popped from of the stack, when the method returns, the access to the `x` instance variable accesses the one of the uninitialized collaborator instead of the caller object.
 

@@ -111,7 +111,7 @@ CInterpreter >> currentScope
   		yourself
 ```
 
-### Using the scope
+### Using the Scope
 
 The basic structure of our lexical scope implementation introduces the method `scopeDefining:`.
 This method returns the scope defining the given name. The method `scopeDefining:` forwards the search to the current scope, obtained through `currentScope`. Since we only have one scope for now we do not cover the case where the variable is not in the variables of the receiver. 
@@ -268,11 +268,11 @@ The case of global variable writing is similar to the instance variable assignme
 
 
 
-### Little setup
+### Little Setup
 
 Our first testing scenario, similar to the previous ones, is as follows: we will define a method `returnGlobal` that reads and returns the global named `Global`.
 Now the question is that from the CInterpretable class the global variable `Global` should be a Pharo global variable. 
-Note that when the interpreter will encounter such a variable, it will use its own private environment. 
+Note that when the interpreter encounters such a variable, it uses its own private environment. 
 
 So to make sure that you can compile the code and execute your tests, we define the class method initialize as follows: 
 
@@ -304,13 +304,19 @@ CInterpretable >> returnGlobal
 We start by enriching the class `CInterpreterTest` with an instance variable pointing to a new interpreter. 
 
 ```
-CInterpreterTest >> setUp	super setUp.	interpreter := CInterpreter new. 	receiver := CInterpretable new
+CInterpreterTest >> setUp
+
+	super setUp.
+	interpreter := CInterpreter new. 
+	receiver := CInterpretable new
 ```
 
 This implies that we should modify the getter to be 
 
 ```
-CInterpreterTest >> interpreter	^ interpreter
+CInterpreterTest >> interpreter
+
+	^ interpreter
 ```
 
 We define a test that specifies that the interpreter's environment has a binding whose key is `#Global` and value is a new object.
