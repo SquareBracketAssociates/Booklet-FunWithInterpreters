@@ -303,12 +303,10 @@ The tests should pass.
 
 
 ### Implementing Temporary Variable Writes
-HERE
+The next aspect we have to address is temporary writing. 
 
-Finally we test that writes to temporary variables are working too.
+We test that writes to temporary variables are working too.
 We define our scenario method `writeTemporaryVariable`, which defines a temporary variable, assigns to it and returns it. 
-An optimizing compiler for this code would be smart enough to do constant propagation of the literal integer and then realize that the temporary is dead code and remove it, leaving us with a method body looking like ` ^ 100 `. 
-However, since the parser does not do such optimizations by itself, we are sure that the AST we get contains both the temporary definition, the assignment, and the temporary return.
 
 ```
 CInterpretable >> writeTemporaryVariable
@@ -317,6 +315,7 @@ CInterpretable >> writeTemporaryVariable
 	^ temp
 ```
 
+Remark that an optimizing compiler for this code would be smart enough to do constant propagation of the literal integer and then realize that the temporary is dead code and remove it, leaving us with a method body looking like ` ^ 100 `. However, since the parser does not do such optimizations by itself, we are sure that the AST we get contains both the temporary definition, the assignment, and the temporary return.
 
 Its companion test checks that evaluating this method does effectively return 100, meaning that the temporary variable write succeeded, and that `temp` means the same variable in the assignment and in the access.
 
@@ -327,9 +326,9 @@ CInterpreterTest >> testWriteTemporaryVariable
 		equals: 100
 ```
 
+If you execute the test `testWriteTemporaryVariable` it should fail. 
 
-
-Since temporary variable name resolution is already managed by our method scopes, we just need to implement `write:withValue:` in it to make all our tests pass.
+Since temporary variable name resolution is already managed by method scopes, we just need to implement `write:withValue:` in it to make all our tests pass.
 
 ```
 CMethodScope >> write: aString withValue: aValue
@@ -337,9 +336,8 @@ CMethodScope >> write: aString withValue: aValue
 ```
 
 
-
 ### Evaluation Order
-
+HERE
 
 The last thing we need to make sure is that arguments are evaluated in the correct order.
 The evaluation order in Pharo goes as follows: before evaluating a message, the receiver and all arguments are evaluated. The receiver is evaluated before the arguments. Arguments are evaluated in left-to-right order.
