@@ -259,7 +259,7 @@ Now the tests should pass.
 ### Evaluating Variables: Global Reads
 
 We finish this chapter with the reading of global variables, which covers two cases: proper global variables and access to classes.
-It illustrate the chain of scopes where an instance scope parent is a global scope. 
+It illustrates the chain of scopes where an instance scope parent is a global scope. 
 
 To better control our testing environment, we decided to not use the Pharo environment by default.
 Instead, the interpreter will know its global scope in an instance variable and look up globals in it using a simple API, making it possible to use the system's global environment instead if we wanted to.

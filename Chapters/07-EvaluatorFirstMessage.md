@@ -32,20 +32,10 @@ Figure *@callstack@* presents a call stack with two methods. The first method in
 
 
 
-
 ### Putting in Place the Stack
 
-We will use the stack implementation available at github://pharo-containers/.
-
-```
-Metacello new
-  baseline: 'ContainersStack';
-  repository: 'github://pharo-containers/Containers-Stack:v1.0/src';
-  load.
-```
-
 Since methods define a scope with their temporary variables and arguments, we represent frames using a new kind of scope: a method scope.
-For now, the method scope will store the current receiver, and later its parent scope, and a set of key-value pairs representing the variables defined in the current method execution: the arguments and temporaries (see Chapter *@@*).
+For now, the method scope will store the current receiver, and later its parent scope, and a set of key-value pairs representing the variables defined in the current method execution: the arguments and temporaries (see Chapter *@cha:messageArgs@*).
 
 ```
 Object << #CMethodScope
@@ -57,6 +47,20 @@ CMethodScope >> receiver: aCInterpretable
 
 CMethodScope >> receiver
 	^ receiver
+```
+
+
+
+
+### Putting in Place the Stack
+
+We will use the stack implementation available at github://pharo-containers/.
+
+```
+Metacello new
+  baseline: 'ContainersStack';
+  repository: 'github://pharo-containers/Containers-Stack:v1.0/src';
+  load.
 ```
 
 
@@ -111,6 +115,15 @@ This refactor kept all the test green, and opened the path to introduce message-
 As the reader may have observed, this stack can only grow.
 We will take care of popping frames from the stack later when we revisit method returns.
 
+
+SD: currentScope is not connected to the stack and this is strange.
+Because it is defined as. 
+
+```
+currentScope	^ CInstanceScope new		receiver: self receiver;		parentScope: globalScope;		yourself
+```
+
+Note that we will have to improve the situation because the method `currentScope` (which is creating an instance scope) is not connected with the frame and this will be a problem. 
 
 ### Evaluating a First Message Send
 
@@ -328,7 +341,7 @@ We are ready to continue our journey in message-sends.
 
 
 
-# Conclusion
+### Conclusion
 
 In this chapter, we set the infrastructure to support message execution. 
 We introduced the important notion of stack frames whose elements represent a given execution. 

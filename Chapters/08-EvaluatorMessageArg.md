@@ -44,8 +44,16 @@ Since we have not implemented any support for arguments yet, this test should fa
 
 ### Enhance Method Scope
 
-The method scope was limited to managing the receiver. It is not enough.
-Method scopes should support variables as well. To do so, we basically add a dictionary 
+The current method scope is limited to managing the receiver. It is not enough.
+Method scopes should support variables as well as parsent scope. 
+
+We add the `parentScope:` instance variable and its accessors as well as 
+
+```
+Object << #CMethodScope	slots: { #receiver . #parentScope . #variables };	package: 'Champollion'
+```
+
+To support variables, we add a dictionary 
 to hold them and some utility methods.
 
 ```
@@ -61,8 +69,10 @@ CMethodScope >> at: aKey put: aValue
 	variables at: aKey put: aValue
 ```
 
-In addition we add support for identifying the scope. 
-We specify `scopeDefining:` as follows:  
+In addition, we add support for identifying the scope. 
+We define the method `scopeDefining:` as follows:  It checks whether the looked up name is
+a variable one.
+
 ```
 CMethodScope >> scopeDefining: aString
 	(variables includesKey: aString)
@@ -73,7 +83,8 @@ CMethodScope >> scopeDefining: aString
 
 Note that the `scopeDefining:` delegates to its parent scope when the variable is not locally found. 
 
-Finally we add an `read:` method using the variable implementation logic.
+Finally we add a `read:` method using the variable implementation logic.
+
 ```
 CMethodScope >> read: aString
 	^ variables at: aString
@@ -91,7 +102,8 @@ Implementing argument support requires two main changes:
 Let's start with the second step, the callee side, and since all variable reads are concentrated on the scope lookup, we need to add the method scope in the scope chain.
 
 #### Previous situation
-Previously the method `execute:withReceiver:` was defined as follows
+
+Previously the method `execute:withReceiver:` was defined as follows:
 
 ```
 execute: anAST withReceiver: anObject
@@ -116,27 +128,37 @@ pushNewMethodFrame
 
 #### Improved version
 
+The new version is the following one: 
+
 ```
 CInterpreter >> execute: anAST withReceiver: anObject
 	| result |
 	self pushNewMethodFrame.
-
-	"Set up the scope chain"
 	self topFrame parentScope: (CInstanceScope new
 		receiver: anObject;
 		parentScope: globalScope;
-		yourself);
-	yourself.
+		yourself).
 
 	self topFrame receiver: anObject.
 	result := self visitNode: anAST.
 	self popFrame.
 	^ result
+```
 
+After pushing to the stack a new frame representing the method execution, we should make sure that the parent scope 
+of the method scope is an instance scope. This is what we were doing in the `currentScope` method.
+
+Also notice that the instance scope and the method scope have both a receiver. 
+SD: When can they be different? And why the instance one is not enough since it is in the parent scope of the method. 
+
+
+We have still to make sure that `currentScope` refers to the top frame of the interpreter.
+This is what the following redefinition expresses: 
+
+```
 CInterpreter >> currentScope
 	^ self topFrame
 ```
-
 
 
 
@@ -152,21 +174,19 @@ CInterpreter >> visitMessageNode: aMessageNode
 ```
 
 
-To include arguments in the method activation, let's add a new `arguments` parameter to our method `execute:withReceiver:` to get `execute:withReceiver:withArguments:`. 
+To include arguments in the method activation, we add a new `arguments` parameter to our method `execute:withReceiver:` to get `execute:withReceiver:withArguments:`. 
 
-In addition to adding the receiver to the new frame representing the execution, we add a binding for each parameter (called unfortunately arguments in Pharo AST) with their corresponding value in the argument collection. 
-We use the message `with:do:` to iterate both the parameter list and actual arguments as pairs.
+In addition to adding the receiver to the new frame representing the execution, we add a binding for each parameter (called unfortunately arguments in Pharo AST) with their corresponding value in the argument collection. This binding is added to the variables of the top frame. 
+The message `with:do:` iterates both the parameter list and actual arguments as pairs.
 
 ```
 CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 	| result |
 	self pushNewMethodFrame.
-	"Set up the scope chain"
 	self topFrame parentScope: (CInstanceScope new
 		receiver: anObject;
 		parentScope: globalScope;
-		yourself);
-	yourself.
+		yourself).
 
 	self topFrame receiver: anObject.
 	anAST arguments 
@@ -178,7 +198,8 @@ CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 ```
 
 
-Instead of just removing the old `executeMethod:withReceiver:` method, we redefine it calling the new one with a default empty collection of arguments. This method was used by our tests and is part of our public API, so keeping it will avoid migrating extra code and an empty collection of arguments seems like a sensible and practical default value.
+Instead of just removing the old `executeMethod:withReceiver:` method, we redefine it calling the new one with a default empty collection of arguments. 
+This method was used by our tests and is part of our public API, so keeping it will avoid migrating extra code and an empty collection of arguments is a sensible and practical default value.
  
 ```
 CInterpreter >> executeMethod: anAST withReceiver: anObject
@@ -197,16 +218,8 @@ Our tests should all pass now.
 
 
 
-
-
-
-
-
-
-
-
 ### Refactoring the Terrain
-
+@@HERE
 
 Let's now refactor a bit the existing code to clean it up and expose some existing but hidden functionality. Let us extract the code that accesses `self` and the frame parameters into two other methods that make more intention revealing that we are accessing values in the current frame.
 
