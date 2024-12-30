@@ -398,33 +398,37 @@ CInterpretable >> currentButComputeNextPeanoNumber
 We define a simple method `peanoToInteger:` that converts a peano number into its corresponding integer number.
 
 ```
-CInterpreterTests >> peanoToInt: aPeanoNumber
+CInterpreterTest >> peanoToInteger: aPeanoNumber
 	"Helper method to transform a peano number to a normal Pharo integer"
 	^ aPeanoNumber
 		ifEmpty: [ 0 ]
-		ifNotEmpty: [ 1 + (self peanoToInt: aPeanoNumber first) ]
+		ifNotEmpty: [ 1 + (self peanoToInteger: aPeanoNumber first) ]
 ```
 
 
 ### Using Peano Numbers
 
-Using this support, we can express our evaluation order scenario and test as follows.
-We will add a new instance variable to `CInterpretable` to store its evaluation order.
-Then, we are going to send a message with many arguments, evaluating for each argument `self next`.
-The message receiving the arguments will receive as argument three generated peano values, that we will return as dynamic literal array. If evaluation order is right, the evaluation order of the receiver should be 0, the evaluation of the first argument should be 1, and so on.
+Using the peano encoding, we can express our evaluation order scenario and test as follows:
+We want to get information about the message receiver and each of its arguments: we will compute and store a peano number for each of these sitations.
+
+Let us implement this now.
+The message receiving the arguments will receive as argument three generated peano values, that we will return as dynamic literal array. 
+If the evaluation order is right, the evaluation order of the receiver should be 0, the evaluation of the first argument should be 1, and so on.
+
+
+We add a new instance variable to `CInterpretable` to store the evaluation order of the receiver of a message. 
 
 ```
-Object << #CInterpretable
-	slots: { #x . #collaborator . #evaluationOrder};
-	package: 'Champollion'
+Object << #CInterpretable	slots: { #x . #collaborator . #currentPeanoNumber . #evaluationOrder };	package: 'Champollion'
 ```
-
 
 ```
 CInterpretable >> evaluationOrder
 	^ evaluationOrder
 ```
 
+We define the method `evaluateReceiver` which will store the current peano number in the `evaluationOrder` instance variable.
+Notice that this method returns the receiver so that we can use it as receiver of a message with multiple arguments (to compute the peano number of arguments).
 
 ```
 CInterpretable >> evaluateReceiver
@@ -432,52 +436,46 @@ CInterpretable >> evaluateReceiver
 	^ self
 ```
 
+We then define a method `returnEvaluationOrder` as follows: 
 
 ```
 CInterpretable >> returnEvaluationOrder
 	^ self evaluateReceiver
 		messageArg1: self currentButComputeNextPeanoNumber
-		arg2: self next
-		arg3: self next
-```
+		arg2: self currentButComputeNextPeanoNumber
+		arg3: self currentButComputeNextPeanoNumber
 
-
-```
 CInterpretable >> messageArg1: arg1 arg2: arg2 arg3: arg3
 	^ {arg1 . arg2 . arg3}
+```
+This method invokes the receiver evaluation and computes the next peano before passing it as arguments to the message.
 
-CInterpreterTests >> testEvaluationOrder
-	| argumentEvaluationOrder |
-	argumentEvaluationOrder := self executeSelector: #returnEvaluationOrder.
 
-	self assert: (self peanoToInt: receiver evaluationOrder) equals: 0.
-	self
-		assert: (argumentEvaluationOrder collect: 
-		[ :peano | self peanoToInt: peano])
-	 equals: #(1 2 3)
+To verify the evaluation order we define two simple tests: one checking that the receiver receives the peano number zero. 
+And one that checks that we get an array of numbers 1, 2, and 3. This array indicates that the value of the first argument was executing before the second
+and that the second was executed before the third. 
+
+```
+CInterpreterTest >> testEvaluationOrderOfReceiver	self executeSelector: #returnEvaluationOrder.	self assert: (self peanoToInteger: receiver evaluationOrder) equals: 0.	
+CInterpreterTest >> testEvaluationOrderOfArguments	| argumentEvaluationOrder |	argumentEvaluationOrder := self executeSelector: #returnEvaluationOrder.	self		assert: (argumentEvaluationOrder collect: 			[ :peano | self peanoToInteger: peano])	 	equals: #(1 2 3)
 ```
 
 
-To make this test green we need to implement previously some new support in our interpreter for dynamic literal arrays.
+To make this test green we need our interpreter to support dynamic arrays (The definition is similar to the one for literal arrays we already added). 
 
 ```
-CInterpreter >> visitArrayNode: aRBArrayNode
-	^ aRBArrayNode statements 
+CInterpreter >> visitArrayNode: anArrayNode
+	^ anArrayNode statements 
 		collect: [ :e | self visitNode: e ] 
 		as: Array
 ```
 
 
 At this point our test will fail because the evaluation order is wrong! The receiver was evaluated 4th, after all arguments. 
-This is solved by changing the order of evaluation in `visitMessageNode:`.
+This is solved by changing the order of evaluation in `visitMessageNode:` and executing ` self visitNode: aMessageNode receiver` first.
 
 ```
-CInterpreter >> visitMessageNode: aMessageNode
-	| newReceiver method args |
-	newReceiver := self visitNode: aMessageNode receiver.
-	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
-	method := newReceiver class compiledMethodAt: aMessageNode selector.
-	^ self executeMethod: (self astOf: method) withReceiver: newReceiver andArguments: args
+CInterpreter >> visitMessageNode: aMessageNode	| newReceiver method args | 	newReceiver := self visitNode: aMessageNode receiver.	args := aMessageNode arguments collect: [ :each | self visitNode: each ].	method := newReceiver class compiledMethodAt: aMessageNode selector.	^ self execute: (self astOf: method) withReceiver: newReceiver andArguments: args	
 ```
 
 
@@ -505,8 +503,9 @@ For example, the top-level scope defines global variables, the class scope defin
 In this way, variable visibility can be defined in terms of a scope: the variables visible in a scope are those defined in the scope or in the parents of the scope. 
 Moreover, scoping also gives a conflict resolution strategy: variables defined closer to the current scope in the scope hierarchy have more priority than those defined higher in the scope hierarchy.
 
-### About Return
+SD: We should add something about the interpreter.
 
+### About Return
 
 As a reader, you may wonder why we did not do anything for return expression and this is an interesting question. 
 Up to now interpreting a return is just returning the value of the interpretation of the return expression. 
@@ -515,7 +514,6 @@ should be executed and that we did not introduce different condition control flo
 This is when we will introduce block closure and conditional control flow and we will have to revisit the interpretation of return. 
 
 ### Conclusion
-
 
 Supporting message sends and in particular method execution is the core of the computation in an object-oriented language and this is what this chapter covered.
 
