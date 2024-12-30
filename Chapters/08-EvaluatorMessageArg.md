@@ -301,8 +301,9 @@ CInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aColle
 
 The tests should pass.
 
+### Another Refactoring 
 
-We take the opportunity to refactor a bit the method `execute:withReceiver:andArguments:`: we extract the temporary and argument management into 
+We take the opportunity to refactor a bit the method `execute:withReceiver:andArguments:`. We extract the temporary and argument management into 
 a new method named `manageArgumentsTemps:of:`.
 
 
@@ -366,46 +367,56 @@ The main idea is to implement numbers as nested sets, where
 - the set _(S(S())_ that contains the empty set (`0`) represents the number `1`, 
 the set _(S(S(S())))_ that contains the number `1` represents the number `2`, and so on. 
 
-The only support we need for this is to extend our literal support for dynamic array literals. The code illustrating the idea follows.
 
+### Peano Number Implementation
+
+First we implement peano numbers. The code illustrating the idea follows.
+
+
+First we add a counter named `currentPeanoNumber` to the interpreter and we initialize it with the peano number zero represented by an empty Set. 
+ 
 ```
 CInterpretable >> initialize
 	super initialize.
-	current := { "empty" }
+	currentPeanoNumber := { } "Empty"
 ```
 
 
+The method `nextPeanoNumber`
 ```
-CInterpretable >> next
+CInterpretable >> currentButComputeNextPeanoNumber
 	| result |
 	"Implement a stream as an increment in terms of Peano axioms.
 	See https://en.wikipedia.org/wiki/Peano_axioms"
-	result := current.
+	result := currentPeanoNumber.
 	"We increment the counter"
-	current := { current }.
+	currentPeanoNumber := { currentPeanoNumber }.
 	"We return the previous result"
 	^ result
 ```
 
+We define a simple method `peanoToInteger:` that converts a peano number into its corresponding integer number.
 
 ```
 CInterpreterTests >> peanoToInt: aPeanoNumber
 	"Helper method to transform a peano number to a normal Pharo integer"
 	^ aPeanoNumber
 		ifEmpty: [ 0 ]
-		ifNonEmpty: [ 1 + (self peanoToInt: aPeanoNumber first) ]
+		ifNotEmpty: [ 1 + (self peanoToInt: aPeanoNumber first) ]
 ```
 
 
+### Using Peano Numbers
+
 Using this support, we can express our evaluation order scenario and test as follows.
-We will add a new instance variable to `CHInterpretable` to store its evaluation order.
+We will add a new instance variable to `CInterpretable` to store its evaluation order.
 Then, we are going to send a message with many arguments, evaluating for each argument `self next`.
 The message receiving the arguments will receive as argument three generated peano values, that we will return as dynamic literal array. If evaluation order is right, the evaluation order of the receiver should be 0, the evaluation of the first argument should be 1, and so on.
 
 ```
-Object << #CHInterpretable
+Object << #CInterpretable
 	slots: { #x . #collaborator . #evaluationOrder};
-	package: 'Champollion-Core'
+	package: 'Champollion'
 ```
 
 
@@ -417,7 +428,7 @@ CInterpretable >> evaluationOrder
 
 ```
 CInterpretable >> evaluateReceiver
-	evaluationOrder := self next.
+	evaluationOrder := self currentButComputeNextPeanoNumber.
 	^ self
 ```
 
@@ -425,7 +436,7 @@ CInterpretable >> evaluateReceiver
 ```
 CInterpretable >> returnEvaluationOrder
 	^ self evaluateReceiver
-		messageArg1: self next
+		messageArg1: self currentButComputeNextPeanoNumber
 		arg2: self next
 		arg3: self next
 ```
@@ -447,7 +458,7 @@ CInterpreterTests >> testEvaluationOrder
 ```
 
 
-To make this test green we need to implement previously some new support in our interpreter: writing to temporary variables and dynamic literal arrays.
+To make this test green we need to implement previously some new support in our interpreter for dynamic literal arrays.
 
 ```
 CInterpreter >> visitArrayNode: aRBArrayNode
@@ -467,7 +478,6 @@ CInterpreter >> visitMessageNode: aMessageNode
 	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
 	method := newReceiver class compiledMethodAt: aMessageNode selector.
 	^ self executeMethod: (self astOf: method) withReceiver: newReceiver andArguments: args
-]
 ```
 
 
