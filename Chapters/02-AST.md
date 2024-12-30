@@ -63,7 +63,7 @@ For example, the program `17 max: 42` is the message-send `max:` to receiver 17 
 
 ```language=smalltalk
 | expression |
-expression := Parser parseExpression: '17 max: 42'.
+expression := OCParser parseExpression: '17 max: 42'.
 expression receiver formattedCode
 >>> 17
 
@@ -79,7 +79,7 @@ Expressions are a natural instances of the composite pattern, where expressions 
 
 ```language=smalltalk
 | expression |
-expression := Parser parseExpression: '(17 max: 42) asString'.
+expression := OCParser parseExpression: '(17 max: 42) asString'.
 expression receiver formattedCode
 >>> (17 max: 42)
 
@@ -141,7 +141,7 @@ stringExpression value
 ```
 
 
-A special case of literals are literal arrays, which have their own node: `ASTLiteralArrayNode`.
+A special case of literals are literal arrays, which have their own node: `OCLiteralArrayNode`.
 Literal array nodes understand the message `value` as any other literal, returning the literal array instance.
 However, it allows us to access the sub collection of literals using the message `contents`.
 
@@ -151,7 +151,7 @@ arrayExpression value
 >>> #(1 2 3)
 
 arrayExpression contents first
->>> ASTLiteralValueNode(1)
+>>> OCLiteralValueNode(1)
 ```
 
 
@@ -177,7 +177,7 @@ Instead of complexifying the parser with this kind of information, the Pharo too
 The parser generates a simple AST, later tools annotate the AST with semantic information from a context if required.
 An example of this kind of treatment is the compiler, which requires such contextual information to produce the correct final code.
 
-For the matter of this book, we will not consider nor use semantic analysis, and we will stick with normal `ASTVariableNode` objects.
+For the matter of this book, we will not consider nor use semantic analysis, and we will stick with normal `OCVariableNode` objects.
 Later in the book we may do an optimization phase to get a richer tree that will simplify our interpretation.
 
 
@@ -194,12 +194,12 @@ The message `value` returns the expression at the right of the assignment.
 ```language=smalltalk
 assignmentExpression := OCParser parseExpression: 'var := #( 1 2 ) size'.
 assignmentExpression variable
->>> ASTVariableNode(var)
+>>> OCVariableNode(var)
 ```
 
 ```language=smalltalk
 assignmentExpression value
->>> ASTMessageNode(#(1 2) size)
+>>> OCMessageNode(#(1 2) size)
 ```
 
 
@@ -213,7 +213,7 @@ We say that message nodes are composed expressions because the `receiver` and `a
 ```language=smalltalk
 messageExpression := OCParser parseExpression: '17 max: 42'.
 messageExpression receiver
->>> ASTLiteralValueNode(17)
+>>> OCLiteralValueNode(17)
 ```
 
 
@@ -221,7 +221,7 @@ Note that `arguments` is a normal collection of expressions - in the sense that 
 
 ```language=smalltalk
 messageExpression arguments
->>> an OrderedCollection(ASTLiteralValueNode(42))
+>>> an OrderedCollection(OCLiteralValueNode(42))
 ```
 
 
@@ -301,7 +301,7 @@ t yourself
 
 However, in contrast with the sequence above, cascades are expressions: their value is the value of the last message in the cascade.
 
-A cascade node is an instance of `ASTCascadeNode`.
+A cascade node is an instance of `OCCascadeNode`.
 A cascade node understands the `receiver` message, returning the receiver of the cascade.
 It also understands the `messages` message, returning a collection with the messages in the cascade.
 Note that the messages inside the cascade node are normal `ASTMessageNode` and have a receiver too.
@@ -311,10 +311,10 @@ In the following chapters we will have to be careful when manipulating cascade n
 ```language=smalltalk
 cascadeExpression := OCParser parseExpression: 'var msg1; msg2'.
 cascadeExpression receiver
->>> ASTVariableNode(var)
+>>> OCVariableNode(var)
 
 cascadeExpression messages
->>> an OrderedCollection(ASTMessageNode(var msg1) ASTMessageNode(var msg2))
+>>> an OrderedCollection(OCMessageNode(var msg1) OCMessageNode(var msg2))
 ```
 
 
@@ -330,7 +330,7 @@ To delay the execution of the elements in the dynamic array, a dynamic array nod
 ```
 
 
-Dynamic literal arrays nodes are instances of `ASTArrayNode`.
+Dynamic literal arrays nodes are instances of `OCArrayNode`.
 To access the expressions inside a dynamic array node, they understand the message `children`
 
 ```language=smalltalk
@@ -341,9 +341,9 @@ arrayNode := OCParser parseExpression: '{
 
 arrayNode children.
 >>> an OrderedCollection(
-  ASTMessageNode((1 + 1))
-  ASTMessageNode(self message)
-  ASTMessageNode((anObject doSomethingWith: anArgument + 3)))
+  OCMessageNode((1 + 1))
+  OCMessageNode(self message)
+  OCMessageNode((anObject doSomethingWith: anArgument + 3)))
 ```
 
 
@@ -390,7 +390,7 @@ methodNode := OCParser parseMethod: 'myMethod
 	self'.
 
 methodNode body
->>> ASTSequenceNode(1 + 1. self)
+>>> OCSequenceNode(1 + 1. self)
 ```
 
 
@@ -398,7 +398,7 @@ And we can access and iterate the instructions in the sequence by asking it its 
 
 ```language=smalltalk
 methodNode body statements.
->>> an OrderedCollection(ASTMessageNode(1 + 1) ASTSelfNode(self))
+>>> an OrderedCollection(OCMessageNode(1 + 1) OCSelfNode(self))
 ```
 
 
@@ -423,7 +423,7 @@ methodNode := OCParser parseMethod: 'myMethod
   1+1.
   self'.
 methodNode body temporaries.
->>> an OrderedCollection(ASTVariableNode(temporary))
+>>> an OrderedCollection(OCVariableNode(temporary))
 ```
 
 
@@ -439,10 +439,10 @@ methodNode := OCParser parseMethod: 'myMethod
   ^ self'.
 
 returnNode := methodNode body statements last.
->>>ASTReturnNode(^ self)
+>>>OCReturnNode(^ self)
 
 returnNode value.
->>>ASTSelfNode(self)
+>>>OCSelfNode(self)
 ```
 
 
@@ -507,9 +507,9 @@ ASTs provide several protocols for accessing and iterating any AST node in a gen
 
 - `aNode children`: returns a collection with the direct children of the node.
 - `aNode allChildren`: returns a collection with all recursive children found from the node.
-- `aNode nodesDo: aBlock`: iterates over allChildren applying `aBlock` on each of them.
+- `aNode nodesDo: aBlock`: iterates over all children and apply `aBlock` on each of them.
 - `aNode parent`: returns the direct parent of the node.
-- `aNode methodNode`: returns the method node that is the root of the tree. For consistency, expressions nodes parsed using `parseExpression:` are contained within a method node too.
+- `aNode methodNode`: returns the method node that is the root of the tree. For consistency, expression nodes parsed using `parseExpression:` are contained within a method node too.
 
 
 #### Storing Properties
