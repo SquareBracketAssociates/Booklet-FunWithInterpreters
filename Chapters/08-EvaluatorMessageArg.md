@@ -302,6 +302,19 @@ CInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aColle
 The tests should pass.
 
 
+We take the opportunity to refactor a bit the method `execute:withReceiver:andArguments:`: we extract the temporary and argument management into 
+a new method named `manageArgumentsTemps:of:`.
+
+
+```
+CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection	| result |	self pushNewMethodFrame.	self topFrame parentScope: (CInstanceScope new			 receiver: anObject;			 parentScope: globalScope;			 yourself).	self topFrame receiver: anObject.	self manageArgumentsTemps: aCollection of: anAST.	result := self visitNode: anAST.	self popFrame.	^ result
+```
+
+```
+CInterpreter >> manageArgumentsTemps: aCollection of: anAST	anAST arguments		with: aCollection		do: [ :arg :value | self tempAt: arg name put: value ].	anAST temporaryNames do: [ :tempName |		self tempAt: tempName put: nil ]
+```
+
+
 ### Implementing Temporary Variable Writes
 The next aspect we have to address is temporary writing. 
 
@@ -337,12 +350,23 @@ CMethodScope >> write: aString withValue: aValue
 
 
 ### Evaluation Order
-HERE
+
 
 The last thing we need to make sure is that arguments are evaluated in the correct order.
-The evaluation order in Pharo goes as follows: before evaluating a message, the receiver and all arguments are evaluated. The receiver is evaluated before the arguments. Arguments are evaluated in left-to-right order.
+The evaluation order in Pharo goes as follows: 
 
-Testing the evaluation order in a black-box fashion, as we have been doing so far, is rather challenging with our current evaluator. Indeed, our evaluator does not yet handle arithmetics, allocations, or other kinds of primitive, so we cannot easily count! A simple approach to test is to make a counter out of [Peano Axioms](https://en.wikipedia.org/wiki/Peano_axioms). The main idea is to implement numbers as nested sets, where the empty set _(S())_ represents the number `0`, the set _(S(S())_ that contains the empty set (`0`) represents the number `1`, the set _(S(S(S())))_ that contains the number `1` represents the number `2`, and so on. The only support we need for this is to extend our literal support for dynamic array literals. The code illustrating the idea follows.
+- Before evaluating a message, the receiver and all arguments are evaluated. 
+- The receiver is evaluated before the arguments. 
+- Arguments are evaluated in left-to-right order.
+
+Testing the evaluation order in a black-box fashion, as we have been doing so far, is rather challenging with our current evaluator. Indeed, our evaluator does not yet handle arithmetics, allocations, or other kinds of primitive, so we cannot easily count! A simple approach to test is to make a counter out of [Peano Axioms](https://en.wikipedia.org/wiki/Peano_axioms). 
+
+The main idea is to implement numbers as nested sets, where 
+- the empty set _(S())_ represents the number `0`, 
+- the set _(S(S())_ that contains the empty set (`0`) represents the number `1`, 
+the set _(S(S(S())))_ that contains the number `1` represents the number `2`, and so on. 
+
+The only support we need for this is to extend our literal support for dynamic array literals. The code illustrating the idea follows.
 
 ```
 CInterpretable >> initialize
