@@ -54,8 +54,6 @@ Let us implement method lookup.
 
 ### Method Lookup Scenario
 
-
-
 To implement and test the method lookup, we should extend our scenario classes with a class hierarchy.
 We introduce two superclasses above `CInterpretable`: `CInterpretableRoot` and its subclass `CInterpretableSuperclass`.
 With this setup, we can test all interesting situations, even the ones leading to infinite loops
