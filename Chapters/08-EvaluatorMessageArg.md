@@ -1,4 +1,4 @@
-## Message Arguments and temporaries
+## Message Arguments and Temporaries
 @cha:messageArgs
 
 In the previous chapter, we extended the interpreter to support simple messages sent between different instances of the same class.

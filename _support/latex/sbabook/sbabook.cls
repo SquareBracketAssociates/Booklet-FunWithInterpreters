@@ -371,7 +371,7 @@
     listing only,
     listing options = {
       style = sbabook,
-      basicstyle = \small\codefamily,
+      basicstyle = \footnotesize\codefamily,
       language = {#1}
     },
     breakable,
