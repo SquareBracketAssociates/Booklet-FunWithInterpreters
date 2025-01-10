@@ -1,209 +1,200 @@
 ## Late Binding and Method Lookup
+@cha:lookup
 
-
-Method lookup deserves a chapter on its own: it represents the core internal logic of late-binding and it the first part of sending a message. The method-lookup algorithm needs to support normal message-sends as well as 'super' message-sends.  
-We will implement method lookup for message send to an object. Then we will present message send to super and we will 
+Method lookup deserves a chapter on its own: it represents the core internal logic of late-binding. 
+The method-lookup algorithm needs to support normal message-sends as well as 'super' message-sends.  
+In this chapter, we will implement method lookup for messages sent to an object. 
+Then we will present how we handle the case of messages sent to `super` and we will 
 finish by looking at how to support error \(message `doesNotUnderstand:`\).
 
 
 ### Method Lookup Introduction
 
-
 So far we have concentrated on method evaluation and put aside method lookup.
 Our current solution fetches methods from the class of the receiver, without supporting inheritance.
-In this section we address this problem and implement a proper method lookup algorithm.
+In this section, we address this problem and implement a proper method lookup algorithm.
 
-To implement and test the method lookup, we will extend our scenario classes with a class hierarchy.
-We introduce two superclasses above `CHInterpretable`: `CHInterpretableSecondSuperclass` and its subclass `CHInterpretableSuperclass`.
-With this setup we will be able to test all interesting situations, even the ones leading to infinite loops
+To implement and test the method lookup, we should extend our scenario classes with a class hierarchy.
+We introduce two superclasses above `CInterpretable`: `CInterpretableRoot` and its subclass `CInterpretableSuperclass`.
+With this setup, we can test all interesting situations, even the ones leading to infinite loops
 if our method lookup is wrongly implemented.
 
-![A simple hierarchy for self-send lookup testing.](figures/SimpleHierarchy.pdf width=80&label=fighierarchy)
+![A simple hierarchy for self-send lookup testing. % width=70&anchor=fighierarchy](figures/SimpleHierarchy.pdf)
 
 ```
-Object subclass: #CHInterpretableSecondSuperclass
-	instanceVariableNames: ''
-	classVariableNames: ''
-	package: 'Champollion-Core'
+Object << #CInterpretableRoot
+	package: 'Champollion'
 ```
 
 
 ```
-CHInterpretableSecondSuperclass subclass: #CHInterpretableSuperclass
-	instanceVariableNames: ''
-	classVariableNames: ''
-	package: 'Champollion-Core'
+CInterpretableRoot << #CInterpretableSuperclass
+	package: 'Champollion'
 ```
 
-
 ```
-CHInterpretableSuperclass subclass: #CHInterpretable
-	instanceVariableNames: 'x collaborator evaluationOrder current'
-	classVariableNames: ''
-	package: 'Champollion-Core'
+CInterpretableSuperclass << #CInterpretable
+	slots: { #x . #collaborator .  #currentPeanoNumber . #evaluationOrder };
+	package: 'Champollion'
 ```
 
 
 
-Our first scenario for method lookup will check that sending a message climbs up the inheritance tree when a method is not found in the receiver's class class. 
-In the code below, we define a method in `CHInterpretable` that does a `self` message whose method is implemented in its `CHInterpretableSuperclass` superclass. 
+Our first scenario for method lookup will check that sending a message climbs up the inheritance tree when a method is not found in the receiver's class. 
+In the code below, we define a method in `CInterpretable` that does a `self` message whose method is implemented in its superclass (`CInterpretableSuperclass`). 
 Executing the first method should send the message, find the superclass method, and evaluate it.
 
 ```
-CHInterpretableSuperclass >> methodInSuperclass [
+CInterpretableSuperclass >> methodInSuperclass
 	^ 5
-]
 
-CHInterpretable >> sendMessageInSuperclass [
+CInterpretable >> sendMessageInSuperclass
 	^ self methodInSuperclass
-]
 
-CHInterpreterTest >> testLookupMessageInSuperclass [
+CInterpreterTest >> testLookupMessageInSuperclass
 	self assert: (self executeSelector: #sendMessageInSuperclass) equals: 5
-]
 ```
 
 
+### A First Lookup 
 
-
-### Implement a First Lookup
-
-
-The test should fail with our evaluator as is, because the evaluation of the message send will not find the method in the receiver's class. 
-A first step towards implementing the lookup is to refactor the method `visitMessageNode:` and extract the wrong code into a `lookup:fromClass:` method.
+The test should fail with our evaluator as the evaluation of the message will not find the method in the receiver's class. 
+A first step is to refactor the method `visitMessageNode:` and extract the wrong code into a `lookup:fromClass:` method.
+We also take the opportunity to extract the management of arguments. 
 
 ```
-CHInterpreter >> visitMessageNode: aMessageNode [
-	| newReceiver method args |
+CInterpreter >> visitMessageNode: aMessageNode
+	| newReceiver method args | 
 	newReceiver := self visitNode: aMessageNode receiver.
-	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	args := self handleArgumentsOf: aMessageNode arguments.
 	method := self lookup: aMessageNode selector fromClass: newReceiver class.
-	^ self execute: method withReceiver: newReceiver andArguments: args
-]
+	^ self execute: (self astOf: method) withReceiver: newReceiver andArguments: args
 
-CHInterpreter >> lookup: aSelector fromClass: aClass [
-  ^ (aClass compiledMethodAt: aMessageNode selector) ast.
-]
+CInterpreter >> lookup: aSelector fromClass: aClass
+	^ aClass compiledMethodAt: aSelector
+  
+CInterpreter >> handleArgumentsOf: aMessageNode 
+	^ aMessageNode arguments collect: [ :each | self visitNode: each ]
 ```
-
 
 The method `lookup:fromClass:` is now the place to implement the method lookup algorithm:
-- if the current class defines the method returns the corresponding AST;
+- if the current class defines the method returns the corresponding compiled method;
 - if the current class does not define the method and we are not on the top of the hierarchy, we recursively lookup in the class' superclass;
 - else when we are on top of the hierarchy and the  `lookup:fromClass:` returns nil to indicate that no method was found.
 
 
-The method `lookup:fromClass:` does not raise an error because this way the `visitMessageNode:` method will be able to send the `doesNotUnderstand:` message to the receiver, as we will see later in this chapter.
-
 ```
-CHInterpreter >> lookup: aSymbol fromClass: aClass [
-	"Return the AST of a method or nil if none is found"
+CInterpreter >> lookup: aSelector fromClass: aClass
+	"Return a compiled method or nil if none is found"
 
-	"If the class defines a method for the selector, return the AST corresponding to the method"
-	(aClass includesSelector: aSymbol)
-		ifTrue: [ ^ (aClass compiledMethodAt: aSymbol) ast ].
+	"If the class defines a method for the selector, returns the method"
+	(aClass includesSelector: aSelector)
+		ifTrue: [ ^ aClass compiledMethodAt: aSelector ].
 
 	"Otherwise lookup recursively in the superclass.
 	If we reach the end of the hierarchy return nil"
 	^ aClass superclass
 		ifNil: [ nil ]
-		ifNotNil: [ self lookup: aSymbol fromClass: aClass superclass ]
-]
+		ifNotNil: [ self lookup: aSelector fromClass: aClass superclass ]
 ```
 
 
-We should call the method `lookup:fromClass:` from the `visitMessageNode:` and our test will pass.
+The method `lookup:fromClass:` does not raise an error because this way the `visitMessageNode:` method will be able to send the `doesNotUnderstand:` message to the receiver, as we will see later in this chapter.
+
+Our tests should pass.
+
 
 
 
 
 ### The Case of Super
 
-
-Many people gets confused by the semantics of `super`. The `super` variable has two different roles in the execution of an object-oriented language. 
-When the `super` variable is read, its value is the receiver of the message as we saw it in the first chapter, it has the same value as `self`.
+Many people get confused by the semantics of `super`. The `super` variable has two different roles in the execution of an object-oriented language. 
+When the `super` variable is read, its value is the _receiver_ of the message as we saw it in the first chapter, it has the same value as `self`.
 
 The second role of the `super` variable is to alter the method lookup when `super` is used as the receiver of the message send. 
-When `super` is used as the receiver of a message send, the method lookup does not start at the class of the receiver, but at the class where the method is installed instead, allowing it to go up higher and higher in the hierarchy.
+When `super` is used as the receiver of a message send, the method lookup does _not_ start from the class of the receiver, but from the class where the method is installed instead, allowing it to go up higher and higher in the hierarchy.
 
-We define a method `doesSuperLookupFromSuperclass` below. 
- It is not really good since it uses `super` while it is not needed. 
+Let us introduce a new scenario for our tests.
+We define two methods named `isInSuperclass` and 
+a method `doesSuperLookupFromSuperclass` as shown below (See Figure *@fighierarchySuper@*).
+
+It is not nice since it uses `super` when it is unnecessary, but this is for a good cause. 
 The handling of overridden messages will present better tests.
  
 ```
-CHInterpretableSuperclass >> isInSuperclass [
+CInterpretableSuperclass >> isInSuperclass
 	^ true
-]
 
-CHInterpretable >> isInSuperclass [
+CInterpretable >> isInSuperclass
 	^ false
-]
 
-CHInterpretable >> doesSuperLookupFromSuperclass [
+CInterpretable >> doesSuperLookupFromSuperclass
 	^ super isInSuperclass
-]
 ```
 
+![A simple hierarchy for super-send lookup testing. %width=80&anchor=fighierarchySuper](figures/HierarchyForSuper.pdf)
 
-
-![A simple hierarchy for super-send lookup testing.](figures/HierarchyForSuper.pdf width=80&label=fighierarchySuper)
-
-
-Once these methods defined, we can now test that the `isInSuperclass` message activates the method in the superclass, returning `true`.
+Once these methods are defined, we can test that the `isInSuperclass` message activates the method in the superclass, returning `true`.
 
 ```
-CHInterpreterTest >> testLookupSuperMessage [
+CInterpreterTest >> testLookupSuperMessage
 	self assert: (self executeSelector: #doesSuperLookupFromSuperclass)
-]
 ```
 
 
 The `super` variable changes the method lookup described previously.
-When the receiver is `super`, the lookup does not start from the class of the receiver, but from the superclass of the class defining the method of the current frame. 
+When the receiver is `super`, the lookup does not start from the class of the receiver, but from _the superclass of the class defining the method_.
 This implies that we need a way to access the method that is being currently executed, and the class where it is defined.
 
-We can again store this information in the current frame during the method's activation.
+We can store this information in the current frame during the method's activation.
 We add it for now as a fake temporary variable in the frame, with the name `___method`.
 By prefixing the variable's name with `___` we make it less probable this fake variable creates a conflict with a real variable. 
 If we would have just named it e.g., `method`, any method with a normal normal temporary called `method` would be broken.
 
 ```
-CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection [
+CInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
 	| result |
 	self pushNewFrame.
 	self tempAt: #___method put: anAST.
 	self tempAt: #self put: anObject.
-	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ]. 
+	self manageArgumentsTemps: aCollection of: anAST.
 	result := self visitNode: anAST body.
 	self popFrame.
 	^ result
-]
 ```
 
-
-We also define a convenience accessor method `currentMethod`, to get the current method stored in the current frame. 
+We also define a convenience accessor method `currentMethod`, to get the current method stored in the current frame as well as the `tempAt:` method
+and its companion method in the class `CMethodScope`.
 In the future, if we want to change this implementation, we will have less places to change if we hide the access to the method behind an accessor.
 
 ```
-CHInterpretable >> currentMethod [
+CMethodScope >> at: aKey
+	^ variables at: aKey
+
+CInterpreter >> tempAt: aSymbol
+	^ self topFrame at: aSymbol
+
+CInterpreter >> currentMethod
 	^ self tempAt: #___method
-]
 ```
 
 
 Note that using the current frame to store the current method will work, even if we have several messages in sequence. 
-When a message is sent a new frame is pushed with a new method, and upon return the frame is popped along with its method. 
-So the top frame in the stack will be always contain the method it executes.
-Finally, we redefine the `visitMessageNode:` method to change class where to start looking for the method. 
+When a message is sent a new frame is pushed with a new method, and on return the frame is popped along with its method. 
+So the top frame always contains the method it executes.
+
+
+Finally, we redefine the `visitMessageNode:` method to change the class where to start looking for the method. 
 
 ```
-CHInterpreterTest >> visitMessageNode: aMessageNode [
+CInterpreterTest >> visitMessageNode: aMessageNode [
 
 	| newReceiver method args lookupClass pragma | 
 	newReceiver := self visitNode: aMessageNode receiver.
-	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	args := self handleArgumentsOf: aMessageNode arguments.
 	
-	lookupClass := aMessageNode receiver isSuper 
+	lookupClass := aMessageNode isSuperSend 
 		ifTrue: [ self currentMethod methodClass superclass ] 
 		ifFalse: [ newReceiver class ].
 	method := self lookup: aMessageNode selector fromClass: lookupClass.	

@@ -50,7 +50,9 @@ Method scopes should support variables as well as parsent scope.
 We add the `parentScope:` instance variable and its accessors as well as 
 
 ```
-Object << #CMethodScope	slots: { #receiver . #parentScope . #variables };	package: 'Champollion'
+Object << #CMethodScope
+	slots: { #receiver . #parentScope . #variables };
+	package: 'Champollion'
 ```
 
 To support variables, we add a dictionary 
@@ -238,7 +240,6 @@ CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 	result := self visitNode: anAST.
 	self popFrame.
 	^ result
-]
 ```
 
 
@@ -308,11 +309,29 @@ a new method named `manageArgumentsTemps:of:`.
 
 
 ```
-CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection	| result |	self pushNewMethodFrame.	self topFrame parentScope: (CInstanceScope new			 receiver: anObject;			 parentScope: globalScope;			 yourself).	self topFrame receiver: anObject.	self manageArgumentsTemps: aCollection of: anAST.	result := self visitNode: anAST.	self popFrame.	^ result
+CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
+
+	| result |
+	self pushNewMethodFrame.
+	self topFrame parentScope: (CInstanceScope new
+			 receiver: anObject;
+			 parentScope: globalScope;
+			 yourself).
+	self topFrame receiver: anObject.
+	self manageArgumentsTemps: aCollection of: anAST.
+	result := self visitNode: anAST.
+	self popFrame.
+	^ result
 ```
 
 ```
-CInterpreter >> manageArgumentsTemps: aCollection of: anAST	anAST arguments		with: aCollection		do: [ :arg :value | self tempAt: arg name put: value ].	anAST temporaryNames do: [ :tempName |		self tempAt: tempName put: nil ]
+CInterpreter >> manageArgumentsTemps: aCollection of: anAST
+
+	anAST arguments
+		with: aCollection
+		do: [ :arg :value | self tempAt: arg name put: value ].
+	anAST temporaryNames do: [ :tempName |
+		self tempAt: tempName put: nil ]
 ```
 
 
@@ -419,7 +438,9 @@ If the evaluation order is right, the evaluation order of the receiver should be
 We add a new instance variable to `CInterpretable` to store the evaluation order of the receiver of a message. 
 
 ```
-Object << #CInterpretable	slots: { #x . #collaborator . #currentPeanoNumber . #evaluationOrder };	package: 'Champollion'
+Object << #CInterpretable
+	slots: { #x . #collaborator . #currentPeanoNumber . #evaluationOrder };
+	package: 'Champollion'
 ```
 
 ```
@@ -448,7 +469,7 @@ CInterpretable >> returnEvaluationOrder
 CInterpretable >> messageArg1: arg1 arg2: arg2 arg3: arg3
 	^ {arg1 . arg2 . arg3}
 ```
-This method invokes the receiver evaluation and computes the next peano before passing it as arguments to the message.
+This method invokes the receiver evaluation and computes the next peano number before passing it as arguments to the message.
 
 
 To verify the evaluation order we define two simple tests: one checking that the receiver receives the peano number zero. 
@@ -456,8 +477,17 @@ And one that checks that we get an array of numbers 1, 2, and 3. This array indi
 and that the second was executed before the third. 
 
 ```
-CInterpreterTest >> testEvaluationOrderOfReceiver	self executeSelector: #returnEvaluationOrder.	self assert: (self peanoToInteger: receiver evaluationOrder) equals: 0.	
-CInterpreterTest >> testEvaluationOrderOfArguments	| argumentEvaluationOrder |	argumentEvaluationOrder := self executeSelector: #returnEvaluationOrder.	self		assert: (argumentEvaluationOrder collect: 			[ :peano | self peanoToInteger: peano])	 	equals: #(1 2 3)
+CInterpreterTest >> testEvaluationOrderOfReceiver
+	self executeSelector: #returnEvaluationOrder.
+	self assert: (self peanoToInteger: receiver evaluationOrder) equals: 0.
+	
+CInterpreterTest >> testEvaluationOrderOfArguments
+	| argumentEvaluationOrder |
+	argumentEvaluationOrder := self executeSelector: #returnEvaluationOrder.
+	self
+		assert: (argumentEvaluationOrder collect: 
+			[ :peano | self peanoToInteger: peano])
+	 	equals: #(1 2 3)
 ```
 
 
@@ -475,7 +505,13 @@ At this point our test will fail because the evaluation order is wrong! The rece
 This is solved by changing the order of evaluation in `visitMessageNode:` and executing ` self visitNode: aMessageNode receiver` first.
 
 ```
-CInterpreter >> visitMessageNode: aMessageNode	| newReceiver method args | 	newReceiver := self visitNode: aMessageNode receiver.	args := aMessageNode arguments collect: [ :each | self visitNode: each ].	method := newReceiver class compiledMethodAt: aMessageNode selector.	^ self execute: (self astOf: method) withReceiver: newReceiver andArguments: args	
+CInterpreter >> visitMessageNode: aMessageNode
+	| newReceiver method args | 
+	newReceiver := self visitNode: aMessageNode receiver.
+	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
+	method := newReceiver class compiledMethodAt: aMessageNode selector.
+	^ self execute: (self astOf: method) withReceiver: newReceiver andArguments: args
+	
 ```
 
 
