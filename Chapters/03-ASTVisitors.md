@@ -358,7 +358,7 @@ The following test checks that we identify message selectors.
 SearchVisitorTest >> testTokenInMessage
 
 	| tree visitor |
-	tree := Parser parseMethod: 'one 
+	tree := OCParser parseMethod: 'one 
 
 self pharo2 pharoVar: 11.
 '.

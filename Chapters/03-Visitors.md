@@ -6,7 +6,7 @@ The main purpose of the Visitor pattern is to externalize an operation from a da
 In addition, it supports the modular definition of operation (independent from each other) and encapsulating their own data.
 
 
-### A mini filesystem
+### A Mini Filesystem
 
 
 For example, let's consider a file system implemented with the composite pattern, where nodes can be files or directories.

@@ -5,7 +5,7 @@ In the previous chapters, we focused on structural evaluation: reading literal o
 The work we did in the previous chapter is nevertheless important to set up the stage: we have a better taste of the visitor pattern, we started a first testing infrastructure, and eventually, message-sends need to carry out some work by using literal objects or reading and writing variables.
 
 
-### Message concerns 
+### Message Concerns 
 
 Message-sends deserve a chapter on their own because they introduce many different concerns. 
 On the one hand, each message-send is resolved in two steps: 
@@ -32,7 +32,7 @@ Figure *@callstack@* presents a call stack with two methods. The first method in
 
 
 
-### Putting in Place the Stack
+### Method Scope
 
 Since methods define a scope with their temporary variables and arguments, we represent frames using a new kind of scope: a method scope.
 For now, the method scope will store the current receiver, and later its parent scope, and a set of key-value pairs representing the variables defined in the current method execution: the arguments and temporaries (see Chapter *@cha:messageArgs@*).
@@ -52,7 +52,7 @@ CMethodScope >> receiver
 
 
 
-### Putting in Place the Stack
+### Put in Place the Stack
 
 We will use the stack implementation available at github://pharo-containers/.
 
@@ -125,7 +125,7 @@ currentScope	^ CInstanceScope new		receiver: self receiver;		parentScope: glo
 
 Note that we will have to improve the situation because the method `currentScope` (which is creating an instance scope) is not connected with the frame and this will be a problem. 
 
-### Evaluating a First Message Send
+### A First Message Send Evaluation
 
 Let's start as usual by defining a new method exhibiting the scenario we want to work on.
 In this case, we want to start by extending our evaluator to correctly evaluate return values of message sends.
@@ -179,17 +179,21 @@ CInterpreter >> visitMessageNode: aMessageNode
 
 All our tests should pass and in particular `testSelfSend`. 
 
-### Consolidating AST Access Logic
+### AST Access Logic Consolidation
 
 Pharo provides a way to get an AST from a compiled method, but we do not want to use
 because the AST it returns is different from the one we want for this book (the variables are resolved based on a semantical analysis). 
 This is why we use `OCParser parseMethod: method sourceCode.`
 
 To encapsulate such a decision we define the method `astOf:` and use it. 
+In addition we take the opportunity to set the class from which the method AST is originating. 
 
 ```
 astOf: aCompiledMethod 
-	^ OCParser parseMethod: aCompiledMethod sourceCode.
+	| ast |
+	ast := OCParser parseMethod: aCompiledMethod sourceCode.
+	ast methodClass: aCompiledMethod methodClass.
+	^ ast
 ```
 
 ```
@@ -200,7 +204,7 @@ CInterpreter >> visitMessageNode: aMessageNode
 	^ self execute: (self astOf: method) withReceiver: newReceiver
 ```
 
-### Balancing the Stack
+### Balance the Stack
 
 We mentioned earlier that when the execution of a method is finished and the execution returns to its caller method, its frame should be also discarded from the stack. The current implementation clearly does not do it.
 Indeed, we also said that our initial implementation of the stack only grows: it is clear by reading our code that we never pop frames from the stack.
@@ -266,7 +270,7 @@ CInterpreterTest >> setUp
 ```
 
 
-#### Making the Test Pass
+#### Make the Test Pass
 
 Executing this test breaks because the access to the instance variable `x` returns nil, showing the limits of our current implementation.  This is due to the fact that evaluating message send `returnInstanceVariableX` creates a new frame with the collaborator as receiver, and since that frame is not popped from of the stack, when the method returns, the access to the `x` instance variable accesses the one of the uninitialized collaborator instead of the caller object.
 

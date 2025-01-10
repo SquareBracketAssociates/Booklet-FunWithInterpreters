@@ -82,7 +82,7 @@ This first test is worth one comment: since our evaluator is an AST interpreter,
 In other words, we need to get the AST of the `returnInteger` method.
 Instead of invoking the parser to get an AST from source code, we will use Pharo's reflective API to get the AST of an already existing method.
 
-### Making the test pass: a First Literal Evaluator
+### Making the Test Pass: a First Literal Evaluator
 
 
 Executing our first test fails first because our test does not understand `interpreter`, meaning we need to implement a method for it in our test class.
@@ -167,7 +167,7 @@ CInterpreter >> visitLiteralValueNode: aLiteralValueNode
 
 Our first test is now green and we are ready to continue our journey.
 
-### Evaluating Literals: Floats
+### Literal Evaluation: Floats
 
 
 For completeness, let's implement support for literal floats.
@@ -206,11 +206,13 @@ Second, some would argue that this test is somehow repeating code from the previ
 Since we will write many tests with a similar structure during this book, it comes in handy to share some logic between them. The two tests we wrote so far show a good candidate of logic to share as repeated code we can extract.
 
 The method `executeSelector:` extracts some common logic that will make our tests easier to read and understand: it obtains the AST of a method from its selector, evaluates it, and returns the value of the execution.
+We also take the opportunity to set in the AST the class from which the method is originating. It will help us in the future.
 
 ```
-CHInterpreterTest >> executeSelector: aSymbol
+CInterpreterTest >> executeSelector: aSymbol
 	| ast |
 	ast := OCParser parseMethod: (CInterpretable >> aSymbol) sourceCode.
+	ast methodClass: CInterpretable.
 	^ self interpreter execute: ast
 ```
 
@@ -235,13 +237,13 @@ CInterpreterTest >> testReturnFloat
 
 We are ready to write tests for the other constants efficiently.
 
-### Evaluating booleans
+### Boolean Evaluation
 
 Boolean literals are the` false` and `true` objects, typically used for conditionals and control flow statements.
 In the previous sections we implemented support for numbers, now we introduce support for returning boolean values as follows:
 
 ```
-CHInterpretable >> returnBoolean
+CInterpretable >> returnBoolean
 	^ false
 ```
 
@@ -261,8 +263,7 @@ If everything goes ok, this test will be automatically green, without the need f
 This is because booleans are represented in the AST with literal value nodes, which we have already implemented.
 
 
-### Evaluating Literals: Arrays
-
+### Literal Evaluation: Arrays
 
 Now that we support simple literals such as booleans and numbers, let's introduce literal arrays.
 Literal arrays are arrays that are defined inline in methods with all their elements being other literals.
@@ -298,7 +299,7 @@ CInterpreterTest >> testReturnRecursiveLiteralArray
 ```
 
 
-### Making the test pass: visiting literal array nodes
+### Make the Test Pass: visiting literal array nodes
 
 We have to implement the method `visitLiteralArrayNode:` to visit literal arrays.
 Literal arrays contain an array of literal nodes, representing the elements inside the literal array.

@@ -1,4 +1,4 @@
-## Representing Code with Abstract Syntax Trees
+## Code Representation with Abstract Syntax Trees
 @cha:ast
 
 To execute actual code on top of our ObjVlisp kernel, we need code to execute.
@@ -45,7 +45,7 @@ Fortunately, Pharo also includes a parser that does exactly this: the `Parser`.
 The `Parser` class implements a parser for Pharo code.
 It has two main modes of working: parsing expressions and parsing methods.
 
-#### For the Purists: abstract vs concrete trees
+#### For the Purists: Abstract vs Concrete Trees
 
 
 People tend to make the distinction between abstract and concrete syntax trees.
@@ -55,7 +55,7 @@ This is similar for variable definition delimiters (pipes) or statement delimite
 A concrete tree on the other hand keeps such information because tools may need it.
 From that perspective, the Pharo AST is in between both. The tree structure contains no information about the concrete elements of the syntax, but these informations are remembered by the nodes so the source code can be rebuilt as similar as the original code as possible. However, we make a bit of language abuse and we refer to them as ASTs.
 
-### Parsing Expressions
+### Parse Expressions
 
 
 Expressions are constructs that can be evaluated to a value.
@@ -499,7 +499,7 @@ In this section, we will explore some core-messages of Pharo's AST, that allow c
 Most of these manipulations are rather primitive and simple.
 In the next chapter, we will see how the visitor pattern in conjunction with ASTs empower us, and gives us the possibility to build more complex applications such as concrete and abstract evaluators as we will see in the next chapters.
 
-#### Iterating over an AST
+#### AST Iteration
 
 
 ASTs are indeed trees, and we can traverse them as any other tree.
@@ -512,7 +512,7 @@ ASTs provide several protocols for accessing and iterating any AST node in a gen
 - `aNode methodNode`: returns the method node that is the root of the tree. For consistency, expression nodes parsed using `parseExpression:` are contained within a method node too.
 
 
-#### Storing Properties
+#### Property Store
 
 Some manipulations require storing meta-data associated to AST nodes.
 Pharo ASTs provide a set of messages for storing arbitrary properties inside a node.

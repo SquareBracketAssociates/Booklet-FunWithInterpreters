@@ -188,7 +188,7 @@ So the top frame always contains the method it executes.
 Finally, we redefine the `visitMessageNode:` method to change the class where to start looking for the method. 
 
 ```
-CInterpreterTest >> visitMessageNode: aMessageNode [
+CInterpreter >> visitMessageNode: aMessageNode
 
 	| newReceiver method args lookupClass pragma | 
 	newReceiver := self visitNode: aMessageNode receiver.
@@ -199,11 +199,12 @@ CInterpreterTest >> visitMessageNode: aMessageNode [
 		ifFalse: [ newReceiver class ].
 	method := self lookup: aMessageNode selector fromClass: lookupClass.	
 	^ self executeMethod: method withReceiver: newReceiver andArguments: args
-]
 ```
 
+With this last change, your tests should now all pass.
 
-### Overridden Messsages
+
+### Overridden Messages
 
 
 We have made sure that sending a message to `super` starts looking methods in the superclass of the class defining the method. 

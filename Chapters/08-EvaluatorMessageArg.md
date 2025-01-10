@@ -6,7 +6,7 @@ In this chapter, we will extend this message passing implementation to support p
 We will take advantage of the 
 
 
-### Supporting Message Arguments
+### Message Argument Evaluation
 
 So far we have worked only with unary messages. Unary messages have no arguments, so the number of programs we can express with them only is limited. The next step towards having a full-blown interpreter is to support message arguments, which will open the door to support binary and keyword messages. From the evaluator's point of view, as well as from the AST point of view, we will not distinguish between unary, binary, and keyword messages. The parser already takes care of distinguishing them and handling their precedence. Indeed, message nodes in the AST are the same for all kinds of messages, they have a selector and a collection of argument nodes. 
 Precedence is then modeled as relationships between the AST nodes.
@@ -103,7 +103,7 @@ Implementing argument support requires two main changes:
 
 Let's start with the second step, the callee side, and since all variable reads are concentrated on the scope lookup, we need to add the method scope in the scope chain.
 
-#### Previous situation
+#### Previous Situation
 
 Previously the method `execute:withReceiver:` was defined as follows:
 
@@ -128,7 +128,7 @@ pushNewMethodFrame
 	^ newTop
 ```
 
-#### Improved version
+#### Improved Version
 
 The new version is the following one: 
 
@@ -244,7 +244,7 @@ CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 
 
 
-### Handling Temporaries
+### Temporary Evaluation
 
 Temporary variables, or local variables, are variables that live within the scope of a method's **execution**.
 Memory for such variables is allocated when a method is activated, and released when the method returns.
@@ -335,7 +335,7 @@ CInterpreter >> manageArgumentsTemps: aCollection of: anAST
 ```
 
 
-### Implementing Temporary Variable Writes
+### Temporary Variable Write Evaluation
 The next aspect we have to address is temporary writing. 
 
 We test that writes to temporary variables are working too.
