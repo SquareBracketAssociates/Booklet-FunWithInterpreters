@@ -1,17 +1,16 @@
 ## Handling Unknown Messages
 @cha:dnu
 
-In the previous chapter we presented method lookup and show the precise semantics of message sent to `super`. We did not take into the case where the method we are looking up actually exists.
+In the previous chapter, we presented method lookup and showed the precise semantics of the messages sent to `super`. We only took into account the case where the method we are looking up actually exists.
 In this chapter, we show how to handle this case. We extend the interpreter with support for the 
  support error and the famous `doesNotUnderstand:`.
 
-
-
+We start by revisiting the current method lookup implementation. Doing so, we will be ready to handle the case of unknown messages.
 
 
 ### Correct Semantics Verification
 
-To ensure that the method lookup is correctly implemented, especially in the presence of `super` messages, we need to verify an extra condition.  Several books wrongly define that `super` messages lookup methods starting from the superclass of the class of the receiver. This is plain wrong.
+To ensure that the method lookup is correctly implemented, especially in the presence of `super` messages, we need to stress our implementation with an extra scenario. Several books wrongly define that `super` messages lookup methods starting from the superclass of the class of the receiver. This is plain wrong.
 
 This definition, illustrated in the code snippet below, is incorrect: it only works when the inheritance depth is limited to two classes, a class, and its superclass. 
 In other cases, this definition creates an infinite loop.
@@ -35,7 +34,7 @@ In this scenario, our inheritance depth is of three classes and we create two me
 In the highest class, the method returns a value.
 In the middle class, the first method is overridden doing a super send.
 
-![A simple situation making wrongly defined super semantics loop endlessly: sending the message `redefinedMethod` to an instance of the class `CInterpretable` loops forever. %width=60&anchor=fighierarchyFullWrong](figures/WrongSuperLoopsHierarchy.pdf)
+![A simple situation that breaks wrongly defined super semantics: sending the message `redefinedMethod` to an instance of the class `CInterpretable` loops forever. %width=60&anchor=fighierarchyFullWrong](figures/WrongSuperLoopsHierarchy.pdf)
 
 Let us define the situation that will loop with the wrong semantics.
 

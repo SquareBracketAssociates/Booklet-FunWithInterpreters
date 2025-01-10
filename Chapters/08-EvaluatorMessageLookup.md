@@ -7,11 +7,54 @@ In this chapter, we will implement method lookup for messages sent to an object.
 Then we will present how we handle the case of messages sent to `super`.
 
 
-### Method Lookup Introduction
-
 So far we have concentrated on method evaluation and put aside method lookup.
 Our current solution fetches methods from the class of the receiver, without supporting inheritance.
 In this section, we address this problem and implement a proper method lookup algorithm.
+
+### Method Lookup Introduction
+
+![Sending a message is a two-step process: method lookup and execution. % width=48&label=fig:ToSteps](figures/InheritanceDiagram-sendingMessage.pdf)
+
+Sending a message is a two-step process as shown by Figure *@fig:ToSteps@*:
+1. Method lookup: the method corresponding to the selector is looked up in the class of the receiver and its superclasses.
+1. Method execution: the method is applied to the receiver. This means that `self` or `this` in the method will be bound to the receiver.
+
+Conceptually, sending a message can be described by the following function composition:
+
+```
+sending a message (receiver argument)
+	 return apply (lookup (selector classof(receiver) receiver) receiver arguments)
+```
+
+
+#### Method lookup
+
+Now the lookup process is conceptually defined as follows:
+1. The lookup starts in the **class** of the **receiver**.
+1. If the method is defined in that class (i.e., if the method is defined in the method dictionary), it is returned.
+1. Otherwise the search continues in the superclass of the currently explored class.
+1. If no method is found and there is no superclass to explore (if we are in the class `Object`), this is an error (i.e., the method is not defined).
+
+
+![Looking for a method is a two-step process: first, go to the class of receiver then follow inheritance. % width=58&label=fig:LookupNoError](figures/Ref-LookupNoError.pdf)
+
+The method lookup walks through the inheritance graph one class at a time using the superclass relationship. Here is a possible description of the lookup algorithm that will be used for both instance and class methods.
+
+```
+lookup (selector class receiver):
+   if the method is found in class
+      then return it
+      else if class == Object
+           then Error
+           else lookup (selector superclass(class) receiver)
+```
+
+Let us implement method lookup. 
+
+
+### Method Lookup Scenario
+
+
 
 To implement and test the method lookup, we should extend our scenario classes with a class hierarchy.
 We introduce two superclasses above `CInterpretable`: `CInterpretableRoot` and its subclass `CInterpretableSuperclass`.
