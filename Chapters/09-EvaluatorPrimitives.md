@@ -22,21 +22,18 @@ Such a primitive behavior is expressed as special methods, namely **primitive me
 
 In addition to essential behavior, primitive behavior is often used to implement performance-critical code in a much more efficient way, since primitives are implemented in the implementation language and do not suffer the interpretation overhead.
 
-#### Primitives as messages
+
+### Pharo Primitive Study
 
 Differently, from languages such as Java or C, which express arithmetics as special operators that are compiled/interpreted differently, Pharo maintains the message send metaphor for primitive behavior. 
-Indeed, in Pharo,  `+` is a message which triggers a look-up and a method activation. 
+Indeed, in Pharo,  `+` is a message that triggers a method look-up and a method  activation. 
 
 This separation makes redefining operators as simple as implementing a method with the selector `+` in our own class, without the need for special syntax for it. The primitive should just be tagged with an id so that the Virtual machine finds its definition and executes it. 
-
-
-
-### Primitives in Pharo
 
 In Pharo the design of primitives is split in three different parts: _messages_, _primitive methods_ (the Pharo method that is annotated), and the _primitive_ itself which is provided by the interpreter - in the case of our interpreter this is a method that implements the primitive behavior. In the case of a Virtual Machine, it is a C function. 
 
 
-###### Primitives invoked as Messages.
+###Study: Primitives invoked as Messages
 
 The first thing to note is that in Pharo programs, primitive behavior is invoked through standard message sends.
 Indeed sending the message ` 1 + 2 ` is handled as a message, but the method `+` on `Integer` is a primitive (during Pharo execution it calls primitive functions transparently from the developer).
@@ -48,15 +45,12 @@ With some terminology abuse we could think of this as "operator redefinition", a
 This is why in Pharo it is possible to define a new method `+` on any class as follows:
 
 ```
-MyClass >> + anArgument [
+MyClass >> + anArgument
   "Redefine +"
   ...
-]
 ```
 
-
-
-###### Primitive annotation.
+###Study: Primitive annotation
 
 To define primitive behavior, Pharo relies on special methods called _primitive methods_:
 Primitive methods are normal Pharo methods with a `primitive` annotation. 
@@ -65,43 +59,41 @@ This annotation identifies that the method is special.
 For example, let us consider the method `SmallInteger>>+` method below:
 
 ```
-SmallInteger >> + aNumber [
+SmallInteger >> + aNumber
 	<primitive: 1>
 	^ super + aNumber
-]
 ```
 
 
 This method looks like a normal method with selector `+`, and with a normal method body doing `^super + aNumber`.
 The only difference between this method and a normal one is that this method also has an annotation, or pragma, indicating that it is the primitive number 1.
 
-The body of the method is normally not executed. In its place, the primitive 1 is executed.
+The body of the method is normally not executed. 
+In its place, the primitive 1 is executed.
 The method body is only executed if the primitive failed.
 
 
 
-###### Interpreter primitives.
+### Study: Interpreter primitives
 
 Before diving into how _primitive methods_ are executed, let us introduce the third component in place: the _interpreter primitives_.
-A primitive is a piece of code \(another method\) defined in the interpreter that will be executed when a primitive method is executed. 
+A primitive is a piece of code (another method) defined in the interpreter that will be executed when a primitive method is executed. 
 
-To make a parallel between our interpreter and the Pharo virtual machine, the virtual machine is executing a C-function is executed
-when a primitive method is executed.
+To make a parallel between our interpreter and the Pharo virtual machine: the virtual machine executes a C-function when a primitive method is executed.
 
-The interpreter defines a set of supported primitives with unique ids.
-In our case, for example, the primitive with id `1` implements the behavior that adds up two integers.
+The virtual machine interpreter defines a set of supported primitives with unique ids. We will mimic this behavior and in our interpreter, the primitive with id `1` implements the behavior that adds up two integers.
 
-When a primitive method is activated, it first looks up what _primitive_ to execute based on its primitive id number, and executes it.
-The primitive performs some validations if required, executes the corresponding behavior, and returns either with a success if everything went ok, or a failure if there was a problem.
-On success, the method execution returns with the value computed by the primitive. 
-On failure, the body of the method is executed instead. Because of this, the body of a primitive method is also named the "fall-back code".
+When a primitive method is activated, 
+
+- it first looks up what _primitive_ to execute based on its primitive id number, and executes it.
+- The primitive performs some validations if required, executes the corresponding behavior, and returns either with a success if everything went ok, or a failure if there was a problem.
+- On success, the method execution returns with the value computed by the primitive. 
+- On failure, the body of the method is executed instead. Because of this, the body of a primitive method is also named the "fall-back code".
 
 Note that in Pharo some primitives called essential such as the object allocation cannot be executed from Pharo. 
-For such primitive, implementors added a method body to describe what the primitive is doing if it could be 
-written in Pharo.
+For such primitive, implementors added a method body to describe what the primitive is doing if it could be written in Pharo.
 
 ### Infrastructure for Primitive Evaluation
-
 
 To implement primitives in our evaluator we only need to change how methods are activated.
 Indeed, as we have seen above, the method lookup nor other special nodes are required for the execution of primitives, and the AST already supports pragma nodes, from which we need to extract the method's primitive id.
