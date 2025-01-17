@@ -286,8 +286,10 @@ To address it, we need to handle this problem and send the `doesNotUnderstand:` 
 For this we modify the method ` send:receiver:lookupFromClass:arguments:` as follows: 
 
 - it looks for the method
-- if the method is not found, it creates a message, and send the message `doesNotUnderstand:` to the receiver with the message as argument,
-- else it just execute the found method. 
+- if the method is not found, it creates a message, and send the message `doesNotUnderstand:` to the receiver with the message as an argument,
+- else it just executes the found method. 
+
+
 ```
 CInterpreter >> send: aSelector receiver: newReceiver lookupFromClass: lookupClass arguments: arguments [
 

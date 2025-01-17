@@ -1,39 +1,49 @@
 ## Primitive Operations
+cha:prims
 
 
-Our interpreter does not handle yet any essential behavior such as basic number operations. 
-This prevents us to evaluate complex programs.
-This chapter introduces the concept of primitive methods in Pharo.
-We call primitive behavior the behaviour that needs to be implemented in the interpreter or evaluator because it cannot be purely expressed in the programming language, Pharo in this case.
-Let's consider for example the operation of adding up two numbers \(`+`\).
-We cannot express in a pure and concise way a normal method executing an addition.
-Along with arithmetics, other examples of primitive operations are object allocation and reflective object access.
-Such primitive behavior is expressed as special methods, namely **primitive methods** in Pharo, whose behavior is defined in the interpreter.
+Our interpreter does not handle yet any essential behavior such as basic number operations.  This prevents us from evaluating complex programs.
+This chapter introduces the concept of primitive methods as done in Pharo and extends the interpreter to evaluate them. 
 
-Differently from languages such as Java or C, that express arithmetics as special operators that are compiled/interpreted differently, Pharo maintains the message-send metaphore for primitive behavior. 
-Indeed, in Pharo `+` is a message, which triggers a look-up and a method activation. 
-This separation makes redefining operators as simple as implementing a method with the selector `+` in our own class, without the need for special syntax for it.
-
-In addition of essential behavior, primitive behavior is often used to implement performance-critical code in a much more efficient way, since primitives are implemented in the implementation language and do not suffer the interpretation overhead.
-
-In this chapter we will study how primitive methods work, and how they should be properly implemented, including the evaluation of their fallback code \(i.e., what happens when a primitive fails\). 
+We will study how primitive methods work in Pharo, and how they should be properly implemented, including the evaluation of their fallback code (i.e., what happens when a primitive fails).
 We will then visit some of the essential primitives we need to make work to execute complex examples.
+This opens the door to the evaluation of more interesting programs.
+
+### The need for Primitives in Pharo
+
+We call primitive behavior, behavior that needs to be implemented in the interpreter or evaluator because it cannot be purely expressed in the programming language, Pharo in this case. 
+
+Let's consider, for example, the operation of adding up two numbers (`+`).
+We cannot express in a pure and concise way a normal method of executing an addition.
+
+Along with arithmetics, other examples of primitive operations are object allocation and reflective object access.
+Such a primitive behavior is expressed as special methods, namely **primitive methods** in Pharo, whose behavior is defined in the virtual machine.
+
+
+In addition to essential behavior, primitive behavior is often used to implement performance-critical code in a much more efficient way, since primitives are implemented in the implementation language and do not suffer the interpretation overhead.
+
+#### Primitives as messages
+
+Differently, from languages such as Java or C, which express arithmetics as special operators that are compiled/interpreted differently, Pharo maintains the message send metaphor for primitive behavior. 
+Indeed, in Pharo,  `+` is a message which triggers a look-up and a method activation. 
+
+This separation makes redefining operators as simple as implementing a method with the selector `+` in our own class, without the need for special syntax for it. The primitive should just be tagged with an id so that the Virtual machine finds its definition and executes it. 
+
 
 
 ### Primitives in Pharo
 
-
-In Pharo the design of primitives is split in three different parts: _messages_, _primitive methods_ \(the Pharo method that is annotated\), and the _primitive_ itself which is provided by the interpreter \(in our case this is a method that implements the primitive behavior. In the case of a Virtual Machine it would be a C function\). 
+In Pharo the design of primitives is split in three different parts: _messages_, _primitive methods_ (the Pharo method that is annotated), and the _primitive_ itself which is provided by the interpreter - in the case of our interpreter this is a method that implements the primitive behavior. In the case of a Virtual Machine, it is a C function. 
 
 
 ###### Primitives invoked as Messages.
 
-The first thing to note is that in Pharo programs primitive behavior is invoked through standard message sends.
-Indeed sending the message ` 1 + 2 ` is handled as a message, but the method `+` on `Integer` is a primitive \(during Pharo execution it calls primitive functions transparently from the developer\).
+The first thing to note is that in Pharo programs, primitive behavior is invoked through standard message sends.
+Indeed sending the message ` 1 + 2 ` is handled as a message, but the method `+` on `Integer` is a primitive (during Pharo execution it calls primitive functions transparently from the developer).
 
 This management of primitives as messages allows developers to define operators such as `+` as non-primitives on their own classes, by just implementing methods with the corresponding selectors and without any additional syntax. 
 
-With some terminology abuse we could think of this as "operator redefinition", although it is no such, it is just a standard method re/definition. This operator redefinition feature is useful for example when creating internal domain specific languages \(DSLs\), or to have polymorphism between integers and floats. 
+With some terminology abuse we could think of this as "operator redefinition", although it is no such, it is just a standard method re/definition. This operator redefinition feature is useful for example when creating internal Domain Specific Languages (DSLs), or to have polymorphism between integers and floats. 
 
 This is why in Pharo it is possible to define a new method `+` on any class as follows:
 
@@ -65,7 +75,7 @@ SmallInteger >> + aNumber [
 This method looks like a normal method with selector `+`, and with a normal method body doing `^super + aNumber`.
 The only difference between this method and a normal one is that this method also has an annotation, or pragma, indicating that it is the primitive number 1.
 
-The body if the method is normally not executed. In its place the primitive 1 is executed.
+The body of the method is normally not executed. In its place, the primitive 1 is executed.
 The method body is only executed if the primitive failed.
 
 
@@ -75,13 +85,13 @@ The method body is only executed if the primitive failed.
 Before diving into how _primitive methods_ are executed, let us introduce the third component in place: the _interpreter primitives_.
 A primitive is a piece of code \(another method\) defined in the interpreter that will be executed when a primitive method is executed. 
 
-To make parallel between our interpreter and the Pharo virtual machine, the virtual machine is executing a C-function is executed
+To make a parallel between our interpreter and the Pharo virtual machine, the virtual machine is executing a C-function is executed
 when a primitive method is executed.
 
 The interpreter defines a set of supported primitives with unique ids.
 In our case, for example, the primitive with id `1` implements the behavior that adds up two integers.
 
-When a primitive method is activated, it first looks-up what _primitive_ to execute based on its primitive id number, and executes it.
+When a primitive method is activated, it first looks up what _primitive_ to execute based on its primitive id number, and executes it.
 The primitive performs some validations if required, executes the corresponding behavior, and returns either with a success if everything went ok, or a failure if there was a problem.
 On success, the method execution returns with the value computed by the primitive. 
 On failure, the body of the method is executed instead. Because of this, the body of a primitive method is also named the "fall-back code".
@@ -90,7 +100,7 @@ Note that in Pharo some primitives called essential such as the object allocatio
 For such primitive, implementors added a method body to describe what the primitive is doing if it could be 
 written in Pharo.
 
-### Infrastructure for Primitives
+### Infrastructure for Primitive Evaluation
 
 
 To implement primitives in our evaluator we only need to change how methods are activated.
@@ -103,21 +113,19 @@ We implement such a mapping using a table with the form `<id, evaluator_selector
 The `primitives` instance variable is initialized to a dictionary as follows: 
 
 ```
-CHInterpreter >> initialize [
+CInterpreter >> initialize
 	super initialize. 
 	stack := Stack new.
 	primitives := Dictionary new.
 	self initializePrimitiveTable.
-]
 ```
 
 
 Then we define the method `initializePrimitiveTable` to initialize the mapping between the primitive id and the Pharo method to be executed. 
 
 ```
-CHInterpreter >> initializePrimitiveTable [
+CInterpreter >> initializePrimitiveTable
 	primitives at: 1 put: #primitiveSmallIntegerAdd
-]
 ```
 
 
@@ -131,64 +139,58 @@ Doing `1 + 5` the primitive should always be a success and return `6`.
 
 
 ```
-CHInterpretable >> smallintAdd [
+CInterpretable >> smallintAdd
 	^ 1 + 5
-]
 
-CHInterpreterTests >> testSmallIntAddPrimitive [
+CInterpreterTests >> testSmallIntAddPrimitive
 	self
 		assert: (self executeSelector: #smallintAdd)
 		equals: 6
-]
 ```
 
 
 ### Primitives Implementation
 
 
-In our first iteration we will not care about optimizing our evaluator, for which we had already and we will have tons of opportunities.
+In our first iteration, we will not care about optimizing our evaluator, for which we had already and we will have tons of opportunities.
 To have a simple implementation to work on, we execute the primitive after the method's frame creation, in the `visitMethodNode:` method.
 This way the primitive has a simple way to access the receiver and the arguments by reading the frame.
 We leave primitive failure management for our second iteration.
 
-Upon primitive method execution, we extract the primitive id from the pragma, get the selector of that id from the table, and use `perform:` method on the interpreter with that selector to execute the primitive.
+Upon primitive method execution, we extract the primitive id from the pragma, get the selector of that id from the table, and use the `perform:` method on the interpreter with that selector to execute the primitive.
 
 ```
-CHInterpreter >> executePrimitiveMethod: anAST [
+CInterpreter >> executePrimitiveMethod: anAST
 	| primitiveNumber |
 	primitiveNumber := anAST pragmas
 		detect: [ :each | each isPrimitive ]
 		ifFound: [ :aPragmaPrimitive | aPragmaPrimitive arguments first value ]
 		ifNone: [ self error: 'Not a primitive method' ].
 	^ self perform: (primitives at: primitiveNumber)
-]
 ```
-
 
 We also need to take care of sending the receiver and arguments of the message to the primitive, so it can manipulate them.
 
 ```
-CHInterpreter >> visitMethodNode: aMethodNode [	
+CInterpreter >> visitMethodNode: aMethodNode
 	aMethodNode isPrimitive ifTrue: [ 
 		"Do not handle primitive failures for now"
 		^ self executePrimitiveMethod: aMethodNode ].
 	^ self visitNode: aMethodNode body
-]
 ```
 
 
 We define the primitive `primitiveSmallIntegerAdd` as follows: 
+
 ```
-CHInterpreter >> primitiveSmallIntegerAdd [
+CInterpreter >> primitiveSmallIntegerAdd
 	| receiver argument |
 	receiver := self receiver.
 	argument := self argumentAt: 1.
 	^ receiver + argument
-]
 
-CHInterpreter >> argumentAt: anInteger [
+CInterpreter >> argumentAt: anInteger
   ^ self tempAt: (self currentMethod arguments at: anInteger) name
-]
 ```
 
 
@@ -198,29 +200,26 @@ CHInterpreter >> argumentAt: anInteger [
 Let's now consider what should happen when a primitive fails.
 For example, following Pharo's specification, primitive 1 fails when the receiver or the argument are not small integers, or whenever their sum overflows and does not fit into a small integer anymore.
 
-To produce one of such failing cases, we can implement primitive 1 in our `CHInterpretable` class, which should fail because the receiver should be a small integer.
+To produce one of such failing cases, we can implement primitive 1 in our `CInterpretable` class, which should fail because the receiver should be a small integer.
  When it fails, the fallback code should execute.
 
  We define two methods `failingPrimitive` and `callingFailingPrimitive` to support the test of failing primitive.
  
 ```
-CHInterpretable >> failingPrimitive [
+CInterpretable >> failingPrimitive
 	<primitive: 1>
 	^ 'failure'
-]
 
-CHInterpretable >> callingFailingPrimitive [
+CInterpretable >> callingFailingPrimitive
 	^ self failingPrimitive
-]
 ```
 
 
 ```
-CHInterpreterTests >> testFailingPrimitive [
+CInterpreterTests >> testFailingPrimitive
 	self
 		assert: (self executeSelector: #callingFailingPrimitive)
 		equals: 'failure'
-]
 ```
 
 
@@ -230,29 +229,28 @@ We define a new subclass of `Exception` named `CHPrimitiveFail`
 In the primitive `primitiveSmallIntegerAdd`, if we detect a failure condition, we raise a `CHPrimitiveFail` error.
 Note that this the primitive is incomplete since we should also test that the argument and the result is small integer
 as shown in the following sections.
+
 ```
-CHInterpreter >> primitiveSmallIntegerAdd [
+CInterpreter >> primitiveSmallIntegerAdd
 	| receiver argument |
 	receiver := self receiver.
 	receiver class = SmallInteger
 		ifFalse: [ CHPrimitiveFail signal ].
 	argument := self argumentAt: 1.
 	^ receiver + argument
-]
 ```
 
+We then need to modify the way we evaluate methods to handle `CPrimitiveFail` exceptions and continue evaluating the body.
 
-We then need to modify the way we evaluate methods to handle `CHPrimitiveFail` exceptions and continue evaluating the body.
 ```
-CHInterpreter >>visitMethodNode: aMethodNode [
+CInterpreter >>visitMethodNode: aMethodNode
 	[ aMethodNode isPrimitive ifTrue: [ 
 		"Do not handle primitive failures for now"
 		^ self executePrimitiveMethod: aMethodNode ]]
-		on: CHPrimitiveFail do: [ :err | 
+		on: CPrimitiveFail do: [ :err | 
 			"Nothing, just continue with the method body" ].
 	
 	^ self visitNode: aMethodNode body
-]
 ```
 
 
@@ -260,45 +258,44 @@ With these changes, everything should work fine now.
   
 ### Typical Primitive Failure Cases
 
-
 For primitives to work properly, and for Pharo to be a safe language, primitives should properly do a series of checks.
 This is particularly important when the interpreter fully controls all other aspects of the language, such as the memory.
 In such cases, primitives, as well as the other parts of the evaluator, have full power over our objects, potentially producing memory corruptions.
 
 Among the basic checks that primitives should do, they should not only verify that arguments are of the primitive's expected type, as we have shown above. 
- In addition a general check is that the primitive was called with the right number of arguments. 
+
+In addition, a general check is that the primitive was called with the right number of arguments. 
+
 This check is particularly important because developers may wrongly define primitives such as we did before, where we have defined a unary method while the primitive was expecting one argument.
-If we don't properly check the arguments trying to access it could cause an interpreter failure, while the proper behaviour should be to just fail the primitive and let the fallback code carry on the execution.
+If we don't properly check the arguments trying to access it could cause an interpreter failure, while the proper behavior should be to just fail the primitive and let the fallback code carry on the execution.
 
 
-In the following sections, we  implement a series of essential primitives taking care of typical failure cases. 
+In the following sections, we implement a series of essential primitives taking care of typical failure cases. 
 With such primitives, it will be possible to execute a large range of Pharo programs.
 
 ### Essential Primitives: Arithmetic 
 
-
-The basic arithmetic primitives are small integer addition, substraction, multiplication, and division.
-They all require a small integer receiver, a small integer argument, and that the result is also a small integer.
+The basic arithmetic primitives are small integer addition, subtraction, multiplication, and division.
+They all require a small integer receiver and a small integer argument, and that the result is also a small integer.
 Division in addition fails in case the argument is `0`.
 The following code snippet illustrates integer addition and division.
-For space reason, we do not include substraction and multiplication, their implementation is similarly to the one of addition.
+For space reasons, we do not include subtraction and multiplication, their implementation is similar to the one of addition.
 
 ```
-CHInterpreter >> initializePrimitiveTable [
+CInterpreter >> initializePrimitiveTable
 	...
 	primitives at: 1 	  put: #primitiveSmallIntegerAdd.
 	primitives at: 2 	  put: #primitiveSmallIntegerMinus.
 	primitives at: 9 	  put: #primitiveSmallIntegerMultiply.
 	primitives at: 10 	put: #primitiveSmallIntegerDivide.
 	...
-]
 ```
 
 
-The addition primitive  now checks that the receiver, argument and result are small integers.
+The addition primitive now checks that the receiver, argument, and result are small integers.
 
 ```
-CHInterpreter >> primitiveSmallIntegerAdd [
+CInterpreter >> primitiveSmallIntegerAdd
 	| receiver argument result |
 	self numberOfArguments < 1
 		ifTrue: [ CHPrimitiveFail signal ].
@@ -315,31 +312,29 @@ CHInterpreter >> primitiveSmallIntegerAdd [
 	result class = SmallInteger
 		ifFalse: [ CHPrimitiveFail signal ].
 	^ result
-]
 ```
 
 
 
 ```
-CHInterpreter >> primitiveSmallIntegerDivide [
+CInterpreter >> primitiveSmallIntegerDivide
 	| receiver argument result |
 	self numberOfArguments < 1
-		ifTrue: [ CHPrimitiveFail signal ].
+		ifTrue: [ CPrimitiveFail signal ].
 
 	receiver := self receiver.
 	receiver class = SmallInteger
-		ifFalse: [ CHPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFail signal ].
 	
 	argument := self argumentAt: 1.
 	(argument class = SmallInteger
 		and: [ argument ~= 0 ])
-			ifFalse: [ CHPrimitiveFail signal ].
+			ifFalse: [ CPrimitiveFail signal ].
 
 	result := receiver / argument.
 	result class = SmallInteger
-		ifFalse: [ CHPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFail signal ].
 	^ result
-]
 ```
 
 
@@ -355,7 +350,7 @@ Identity comparisons only require that the primitive receives an argument to com
 The following code snippet illustrates both kind of methods with small integer less than and object idenity equality.
 
 ```
-CHInterpreter >> initializePrimitiveTable [
+CInterpreter >> initializePrimitiveTable
 	...
 	primitives at: 3 	put: #primitiveSmallIntegerLessThan.
 	primitives at: 4 	put: #primitiveSmallIntegerGreaterThan.
@@ -368,36 +363,33 @@ CHInterpreter >> initializePrimitiveTable [
 	primitives at: 110 	put: #primitiveIdentical.
 	primitives at: 111 	put: #primitiveNotIdentical.
 	...
-]
 ```
 
 
 ```
-CHInterpreter >> primitiveSmallIntegerLessThan [
+CInterpreter >> primitiveSmallIntegerLessThan
 	| receiver argument result |
 	self numberOfArguments < 1
-		ifTrue: [ CHPrimitiveFail signal ].
+		ifTrue: [ CPrimitiveFail signal ].
 
 	receiver := self receiver.
 	receiver class = SmallInteger
-		ifFalse: [ CHPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFail signal ].
 	
 	argument := self argumentAt: 1.
 	argument class = SmallInteger
-		ifFalse: [ CHPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFail signal ].
 
 	^ receiver < argument
-]
 ```
 
 
 ```
-CHInterpreter >> primitiveIdentical [
+CInterpreter >> primitiveIdentical
 	self numberOfArguments < 1
-		ifTrue: [ CHPrimitiveFail signal ].
+		ifTrue: [ CPrimitiveFail signal ].
 
 	^ self receiver == (self argumentAt: 1)
-]
 ```
 
 
@@ -410,7 +402,7 @@ Array access primitives check that the receiver is of the right kind and that th
 The following code snippet illustrates `Array` access primitives for general Arrays, and Strings.
 
 ```
-CHInterpreter >> initializePrimitiveTable [
+CInterpreter >> initializePrimitiveTable
 	...
 	primitives at: 60 	put: #primitiveAt.
 	primitives at: 61 	put: #primitiveAtPut.
@@ -418,26 +410,24 @@ CHInterpreter >> initializePrimitiveTable [
 	primitives at: 63 	put: #primitiveStringAt.
 	primitives at: 64 	put: #primitiveStringAtPut.
 	...
-]
 ```
 
 
 The primitive `primitiveSize` verifies that the receiver is an object supporting the notion of size.
 
 ```
-CHInterpreter >> primitiveSize [
+CInterpreter >> primitiveSize
 	self receiver class classLayout isVariable
-		ifFalse: [ CHPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFail signal ].
 
 	^ self receiver basicSize
-]
 ```
 
 
 The primitive `primitiveAt` verifies that the receiver is an object supporting the notion of size and in addition that the index is an integer in the range of the size of the receiver.
 
 ```
-CHInterpreter >> primitiveAt [
+CInterpreter >> primitiveAt
 	self numberOfArguments < 1
 		ifTrue: [ CHPrimitiveFail signal ].
 
@@ -452,28 +442,27 @@ CHInterpreter >> primitiveAt [
 		ifTrue: [ CHPrimitiveFail signal ].
 		
 	^ self receiver basicAt: (self argumentAt: 1)
-]
 ```
 
 
 The primitive `primitiveStringAt` verifies that the receiver is from a class whose elements are bytes.
+
 ```
-CHInterpreter >> primitiveStringAt [
+CInterpreter >> primitiveStringAt
 	self numberOfArguments < 1
-		ifTrue: [ CHPrimitiveFail signal ].
+		ifTrue: [ CPrimitiveFail signal ].
 		
 	self receiver class classLayout isBytes
-		ifFalse: [ CHPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFail signal ].
 	
 	((self argumentAt: 1) isKindOf: SmallInteger)
-		ifFalse: [ CHPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFail signal ].
 	"Bounds check"
 	
 	self receiver size < (self argumentAt: 1)
 		ifTrue: [ CHPrimitiveFail signal ].
 	
 	^ self receiver at: (self argumentAt: 1)
-]
 ```
 
 
@@ -488,48 +477,45 @@ Both these primitives validate that the receiver are classes of the specified ki
 In addition `new:` does check that there is an argument, it is a small integer.
 
 ```
-CHInterpreter >> initializePrimitiveTable [
+CInterpreter >> initializePrimitiveTable
 	...
 	primitives at: 70 	put: #primitiveBasicNew.
 	primitives at: 71 	put: #primitiveBasicNewVariable.
 	...
-]
 ```
 
 
 ```
-CHInterpreter >> primitiveBasicNew [
+CInterpreter >> primitiveBasicNew
 	self receiver isClass
-		ifFalse: [ CHPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFail signal ].
 	^ self receiver basicNew
-]
 ```
 
 
 ```
-CHInterpreter >> primitiveBasicNewVariable [
+CInterpreter >> primitiveBasicNewVariable
 	self numberOfArguments < 1
-		ifTrue: [ CHPrimitiveFail signal ].
+		ifTrue: [ CPrimitiveFail signal ].
 
 	self receiver isClass
-		ifFalse: [ CHPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFail signal ].
 	self receiver class classLayout isVariable
-		ifFalse: [ CHPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFail signal ].
 	
 	((self argumentAt: 1) isKindOf: SmallInteger)
-		ifFalse: [ CHPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFail signal ].
 	
 	^ self receiver basicNew: (self argumentAt: 1)
-]
 ```
 
 
 ### Conclusion
 
 
-This chapter presented primitive behavior, implementing behaviour that cannot be purely expressed in the evaluated language.
-Primitive behaviour is accessed through _primitive methods_, which are methods marked with a `primitive:` pragma.
+This chapter presented primitive behavior, implementing behavior that cannot be purely expressed in the evaluated language.
+Primitive behavior is accessed through _primitive methods_, which are methods marked with a `primitive:` pragma.
 When a primitive method executes, it first executes the primitive behavior associated with the primitive id.
 If it fails, the body of the method is executed as in non-primitive methods.
 
-We have then discussed about primitive failures and verifications, and presented a short list of essential primitives that are required to execute more interesting Pharo programs.
+We have then discussed about primitive failures and verification  and presented a short list of essential primitives that are required to execute more interesting Pharo programs.
