@@ -192,11 +192,10 @@ CInterpreter >> visitMethodNode: aMethodNode
 	^ self visitNode: aMethodNode body
 ```
 
-With this our new test should pass.
+Our new test pass.
 
 
 ### Primitive Failures and Fallback Code
-
 
 Let's now consider what should happen when a primitive fails.
 For example, following Pharo's specification, primitive 1 fails when the receiver or the argument are not small integers, or whenever their sum overflows and does not fit into a small integer anymore.
@@ -205,6 +204,8 @@ To produce one of such failing cases, we can implement primitive 1 in our `CInte
  When it fails, the fallback code should execute.
 
  We define two methods `failingPrimitive` and `callingFailingPrimitive` to support the test of failing primitive.
+ 
+Stef here.
  
 ```
 CInterpretable >> failingPrimitive
