@@ -45,7 +45,7 @@ CInterpretable >> returnInstanceVariableX
 To test the correct evaluation of the instance variable read, we check that the getter returns the value in the instance variable, which we can previously set.
 
 ```
-CHInterpreterTest >> testReturnInstanceVariableRead
+CInterpreterTest >> testReturnInstanceVariableRead
 	| receiver |
 	receiver := CInterpretable new.
 	receiver x: 100.

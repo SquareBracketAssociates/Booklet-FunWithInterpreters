@@ -65,12 +65,10 @@ SmallInteger >> + aNumber
 ```
 
 
-This method looks like a normal method with selector `+`, and with a normal method body doing `^super + aNumber`.
+This method looks like a normal method with selector `+` and with a normal method body doing `^ super + aNumber`.
 The only difference between this method and a normal one is that this method also has an annotation, or pragma, indicating that it is the primitive number 1.
 
-The body of the method is normally not executed. 
-In its place, the primitive 1 is executed.
-The method body is only executed if the primitive failed.
+
 
 
 
@@ -83,7 +81,12 @@ To make a parallel between our interpreter and the Pharo virtual machine: the vi
 
 The virtual machine interpreter defines a set of supported primitives with unique ids. We will mimic this behavior and in our interpreter, the primitive with id `1` implements the behavior that adds up two integers.
 
+
 When a primitive method is activated, 
+the body of the method is normally not executed. Instead the primitive 1 is executed.
+The method body is only executed, if the primitive failed.
+
+More concretely, when a primitive method is activated, 
 
 - it first looks up what _primitive_ to execute based on its primitive id number, and executes it.
 - The primitive performs some validations if required, executes the corresponding behavior, and returns either with a success if everything went ok, or a failure if there was a problem.
@@ -96,9 +99,28 @@ For such primitive, implementors added a method body to describe what the primit
 ### Infrastructure for Primitive Evaluation
 
 To implement primitives in our evaluator we only need to change how methods are activated.
-Indeed, as we have seen above, the method lookup nor other special nodes are required for the execution of primitives, and the AST already supports pragma nodes, from which we need to extract the method's primitive id.
+Indeed, as we have seen above, neither a special method lookup nor dedicated nodes are required for the execution of primitives, and the AST already supports pragma nodes, from which we need to extract the method's primitive id.
 
-We will extend the method evalution in a simple way: During the activation of a primitive method, we need to look for the primitive to execute, and check for failures.
+
+Let's start by setting up our testing scenario: adding up two numbers.
+We make sure to work with small enough numbers in this test, to not care about primitive failures yet.
+Doing `1 + 5` the primitive should always be a success and return `6`.
+
+
+```
+CInterpretable >> smallintAdd
+	^ 1 + 5
+
+CInterpreterTests >> testSmallIntAddPrimitive
+	self
+		assert: (self executeSelector: #smallintAdd)
+		equals: 6
+```
+
+
+### Primitive Table Addition
+
+We extend the method evaluation in a simple way: During the activation of a primitive method, we need to look for the primitive to execute and check for failures.
 Therefore we need to map primitive ids to primitive methods.
 
 We implement such a mapping using a table with the form `<id, evaluator_selector>`. 
@@ -121,33 +143,31 @@ CInterpreter >> initializePrimitiveTable
 ```
 
 
-
-Let's start by setting up our testing scenario: adding up two numbers.
-We make sure to work with small enough numbers in this test, to not care about primitive failures yet.
-Doing `1 + 5` the primitive should always be a success and return `6`.
-
-
-
-
+We define the primitive `primitiveSmallIntegerAdd` as follows: 
 
 ```
-CInterpretable >> smallintAdd
-	^ 1 + 5
+CInterpreter >> primitiveSmallIntegerAdd
+	| receiver argument |
+	receiver := self receiver.
+	argument := self argumentAt: 1.
+	^ receiver + argument
+```
 
-CInterpreterTests >> testSmallIntAddPrimitive
-	self
-		assert: (self executeSelector: #smallintAdd)
-		equals: 6
+We introduce a way to access the value of an argument with the method `argumentAt:`.
+
+```
+CInterpreter >> argumentAt: anInteger
+	^ self tempAt: (self currentMethod arguments at: anInteger) name
 ```
 
 
-### Primitives Implementation
 
+### Primitive Implementation
 
-In our first iteration, we will not care about optimizing our evaluator, for which we had already and we will have tons of opportunities.
+In the first iteration, we do not care about optimizing our evaluator (for which we had already and we will have tons of opportunities).
 To have a simple implementation to work on, we execute the primitive after the method's frame creation, in the `visitMethodNode:` method.
 This way the primitive has a simple way to access the receiver and the arguments by reading the frame.
-We leave primitive failure management for our second iteration.
+We leave primitive failure management for the second iteration.
 
 Upon primitive method execution, we extract the primitive id from the pragma, get the selector of that id from the table, and use the `perform:` method on the interpreter with that selector to execute the primitive.
 
@@ -161,7 +181,8 @@ CInterpreter >> executePrimitiveMethod: anAST
 	^ self perform: (primitives at: primitiveNumber)
 ```
 
-We also need to take care of sending the receiver and arguments of the message to the primitive, so it can manipulate them.
+In addition, we specialize `visitMethodNode:` so that it executes primitives when needed.
+At this stage, we do not support primitive failures.
 
 ```
 CInterpreter >> visitMethodNode: aMethodNode
@@ -171,19 +192,7 @@ CInterpreter >> visitMethodNode: aMethodNode
 	^ self visitNode: aMethodNode body
 ```
 
-
-We define the primitive `primitiveSmallIntegerAdd` as follows: 
-
-```
-CInterpreter >> primitiveSmallIntegerAdd
-	| receiver argument |
-	receiver := self receiver.
-	argument := self argumentAt: 1.
-	^ receiver + argument
-
-CInterpreter >> argumentAt: anInteger
-  ^ self tempAt: (self currentMethod arguments at: anInteger) name
-```
+With this our new test should pass.
 
 
 ### Primitive Failures and Fallback Code

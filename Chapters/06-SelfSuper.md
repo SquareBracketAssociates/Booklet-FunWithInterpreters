@@ -54,7 +54,7 @@ For now we add an instance variable in our evaluator called `receiver`.
 
 ```
 Object << #CInterpreter
-	slots: { #receiver};
+	slots: { #receiver };
 	package: 'Champollion'
 ```
 
