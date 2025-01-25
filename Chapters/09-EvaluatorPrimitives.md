@@ -1,5 +1,5 @@
 ## Primitive Operations
-cha:prims
+@cha:prims
 
 
 Our interpreter does not handle yet any essential behavior such as basic number operations.  This prevents us from evaluating complex programs.
@@ -195,7 +195,7 @@ CInterpreter >> visitMethodNode: aMethodNode
 Our new test pass.
 
 
-### Primitive Failures and Fallback Code
+### Primitive Failure Preparation
 
 Let's now consider what should happen when a primitive fails.
 For example, following Pharo's specification, primitive 1 fails when the receiver or the argument are not small integers, or whenever their sum overflows and does not fit into a small integer anymore.
@@ -205,7 +205,7 @@ To produce one of such failing cases, we can implement primitive 1 in our `CInte
 
  We define two methods `failingPrimitive` and `callingFailingPrimitive` to support the test of failing primitive.
  
-Stef here.
+
  
 ```
 CInterpretable >> failingPrimitive
@@ -216,40 +216,43 @@ CInterpretable >> callingFailingPrimitive
 	^ self failingPrimitive
 ```
 
+We define a test to check that on failure we get the result returned by the failing primitive.
 
 ```
-CInterpreterTests >> testFailingPrimitive
+CInterpreterTest >> testFailingPrimitive
 	self
 		assert: (self executeSelector: #callingFailingPrimitive)
 		equals: 'failure'
 ```
 
+### Primitive Failure Implementation
 
-To add primitive failures in a clean way, we introduce them as exceptions.
-We define a new subclass of `Exception` named `CHPrimitiveFail`
+To add primitive failures cleanly, we introduce them as exceptions.
 
-In the primitive `primitiveSmallIntegerAdd`, if we detect a failure condition, we raise a `CHPrimitiveFail` error.
-Note that this the primitive is incomplete since we should also test that the argument and the result is small integer
+We define a new subclass of `Exception` named `CPrimitiveFailed`
+
+In the primitive `primitiveSmallIntegerAdd`, if we detect a failure condition, we raise a `CPrimitiveFailed` error.
+Note that this primitive implementation is incomplete since we should also test that the argument and the result are small integers
 as shown in the following sections.
+
 
 ```
 CInterpreter >> primitiveSmallIntegerAdd
 	| receiver argument |
 	receiver := self receiver.
 	receiver class = SmallInteger
-		ifFalse: [ CHPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFailed signal ].
 	argument := self argumentAt: 1.
 	^ receiver + argument
 ```
 
-We then need to modify the way we evaluate methods to handle `CPrimitiveFail` exceptions and continue evaluating the body.
+We then need to modify the way we evaluate methods to handle `CPrimitiveFailed` exceptions and continue evaluating the body.
 
 ```
-CInterpreter >>visitMethodNode: aMethodNode
+CInterpreter >> visitMethodNode: aMethodNode
 	[ aMethodNode isPrimitive ifTrue: [ 
-		"Do not handle primitive failures for now"
 		^ self executePrimitiveMethod: aMethodNode ]]
-		on: CPrimitiveFail do: [ :err | 
+		on: CPrimitiveFailed do: [ :err | 
 			"Nothing, just continue with the method body" ].
 	
 	^ self visitNode: aMethodNode body
@@ -262,24 +265,63 @@ With these changes, everything should work fine now.
 
 For primitives to work properly, and for Pharo to be a safe language, primitives should properly do a series of checks.
 This is particularly important when the interpreter fully controls all other aspects of the language, such as the memory.
-In such cases, primitives, as well as the other parts of the evaluator, have full power over our objects, potentially producing memory corruptions.
+In such cases, primitives, as well as the other parts of the evaluator, have full power over our objects, potentially producing memory corruption.
 
 Among the basic checks that primitives should do, they should not only verify that arguments are of the primitive's expected type, as we have shown above. 
-
 In addition, a general check is that the primitive was called with the right number of arguments. 
 
-This check is particularly important because developers may wrongly define primitives such as we did before, where we have defined a unary method while the primitive was expecting one argument.
-If we don't properly check the arguments trying to access it could cause an interpreter failure, while the proper behavior should be to just fail the primitive and let the fallback code carry on the execution.
-
+This check is particularly important because developers may wrongly define primitives.
+If we don't properly check the arguments trying to access them could cause an interpreter failure, while the proper behavior should be to just fail the primitive and let the fallback code carry on the execution.
 
 In the following sections, we implement a series of essential primitives taking care of typical failure cases. 
 With such primitives, it will be possible to execute a large range of Pharo programs.
+
+We define the method `numberOfArguments` as follows: 
+
+```
+CInterpreter >> numberOfArguments		^ self currentMethod numArgs
+```
+
+We define a better implementation of the addition primitive with checks: 
+We verify that the receiver, argument, and result are small integers.
+
+```
+CInterpreter >> primitiveSmallIntegerAdd
+	| receiver argument result |
+	self numberOfArguments < 1
+		ifTrue: [ CPrimitiveFailed signal ].
+
+	receiver := self receiver.
+	receiver class = SmallInteger
+		ifFalse: [ CPrimitiveFailed signal ].
+
+	argument := self argumentAt: 1.
+	argument class = SmallInteger
+		ifFalse: [ CPrimitiveFailed signal ].
+
+	result := receiver + argument.
+	result class = SmallInteger
+		ifFalse: [ CPrimitiveFailed signal ].
+	^ result
+```
+
+### Conclusion
+
+In this chapter we showed how primitive behavior is evaluated. 
+In particular we showed how fallback code is executed in case the primitive fails. 
+In the following chapter we will describe essential primitives. 
+With such implementation we will be able to execute more realistic programs.
+
+
+## Essential Primitives
+
 
 ### Essential Primitives: Arithmetic 
 
 The basic arithmetic primitives are small integer addition, subtraction, multiplication, and division.
 They all require a small integer receiver and a small integer argument, and that the result is also a small integer.
 Division in addition fails in case the argument is `0`.
+
 The following code snippet illustrates integer addition and division.
 For space reasons, we do not include subtraction and multiplication, their implementation is similar to the one of addition.
 
@@ -289,60 +331,44 @@ CInterpreter >> initializePrimitiveTable
 	primitives at: 1 	  put: #primitiveSmallIntegerAdd.
 	primitives at: 2 	  put: #primitiveSmallIntegerMinus.
 	primitives at: 9 	  put: #primitiveSmallIntegerMultiply.
-	primitives at: 10 	put: #primitiveSmallIntegerDivide.
+	primitives at: 10  put: #primitiveSmallIntegerDivide.
 	...
 ```
 
 
-The addition primitive now checks that the receiver, argument, and result are small integers.
-
-```
-CInterpreter >> primitiveSmallIntegerAdd
-	| receiver argument result |
-	self numberOfArguments < 1
-		ifTrue: [ CHPrimitiveFail signal ].
-
-	receiver := self receiver.
-	receiver class = SmallInteger
-		ifFalse: [ CHPrimitiveFail signal ].
-
-	argument := self argumentAt: 1.
-	argument class = SmallInteger
-		ifFalse: [ CHPrimitiveFail signal ].
-
-	result := receiver + argument.
-	result class = SmallInteger
-		ifFalse: [ CHPrimitiveFail signal ].
-	^ result
-```
 
 
+
+
+Here is the definition of the primitive implementing integer division.
 
 ```
 CInterpreter >> primitiveSmallIntegerDivide
 	| receiver argument result |
 	self numberOfArguments < 1
-		ifTrue: [ CPrimitiveFail signal ].
+		ifTrue: [ CPrimitiveFailed signal ].
 
 	receiver := self receiver.
 	receiver class = SmallInteger
-		ifFalse: [ CPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFailed signal ].
 	
 	argument := self argumentAt: 1.
 	(argument class = SmallInteger
 		and: [ argument ~= 0 ])
-			ifFalse: [ CPrimitiveFail signal ].
+			ifFalse: [ CPrimitiveFailed signal ].
 
 	result := receiver / argument.
 	result class = SmallInteger
-		ifFalse: [ CPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFailed signal ].
 	^ result
 ```
+
+We let you define integer subtraction and multiplication. 
+
 
 
 
 ### Essential Primitives:  Comparison
-
 
 Comparison primitives span in two different sets. 
 The first set contains the primitives implementing number comparisons such as less than or greater or equals than. 
@@ -372,15 +398,15 @@ CInterpreter >> initializePrimitiveTable
 CInterpreter >> primitiveSmallIntegerLessThan
 	| receiver argument result |
 	self numberOfArguments < 1
-		ifTrue: [ CPrimitiveFail signal ].
+		ifTrue: [ CPrimitiveFailed signal ].
 
 	receiver := self receiver.
 	receiver class = SmallInteger
-		ifFalse: [ CPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFailed signal ].
 	
 	argument := self argumentAt: 1.
 	argument class = SmallInteger
-		ifFalse: [ CPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFailed signal ].
 
 	^ receiver < argument
 ```
@@ -389,7 +415,7 @@ CInterpreter >> primitiveSmallIntegerLessThan
 ```
 CInterpreter >> primitiveIdentical
 	self numberOfArguments < 1
-		ifTrue: [ CPrimitiveFail signal ].
+		ifTrue: [ CPrimitiveFailed signal ].
 
 	^ self receiver == (self argumentAt: 1)
 ```
@@ -420,7 +446,7 @@ The primitive `primitiveSize` verifies that the receiver is an object supporting
 ```
 CInterpreter >> primitiveSize
 	self receiver class classLayout isVariable
-		ifFalse: [ CPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFailed signal ].
 
 	^ self receiver basicSize
 ```
@@ -431,17 +457,17 @@ The primitive `primitiveAt` verifies that the receiver is an object supporting t
 ```
 CInterpreter >> primitiveAt
 	self numberOfArguments < 1
-		ifTrue: [ CHPrimitiveFail signal ].
+		ifTrue: [ CPrimitiveFailed signal ].
 
 	self receiver class classLayout isVariable
-		ifFalse: [ CHPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFailed signal ].
 	
 	((self argumentAt: 1) isKindOf: SmallInteger)
-		ifFalse: [ CHPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFailed signal ].
 		
 	"Bounds check"
 	self receiver size < (self argumentAt: 1)
-		ifTrue: [ CHPrimitiveFail signal ].
+		ifTrue: [ CPrimitiveFailed signal ].
 		
 	^ self receiver basicAt: (self argumentAt: 1)
 ```
@@ -452,17 +478,17 @@ The primitive `primitiveStringAt` verifies that the receiver is from a class who
 ```
 CInterpreter >> primitiveStringAt
 	self numberOfArguments < 1
-		ifTrue: [ CPrimitiveFail signal ].
+		ifTrue: [ CPrimitiveFailed signal ].
 		
 	self receiver class classLayout isBytes
-		ifFalse: [ CPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFailed signal ].
 	
 	((self argumentAt: 1) isKindOf: SmallInteger)
-		ifFalse: [ CPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFailed signal ].
 	"Bounds check"
 	
 	self receiver size < (self argumentAt: 1)
-		ifTrue: [ CHPrimitiveFail signal ].
+		ifTrue: [ CPrimitiveFailed signal ].
 	
 	^ self receiver at: (self argumentAt: 1)
 ```
@@ -490,7 +516,7 @@ CInterpreter >> initializePrimitiveTable
 ```
 CInterpreter >> primitiveBasicNew
 	self receiver isClass
-		ifFalse: [ CPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFailed signal ].
 	^ self receiver basicNew
 ```
 
@@ -498,15 +524,15 @@ CInterpreter >> primitiveBasicNew
 ```
 CInterpreter >> primitiveBasicNewVariable
 	self numberOfArguments < 1
-		ifTrue: [ CPrimitiveFail signal ].
+		ifTrue: [ CPrimitiveFailed signal ].
 
 	self receiver isClass
-		ifFalse: [ CPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFailed signal ].
 	self receiver class classLayout isVariable
-		ifFalse: [ CPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFailed signal ].
 	
 	((self argumentAt: 1) isKindOf: SmallInteger)
-		ifFalse: [ CPrimitiveFail signal ].
+		ifFalse: [ CPrimitiveFailed signal ].
 	
 	^ self receiver basicNew: (self argumentAt: 1)
 ```
