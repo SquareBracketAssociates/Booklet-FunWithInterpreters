@@ -583,6 +583,9 @@ Here we make sure that the Pharo Point class is accessible in the global scope o
 ```
 CInterpreterTest >> testPointNew		| p |	self interpreter globalEnvironmentAt: #Point put: Point.	p := (self executeSelector: #newPoint).	self		assert: p class 		equals: Point.	 
 ```
+
+For `basicNew:` we follow the same approach as before. We validate that the class is a class supporting variable number of instance variables.
+
 ```
 CInterpreter >> primitiveBasicNewVariable
 	self numberOfArguments = 1
@@ -590,13 +593,23 @@ CInterpreter >> primitiveBasicNewVariable
 
 	self receiver isClass
 		ifFalse: [ CPrimitiveFailed signal ].
-	self receiver class classLayout isVariable
+	self receiver classLayout isVariable
 		ifFalse: [ CPrimitiveFailed signal ].
 	
 	((self argumentAt: 1) isKindOf: SmallInteger)
 		ifFalse: [ CPrimitiveFailed signal ].
 	
 	^ self receiver basicNew: (self argumentAt: 1)
+```
+
+The following test verifies that the primitive is working. We also expose Array as a global variable of the interpreter.
+
+
+```
+CInterpreterTest >> testArrayNew		| p |	self interpreter globalEnvironmentAt: #Array put: Array.	p := (self executeSelector: #newArray).	self		assert: p class 		equals: Array.	self assert: p size equals: 4```	 
+
+```
+CInterpretable >> newArray	^ Array basicNew: 4  
 ```
 
 
