@@ -279,7 +279,9 @@ With such primitives, it will be possible to execute a large range of Pharo prog
 We define the method `numberOfArguments` as follows: 
 
 ```
-CInterpreter >> numberOfArguments		^ self currentMethod numArgs
+CInterpreter >> numberOfArguments
+	
+	^ self currentMethod numArgs
 ```
 
 We define a better implementation of the addition primitive with checks: 
@@ -313,7 +315,18 @@ In the following chapter we will describe essential primitives.
 With such implementation we will be able to execute more realistic programs.
 
 
+
+
+
+
+
+
 ## Essential Primitives
+
+In this chapter, we will focus on implementing more primitives.
+We will implement more mathematical primitives but also support for comparisons, and 
+array allocation. 
+
 
 
 ### Essential Primitives: Arithmetic 
@@ -337,10 +350,7 @@ CInterpreter >> initializePrimitiveTable
 
 
 
-
-
-
-Here is the definition of the primitive implementing integer division.
+Here is the definition of the primitive for integer division.
 
 ```
 CInterpreter >> primitiveSmallIntegerDivide
@@ -371,11 +381,13 @@ We let you define integer subtraction and multiplication.
 ### Essential Primitives:  Comparison
 
 Comparison primitives span in two different sets. 
-The first set contains the primitives implementing number comparisons such as less than or greater or equals than. 
-The second set contains the primitives for object identity comparison: identity equals to and identity not equals to.
+- The first set contains the primitives implementing number comparisons such as less than or greater or equals than. 
+- The second set contains the primitives for object identity comparison: identity equals to and identity not equals to.
+
 All number comparisons all require a small integer receiver, a small integer argument.
 Identity comparisons only require that the primitive receives an argument to compare to.
-The following code snippet illustrates both kind of methods with small integer less than and object idenity equality.
+
+The following definitions illustrate the two kinds of methods with small integer less than and object idenity equality.
 
 ```
 CInterpreter >> initializePrimitiveTable
@@ -393,6 +405,7 @@ CInterpreter >> initializePrimitiveTable
 	...
 ```
 
+The following primitives following the same patterns and are self-explanatory.  
 
 ```
 CInterpreter >> primitiveSmallIntegerLessThan
@@ -411,6 +424,12 @@ CInterpreter >> primitiveSmallIntegerLessThan
 	^ receiver < argument
 ```
 
+Following the definition of `primitiveSmallIntegerLessThan`, implement the following primitives
+`primitiveSmallIntegerGreaterThan`,
+`primitiveSmallIntegerLessOrEqualsThan`, and 
+`primitiveSmallIntegerGreaterOrEqualsThan`.
+
+
 
 ```
 CInterpreter >> primitiveIdentical
@@ -420,14 +439,16 @@ CInterpreter >> primitiveIdentical
 	^ self receiver == (self argumentAt: 1)
 ```
 
+Define some tests to ensure that your implementation is correct.
+
+
 
 ### Essential Primitives:  Array Manipulation
 
-
-So far our interpreter is able to manipulate only objects with instance variables, but not arrays or their variants e.g., strings.
-Arrays are special objects whose state is accessed with primitives, usually in methods named `at:` and `at:put:` and `size`.
-Array access primitives check that the receiver is of the right kind and that the index arguments are integers within bounds of the array.
-The following code snippet illustrates `Array` access primitives for general Arrays, and Strings.
+So far our interpreter is able to manipulate only objects with instance variables, but not objects with variable size such as arrays or their variants e.g., strings.
+Arrays are special objects whose state is accessed with primitives, usually in methods named `at:`, `at:put:`, and `size`.
+Array access primitives check that the receiver is of the right kind and that the index arguments are integers within the bounds of the array.
+The following definition illustrates `Array` access primitives for general Arrays, and Strings.
 
 ```
 CInterpreter >> initializePrimitiveTable
@@ -441,7 +462,45 @@ CInterpreter >> initializePrimitiveTable
 ```
 
 
-The primitive `primitiveSize` verifies that the receiver is an object supporting the notion of size.
+The primitive `primitiveAt` verifies that the receiver is an object supporting the notion of size and in addition that the index is an integer in the range of the size of the receiver.
+
+
+```
+CInterpreter >> primitiveAt	self numberOfArguments = 1		ifFalse: [ CPrimitiveFailed signal ].	self receiver class classLayout isVariable		ifFalse: [ CPrimitiveFailed signal ].		((self argumentAt: 1) isKindOf: SmallInteger)		ifFalse: [ CPrimitiveFailed signal ].			"Bounds check"	((self argumentAt: 1) between: 1 and: self receiver size)		ifFalse: [ CPrimitiveFailed signal ].			^ self receiver basicAt: (self argumentAt: 1)```
+
+Here is a simple test verifying that the implementation is correct.
+
+
+```
+CInterpretable >> at	^ #(11 22 33) at: 2
+```
+
+```
+CInterpreterTest >> testAt	self assert: (self executeSelector: #at) equals: 22```	
+
+Note that at this point, since the interpreter is not able to execute conditional and blocks, it cannot interpret 
+failure of the primitive at: because it contains conditionals. 
+
+
+
+
+
+
+
+
+
+The primitive `primitiveStringAt` verifies that the receiver is from a class whose elements are bytes.
+It uses the class format information using the method `isBytes`.
+
+
+```
+CInterpreter >> primitiveStringAt	self numberOfArguments = 1		ifFalse: [ CPrimitiveFailed signal ].			self receiver class classLayout isBytes		ifFalse: [ CPrimitiveFailed signal ].		((self argumentAt: 1) isKindOf: SmallInteger)		ifFalse: [ CPrimitiveFailed signal ].	"Bounds check"		((self argumentAt: 1) between: 1 and: self receiver size)		ifFalse: [ CPrimitiveFailed signal ].		^ self receiver at: (self argumentAt: 1)
+```
+
+
+
+
+The primitive `primitiveSize` verifies that the receiver is an object that has the notion of size. It uses the layout of the class to do so.
 
 ```
 CInterpreter >> primitiveSize
@@ -451,58 +510,48 @@ CInterpreter >> primitiveSize
 	^ self receiver basicSize
 ```
 
+We define a simple test as follows:
 
-The primitive `primitiveAt` verifies that the receiver is an object supporting the notion of size and in addition that the index is an integer in the range of the size of the receiver.
 
 ```
-CInterpreter >> primitiveAt
-	self numberOfArguments < 1
-		ifTrue: [ CPrimitiveFailed signal ].
+CInterpretable >> atSize	^ #(11 22 33)
+```
 
-	self receiver class classLayout isVariable
-		ifFalse: [ CPrimitiveFailed signal ].
-	
-	((self argumentAt: 1) isKindOf: SmallInteger)
-		ifFalse: [ CPrimitiveFailed signal ].
-		
-	"Bounds check"
-	self receiver size < (self argumentAt: 1)
-		ifTrue: [ CPrimitiveFailed signal ].
-		
-	^ self receiver basicAt: (self argumentAt: 1)
+```
+CInterpreterTest >> testAtSize	self assert: (self executeSelector: #atSize) equals: 3
 ```
 
 
-The primitive `primitiveStringAt` verifies that the receiver is from a class whose elements are bytes.
+Now we implement the primitive that supports the modification of arrays.
+
 
 ```
-CInterpreter >> primitiveStringAt
-	self numberOfArguments < 1
-		ifTrue: [ CPrimitiveFailed signal ].
-		
-	self receiver class classLayout isBytes
-		ifFalse: [ CPrimitiveFailed signal ].
-	
-	((self argumentAt: 1) isKindOf: SmallInteger)
-		ifFalse: [ CPrimitiveFailed signal ].
-	"Bounds check"
-	
-	self receiver size < (self argumentAt: 1)
-		ifTrue: [ CPrimitiveFailed signal ].
-	
-	^ self receiver at: (self argumentAt: 1)
+CInterpreter >> primitiveAtPut	self numberOfArguments = 2		ifFalse: [ CPrimitiveFailed signal ].	self receiver class classLayout isVariable		ifFalse: [ CPrimitiveFailed signal ].		((self argumentAt: 1) isKindOf: SmallInteger)		ifFalse: [ CPrimitiveFailed signal ].			"Bounds check"	((self argumentAt: 1) between: 1 and: self receiver size)		ifFalse: [ CPrimitiveFailed signal ].			^ self receiver basicAt: (self argumentAt: 1) put: (self argumentAt: 2)
 ```
+
+We test it as follows:
+
+```
+CInterpretable >> atPut	| ar |	ar := #(11 22 33).	ar at: 2 put: 44.	^ ar
+```
+
+```
+CInterpreterTest >> testAtPut	self assert: (self executeSelector: #atPut) equals: #(11 44 33)
+```
+
+
 
 
 ### Essential Primitives:  Object Allocation
 
-
+We will implement important primitives: the primitives for object allocation.
 Object allocation is implemented by primitives `new` and `new:`.
-The method `new` allocates a new object from a fixed-slot class.
-The method `new:` allocates a new object from a variable-slot class such as `Array`, using the number of slots specified as argument. 
+
+- The method `new` allocates a new object from a fixed-slot class.
+- The method `new:` allocates a new object from a variable-slot class such as `Array`, using the number of slots specified as argument. 
 
 Both these primitives validate that the receiver are classes of the specified kinds.
-In addition `new:` does check that there is an argument, it is a small integer.
+In addition `new:` does check that there is an argument, it is a positive small integer.
 
 ```
 CInterpreter >> initializePrimitiveTable
@@ -513,6 +562,8 @@ CInterpreter >> initializePrimitiveTable
 ```
 
 
+To interpret basic new we rely on the one of Pharo because our interpreter does not its own memory management. 
+
 ```
 CInterpreter >> primitiveBasicNew
 	self receiver isClass
@@ -520,11 +571,22 @@ CInterpreter >> primitiveBasicNew
 	^ self receiver basicNew
 ```
 
+We test it as follows:
+
 
 ```
+CInterpretable >> newPoint	^ Point basicNew  
+```
+
+Here we make sure that the Pharo Point class is accessible in the global scope of the interpreter.
+
+```
+CInterpreterTest >> testPointNew		| p |	self interpreter globalEnvironmentAt: #Point put: Point.	p := (self executeSelector: #newPoint).	self		assert: p class 		equals: Point.	 
+```
+```
 CInterpreter >> primitiveBasicNewVariable
-	self numberOfArguments < 1
-		ifTrue: [ CPrimitiveFailed signal ].
+	self numberOfArguments = 1
+		ifFalse: [ CPrimitiveFailed signal ].
 
 	self receiver isClass
 		ifFalse: [ CPrimitiveFailed signal ].
@@ -540,10 +602,5 @@ CInterpreter >> primitiveBasicNewVariable
 
 ### Conclusion
 
-
-This chapter presented primitive behavior, implementing behavior that cannot be purely expressed in the evaluated language.
-Primitive behavior is accessed through _primitive methods_, which are methods marked with a `primitive:` pragma.
-When a primitive method executes, it first executes the primitive behavior associated with the primitive id.
-If it fails, the body of the method is executed as in non-primitive methods.
-
-We have then discussed about primitive failures and verification  and presented a short list of essential primitives that are required to execute more interesting Pharo programs.
+This chapter shows the implementation of multiple primitives behavior. 
+The short list of essential primitives we presented are required to execute more interesting Pharo programs.
