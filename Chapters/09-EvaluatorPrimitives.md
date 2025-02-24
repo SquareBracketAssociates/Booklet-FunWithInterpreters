@@ -250,6 +250,7 @@ We then need to modify the way we evaluate methods to handle `CPrimitiveFailed` 
 
 ```
 CInterpreter >> visitMethodNode: aMethodNode
+
 	[ aMethodNode isPrimitive ifTrue: [ 
 		^ self executePrimitiveMethod: aMethodNode ]]
 		on: CPrimitiveFailed do: [ :err | 
@@ -290,8 +291,8 @@ We verify that the receiver, argument, and result are small integers.
 ```
 CInterpreter >> primitiveSmallIntegerAdd
 	| receiver argument result |
-	self numberOfArguments < 1
-		ifTrue: [ CPrimitiveFailed signal ].
+	self numberOfArguments = 1
+		ifFalse: [ CPrimitiveFailed signal ].
 
 	receiver := self receiver.
 	receiver class = SmallInteger
@@ -306,6 +307,48 @@ CInterpreter >> primitiveSmallIntegerAdd
 		ifFalse: [ CPrimitiveFailed signal ].
 	^ result
 ```
+
+
+### Stepping 
+
+The `visitMethodNode:` definition above can be confusing let us take a moment to analyse it again. 
+To be clear we need to see the three pieces together: the first definition, the _interpreter_ primitive implementation and the _Pharo_ primitive implementation.
+
+```
+CInterpreter >> visitMethodNode: aMethodNode
+
+	[ aMethodNode isPrimitive ifTrue: [ 
+		^ self executePrimitiveMethod: aMethodNode ]]
+		on: CPrimitiveFailed do: [ :err | 
+			"Nothing, just continue with the method body" ].
+	
+	^ self visitNode: aMethodNode body
+```
+
+```
+CInterpreter >> primitiveSmallIntegerAdd
+     ...
+```
+
+```
+SmallInteger >> + aNumber
+	<primitive: 1>
+	^ super + aNumber
+```     
+
+The argument of the `visitMethodNode:` is a Pharo method. When such a method is a _Pharo_ primitive (i.e., it has the pragma annotation)
+the condition is basically doing a special interpretation: it executes the corresponding _interpreter_ method primitive that we implemented inside the 
+class `CInterpreter`. When such an execution raises a `CPrimitiveFailed` exception, the interpretation continues with the interpretation of the _Pharo_ primitive fallback code. 
+
+What we see is that there is a go and back between the _Pharo_ primitive and the definition of the corresponding primitive
+in the interpreter. 
+First the _Pharo_ primitive pragma is used to identify the _interpreter_ primitive, then the interpreter executes the interpreter primitive. 
+This is only on failure of the such a logic (which in a runtime is implemented in C for example) that the interpreter should execute
+the fallback code of _Pharo_ primitive.
+
+At the moment since the interpreter does not support conditional and block execution, we cannot execute the primitive fallback code. 
+
+
 
 ### Conclusion
 
@@ -466,17 +509,36 @@ The primitive `primitiveAt` verifies that the receiver is an object supporting t
 
 
 ```
-CInterpreter >> primitiveAt	self numberOfArguments = 1		ifFalse: [ CPrimitiveFailed signal ].	self receiver class classLayout isVariable		ifFalse: [ CPrimitiveFailed signal ].		((self argumentAt: 1) isKindOf: SmallInteger)		ifFalse: [ CPrimitiveFailed signal ].			"Bounds check"	((self argumentAt: 1) between: 1 and: self receiver size)		ifFalse: [ CPrimitiveFailed signal ].			^ self receiver basicAt: (self argumentAt: 1)```
+CInterpreter >> primitiveAt
+
+	self numberOfArguments = 1
+		ifFalse: [ CPrimitiveFailed signal ].
+
+	self receiver class classLayout isVariable
+		ifFalse: [ CPrimitiveFailed signal ].
+	
+	((self argumentAt: 1) isKindOf: SmallInteger)
+		ifFalse: [ CPrimitiveFailed signal ].
+		
+	"Bounds check"
+	((self argumentAt: 1) between: 1 and: self receiver size)
+		ifFalse: [ CPrimitiveFailed signal ].
+		
+	^ self receiver basicAt: (self argumentAt: 1)```
 
 Here is a simple test verifying that the implementation is correct.
 
 
 ```
-CInterpretable >> at	^ #(11 22 33) at: 2
+CInterpretable >> at
+
+	^ #(11 22 33) at: 2
 ```
 
 ```
-CInterpreterTest >> testAt	self assert: (self executeSelector: #at) equals: 22```	
+CInterpreterTest >> testAt
+	self assert: (self executeSelector: #at) equals: 22
+```	
 
 Note that at this point, since the interpreter is not able to execute conditional and blocks, it cannot interpret 
 failure of the primitive at: because it contains conditionals. 
@@ -494,7 +556,21 @@ It uses the class format information using the method `isBytes`.
 
 
 ```
-CInterpreter >> primitiveStringAt	self numberOfArguments = 1		ifFalse: [ CPrimitiveFailed signal ].			self receiver class classLayout isBytes		ifFalse: [ CPrimitiveFailed signal ].		((self argumentAt: 1) isKindOf: SmallInteger)		ifFalse: [ CPrimitiveFailed signal ].	"Bounds check"		((self argumentAt: 1) between: 1 and: self receiver size)		ifFalse: [ CPrimitiveFailed signal ].		^ self receiver at: (self argumentAt: 1)
+CInterpreter >> primitiveStringAt
+	self numberOfArguments = 1
+		ifFalse: [ CPrimitiveFailed signal ].
+		
+	self receiver class classLayout isBytes
+		ifFalse: [ CPrimitiveFailed signal ].
+	
+	((self argumentAt: 1) isKindOf: SmallInteger)
+		ifFalse: [ CPrimitiveFailed signal ].
+	"Bounds check"
+	
+	((self argumentAt: 1) between: 1 and: self receiver size)
+		ifFalse: [ CPrimitiveFailed signal ].
+	
+	^ self receiver at: (self argumentAt: 1)
 ```
 
 
@@ -514,11 +590,14 @@ We define a simple test as follows:
 
 
 ```
-CInterpretable >> atSize	^ #(11 22 33)
+CInterpretable >> atSize
+
+	^ #(11 22 33)
 ```
 
 ```
-CInterpreterTest >> testAtSize	self assert: (self executeSelector: #atSize) equals: 3
+CInterpreterTest >> testAtSize
+	self assert: (self executeSelector: #atSize) equals: 3
 ```
 
 
@@ -526,17 +605,37 @@ Now we implement the primitive that supports the modification of arrays.
 
 
 ```
-CInterpreter >> primitiveAtPut	self numberOfArguments = 2		ifFalse: [ CPrimitiveFailed signal ].	self receiver class classLayout isVariable		ifFalse: [ CPrimitiveFailed signal ].		((self argumentAt: 1) isKindOf: SmallInteger)		ifFalse: [ CPrimitiveFailed signal ].			"Bounds check"	((self argumentAt: 1) between: 1 and: self receiver size)		ifFalse: [ CPrimitiveFailed signal ].			^ self receiver basicAt: (self argumentAt: 1) put: (self argumentAt: 2)
+CInterpreter >> primitiveAtPut
+
+	self numberOfArguments = 2
+		ifFalse: [ CPrimitiveFailed signal ].
+
+	self receiver class classLayout isVariable
+		ifFalse: [ CPrimitiveFailed signal ].
+	
+	((self argumentAt: 1) isKindOf: SmallInteger)
+		ifFalse: [ CPrimitiveFailed signal ].
+		
+	"Bounds check"
+	((self argumentAt: 1) between: 1 and: self receiver size)
+		ifFalse: [ CPrimitiveFailed signal ].
+		
+	^ self receiver basicAt: (self argumentAt: 1) put: (self argumentAt: 2)
 ```
 
 We test it as follows:
 
 ```
-CInterpretable >> atPut	| ar |	ar := #(11 22 33).	ar at: 2 put: 44.	^ ar
+CInterpretable >> atPut
+	| ar |
+	ar := #(11 22 33).
+	ar at: 2 put: 44.
+	^ ar
 ```
 
 ```
-CInterpreterTest >> testAtPut	self assert: (self executeSelector: #atPut) equals: #(11 44 33)
+CInterpreterTest >> testAtPut
+	self assert: (self executeSelector: #atPut) equals: #(11 44 33)
 ```
 
 
@@ -575,13 +674,23 @@ We test it as follows:
 
 
 ```
-CInterpretable >> newPoint	^ Point basicNew  
+CInterpretable >> newPoint
+
+	^ Point basicNew  
 ```
 
 Here we make sure that the Pharo Point class is accessible in the global scope of the interpreter.
 
 ```
-CInterpreterTest >> testPointNew		| p |	self interpreter globalEnvironmentAt: #Point put: Point.	p := (self executeSelector: #newPoint).	self		assert: p class 		equals: Point.	 
+CInterpreterTest >> testPointNew
+	
+	| p |
+	self interpreter globalEnvironmentAt: #Point put: Point.
+	p := (self executeSelector: #newPoint).
+	self
+		assert: p class 
+		equals: Point.
+	 
 ```
 
 For `basicNew:` we follow the same approach as before. We validate that the class is a class supporting variable number of instance variables.
@@ -606,10 +715,21 @@ The following test verifies that the primitive is working. We also expose Array 
 
 
 ```
-CInterpreterTest >> testArrayNew		| p |	self interpreter globalEnvironmentAt: #Array put: Array.	p := (self executeSelector: #newArray).	self		assert: p class 		equals: Array.	self assert: p size equals: 4```	 
+CInterpreterTest >> testArrayNew
+	
+	| p |
+	self interpreter globalEnvironmentAt: #Array put: Array.
+	p := (self executeSelector: #newArray).
+	self
+		assert: p class 
+		equals: Array.
+	self assert: p size equals: 4
+```	 
 
 ```
-CInterpretable >> newArray	^ Array basicNew: 4  
+CInterpretable >> newArray
+
+	^ Array basicNew: 4  
 ```
 
 
