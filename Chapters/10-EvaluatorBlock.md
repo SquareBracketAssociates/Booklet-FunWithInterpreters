@@ -1,9 +1,16 @@
 ## Block Closures and Control Flow Statements
 
 
-In this chapter we will extend our evaluator to manage block closures.
-Block closures, also named lexical closures, or just blocks in Pharo, are an important concept in most modern programming languages, including Pharo. 
-A lexical closure is an anonymous functions that captures its definition environment. 
+In this chapter we will extend our evaluator to manage block closures. Block closures, also named lexical closures, or just blocks in Pharo, are an important concept in most modern programming languages, including Pharo. A lexical closure is an anonymous function that captures its definition environment.
+
+This chapter starts by explaining what blocks are and how they are evaluated.
+Block evaluation, being a core part of the language definition, is a service that is requested to the evaluator/interpreter through a primitive.
+We then dive into the lexical capture feature of blocks: when a block closure is created, it captures its defining context, namely its enclosing context (i.e., the visible variables that the block can see). This makes blocks able to read and write not only its own temporary variables but also all the variables accessible to its enclosing context and to maintain such a link even when passed around.
+Finally, we implement non-local returns: return instructions that return to the block _definition context_ instead of the current one. 
+Non-local returns are really important in Pharo since they are used to express early returns (the fact that the execution of a method can be stopped at a given point) a frequent language feature similar to `break` statements in other languages.
+Without non-local return it would difficult to quit the current execution.
+
+### Closures
 
 Closures allow developers to abstract general algorithms from their particular details. For example, a sorting algorithm can be separated from its sorting criteria by making the sorting criteria a block closure passed as argument to it. This allows developers to have the sorting algorithm defined and tested in a single place, and being able to reuse it with multiple criterion in different contexts.
 
@@ -12,16 +19,7 @@ Lexical closures are at the center of the Pharo language, because Pharo leverage
 Moreover, Pharo libraries make usage of block closures to define library-specific control flow instructions, such as the `do:` and `select:` messages understood by collections. Pharo developers often use closures in the Domain Specific languages that they design. 
 Developers are also encouraged to define their own control flow statements, to hide implementation details of their libraries from their users.
 
-
-This chapter starts by explaining what blocks are and how they are evaluated.
-Block evaluation, being a core part of the language definition, is a service that is requested to the evaluator/interpreter through a primitive.
-We then dive into the lexical capture feature of blocks: when a block closure is created, it captures its defining context, namely its enclosing context \(i.e., the visible variables that the block can see\). This makes blocks able to read and write not only its own temporary variables but also all the variables accessible to its enclosing context and to maintain such a link even when passed around.
-Finally, we implement non-local returns: return instructions that return to the block _definition context_ instead of the current one. 
-Non-local returns are really important in Pharo since they are used to express early returns \(the fact that the execution of a method can be stopped at a given point\) a frequent language feature similar to `break` statements in other languages.
-Without non-local return it would difficult to quit the current execution.
-
 ### Representing a Block Closure
-
 
 When a block expression is executed `[ 1+2 ]`, the instructions inside the block definition are not executed.
 Instead, a block object is created, containing those instructions.
@@ -29,87 +27,117 @@ The execution of those instructions is delayed until we send the message `value`
 
 This means that from the evaluator point of view, the evaluation of the closure will be different from the evaluation of its execution. Evaluating a block node will return a block object, and the method `value` will require a primitive to request the interpreter the block's execution. This means that we need a way to represent a closure object in our evaluator, and that closure should store the code it is supposed to evaluate later when receiving the `value` message.
 
-Let us define the class `CHBlock` to represent a block.
-It has an instance variable `code` to hold the block's AST, instance of the `RBBlockNode` class.
+Let us define the class `CBlock` to represent a block.
+It has an instance variable `code` to hold the block's AST, instance of the `BlockNode` class.
 Notice that we do not use the existing `BlockClosure` class from Pharo, since this class is tied up with the Pharo bytecode.
+
 For the sake of simplicity, we will not reconciliate bytecode and AST implementations, meaning that we need our own AST-based block implementation.
 
 ```
-Object subclass: #CHBlock
-	instanceVariableNames: 'code'
-	classVariableNames: ''
+Object << #CBlock
+	slots: { #code };
 	package: 'Champollion-Core'
 ```
 
-
 ```
-CHBlock >> code: aRBBlockNode [
-	code := aRBBlockNode
-]
+CBlock >> code: aBlockNode 
+	code := aBlockNode
 ```
 
 
 ```
-CHBlock >> code [
+CBlock >> code
 	^ code
-]
 ```
 
 
-!!note did we explain before that a method with no return returns self? I think we did not, we should add it! :\)
-
-### Blocks Return their last Expression
 
 
 
-
-Differently from the execution of a method that implicitly returns `self` when it has no explicit return statement, a block without return statement implicitly returns the result of its last expression. 
-
-Let us write a testing scenario for this case: evaluating the following block should return `5` as it is its last expression. 
-
-```
-CHInterpretable >> returnBlockValue [
-	^ [ 1 . 5 ] value
-]
-```
-
-
-```
-CHInterpreterTest >> testBlockValueIsLastStatementValue [
-	self assert: (self executeSelector: #returnBlockValue) equals: 5
-]
-```
+#### Block Definition
 
 
 When the interpreter encounters a block node, it creates a block object for it.
 We define the method `visitBlockNode:` as follows: 
 
 ```
-CHInterpreter >> visitBlockNode: aRBBlockNode [
-	^ CHBlock new
-		code: aRBBlockNode;
+CInterpreter >> visitBlockNode: aBlockNode 
+	^ CBlock new
+		code: aBlockNode;
 		yourself
-]
+```
+
+We add a simple test to verify the correct definition of block objects.
+
+
+```
+CInterperter >> testBlockDefinition
+
+	| bk |
+	bk := (self executeSelector: #returnBlock).
+	self 
+		assert: bk class 
+		equals: CBlock.
+		
+	self 
+		assert: bk code class 
+		equals: RBBlockNode 
+```
+
+```
+CInterpretable >> returnBlock
+	^ [ 1 . 5 ]
+```
+
+### Block Execution
+
+### Blocks Return their last Expression
+
+In Pharo, when a method does not have a return statement, it returns self. 
+The compiler basically adds it during its compilation.
+
+Differently from the execution of a method that implicitly returns `self` when it has no explicit return statement, a block without return statement implicitly returns the result of its last expression. 
+
+Let us write a testing scenario for this case: evaluating the following block should return `5` as it is its last expression. 
+
+```
+CInterpretable >> returnBlockValue
+	^ [ 1 . 5 ] value
+```
+
+
+```
+CInterpreterTest >> testBlockValueIsLastStatementValue
+	self assert: (self executeSelector: #returnBlockValue) equals: 5
 ```
 
 
 Closures are executed when they receive the message `value` or one of its variants such as value `value:`, `value:value:`...
-On the reception of such messages, their bodies should be executed.
-
-% Pharo does not define a way to request the execution of the block's body, unless we relied on our same interpreter.
-% However, since we still want this to be an implementation detail, we will define method evaluation as in normal Pharo, with primitive id ==201==.
-% SD: two previous last sentence are unclear 
-
-We follow the design of Pharo and we add a new primitive responsible for the block body execution. 
-We define the method `value` on the class `CHBlock` as a primitive number 201. 
+On the reception of such messages, their bodies should be executed. Theses messages are defined in Pharo as primitives as shown in the following: 
 
 ```
-CHBlock >> value [
-	<primitive: 201>
-  "If the fallback code executes it means that block evaluation failed.
-  Return nil for now in such case."
-  ^ nil
-]
+BlockClosure >> value
+	"Activate the receiver, creating a closure activation (MethodContext)
+	whose closure is the receiver and whose caller is the sender of this
+	message. Supply the copied values to the activation as its copied
+	temps. Primitive. Essential."
+	<primitive: 207>
+	numArgs ~= 0 ifTrue:
+		[self numArgsError: 0].
+	^self primitiveFailed
+```
+
+
+
+We follow the design of Pharo and we add a new primitive responsible for the block body execution. 
+We define the method `value` on the class `CBlock` as a primitive number 207. 
+
+```
+CBlock >> value
+	<primitive: 207>
+	"If the fallback code executes it means that block evaluation failed.
+	Return nil for now in such case."
+	^ nil
 ```
 
 
@@ -119,20 +147,22 @@ Remember that primitives are executed in their own frame already, so the block's
 created for the primitive method.
 
 ```
-CHInterpreter >> initializePrimitiveTable [
+CInterpreter >> initializePrimitiveTable
   ...
   primitives at: 201 put: #primitiveBlockValue.
   ...
-]
 
-CHInterpreter >> primitiveBlockValue [
+CInterpreter >> primitiveBlockValue
 	^ self visitNode: self receiver code body
-]
 ```
 
 
 So far we implemented only a simple version of closures. 
 We will extend it in the following sections. 
+
+
+
+
 
 ### Closure temporaries
 

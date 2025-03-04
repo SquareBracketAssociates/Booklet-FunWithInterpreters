@@ -468,9 +468,9 @@ CInterpreter >> primitiveSmallIntegerLessThan
 ```
 
 Following the definition of `primitiveSmallIntegerLessThan`, implement the following primitives
-`primitiveSmallIntegerGreaterThan`,
-`primitiveSmallIntegerLessOrEqualsThan`, and 
-`primitiveSmallIntegerGreaterOrEqualsThan`.
+- `primitiveSmallIntegerGreaterThan`,
+- `primitiveSmallIntegerLessOrEqualsThan`, and 
+- `primitiveSmallIntegerGreaterOrEqualsThan`.
 
 
 
@@ -524,7 +524,8 @@ CInterpreter >> primitiveAt
 	((self argumentAt: 1) between: 1 and: self receiver size)
 		ifFalse: [ CPrimitiveFailed signal ].
 		
-	^ self receiver basicAt: (self argumentAt: 1)```
+	^ self receiver basicAt: (self argumentAt: 1)
+```
 
 Here is a simple test verifying that the implementation is correct.
 
