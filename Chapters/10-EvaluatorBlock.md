@@ -91,12 +91,10 @@ CInterpretable >> returnBlock
 
 ### Block Execution
 
-### Blocks Return their last Expression
-
-In Pharo, when a method does not have a return statement, it returns self. 
+In Pharo, when a method does not have a return statement, it returns `self`. 
 The compiler basically adds it during its compilation.
 
-Differently from the execution of a method that implicitly returns `self` when it has no explicit return statement, a block without return statement implicitly returns the result of its last expression. 
+This is different for a block:  a block without return statement implicitly returns the result of its last expression. 
 
 Let us write a testing scenario for this case: evaluating the following block should return `5` as it is its last expression. 
 
@@ -128,8 +126,12 @@ BlockClosure >> value
 ```
 
 
+### Block Execution Implementation
 
 We follow the design of Pharo and we add a new primitive responsible for the block body execution. 
+For this we define a method value on the CBlock and tag it as a primitive. Then we declare a new primitive
+in the interpreter table and finally we define a first version of the primitive corresponding to the value execution. 
+
 We define the method `value` on the class `CBlock` as a primitive number 207. 
 
 ```
@@ -149,7 +151,7 @@ created for the primitive method.
 ```
 CInterpreter >> initializePrimitiveTable
   ...
-  primitives at: 201 put: #primitiveBlockValue.
+  primitives at: 207 put: #primitiveBlockValue.
   ...
 
 CInterpreter >> primitiveBlockValue
@@ -166,12 +168,11 @@ We will extend it in the following sections.
 
 ### Closure temporaries
 
-
 Our simplified closure implementation does not yet have support for closure temporaries.
 Indeed, a closure such as the following will fail with an interpreter failure because `temp` is not defined in the frame.
 
 ```
-  [ | temp | temp ] value
+[ | temp | temp ] value
 ```
 
 
@@ -179,49 +180,54 @@ To solve this we need to declare all block temporaries when activating the block
 As a first attempt to make our test green, let's declare block temporaries once the block is activated:
 
 ```
-CHInterpreter >> primitiveBlockValue [
+CInterpreter >> primitiveBlockValue
 	"Initialize all temporaries to nil"
-	aSequenceNode temporaryNames do: [ :e | self tempAt: e put: nil ].
-	^ self visitNode: self receiver code body
-]
+	| blockCode |
+	blockCode := self receiver code.
+	blockCode temporaryNames do: [ :e | self tempAt: e put: nil ].
+	^ self visitNode: blockCode body
 ```
 
 
 We are now able to execute the following expression
 
 ```
-	[ | a b |
-		a := 1.
-		b := 2.
-		a + b ] value
+[ | a b |
+	a := 1.
+	b := 2.
+	a + b ] value
 ```
 
+Let us define the following test:
 
+```
+CInterpretable >> returnBlockWithVariableValue	^ [ | a b |		a := 1.		b := 2.		a + b ] value
+```
+
+```
+CInterpreterTest >> testBlockValueWithTemporariesValue	self 
+		assert: (self executeSelector: #returnBlockWithVariableValue) 
+		equals: 3
+```
 
 
 ### Removing Logic Repetition
 
 
-The handling of temporaries in `primitiveBlockValue` is very similary to a sequence of messages we wrote when activating a normal method in method `executeMethod:withReceiver:andArguments:` below:
+The handling of temporaries in `primitiveBlockValue` is very similary to a sequence of messages we wrote when activating a normal method in method `execute:withReceiver:andArguments:`. In particular in the `manageArgumentsTemps:of:`.
 
 ```
-CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection [
-	| result |
-	self pushNewFrame.
-	self tempAt: #self put: anObject.
-	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ].
-	anAST temporaryNames do: [ :tempName | self tempAt: tempName name put: nil ].
-	result := self visitNode: anAST body.
-	self popFrame.
-	^ result
-]
+CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection	| result |	self pushNewMethodFrame.	self topFrame parentScope: (CInstanceScope new			 receiver: anObject;			 parentScope: globalScope;			 yourself).	self tempAt: #___method put: anAST.	self topFrame receiver: anObject.	self manageArgumentsTemps: aCollection of: anAST.	result := self visitNode: anAST.	self popFrame.	^ result
 ```
 
+```
+CInterpreter >>manageArgumentsTemps: aCollection of: anAST	anAST arguments		with: aCollection		do: [ :arg :value | self tempAt: arg name put: value ].	anAST temporaryNames do: [ :tempName |		self tempAt: tempName put: nil ]
+```
 
 We solve this repetition by moving temporary initialization to the `visitSequenceNode:` method, since both method nodes and block nodes have sequence nodes inside them.
 
 ```
-CHInterpreter >> visitSequenceNode: aSequenceNode [
+CInterpreter >> visitSequenceNode: aSequenceNode
 	"Initialize all temporaries to nil"
 
 	aSequenceNode temporaryNames do: [ :e | self tempAt: e put: nil ].
@@ -231,28 +237,19 @@ CHInterpreter >> visitSequenceNode: aSequenceNode [
 		do: [ :each | self visitNode: each ].
 	"Return the result of visiting the last statement"
 	^ self visitNode: aSequenceNode statements last
-]
 ```
 
+We then rewrite `primitiveBlockValue` as follows:
 
 ```
-CHInterpreter >> primitiveBlockValue [
+CInterpreter >> primitiveBlockValue
 	^ self visitNode: self receiver code body
-]
 ```
 
+We remove the temporary management from `manageArgumentsTemps:of:` and rename it. 
 ```
-CHInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection [
-	| result |
-	self pushNewFrame.
-	self tempAt: #self put: anObject.
-	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ].
-	result := self visitNode: anAST body.
-	self popFrame.
-	^ result
-]
+CInterpreter >>manageArguments: aCollection of: anAST	anAST arguments		with: aCollection		do: [ :arg :value | self tempAt: arg name put: value ].
 ```
-
 
 The resulting code is nicer and simpler. This is a clear identication that the refactoring was a good move.
 
