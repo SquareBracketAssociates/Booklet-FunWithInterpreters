@@ -201,11 +201,17 @@ We are now able to execute the following expression
 Let us define the following test:
 
 ```
-CInterpretable >> returnBlockWithVariableValue	^ [ | a b |		a := 1.		b := 2.		a + b ] value
+CInterpretable >> returnBlockWithVariableValue
+
+	^ [ | a b |
+		a := 1.
+		b := 2.
+		a + b ] value
 ```
 
 ```
-CInterpreterTest >> testBlockValueWithTemporariesValue	self 
+CInterpreterTest >> testBlockValueWithTemporariesValue
+	self 
 		assert: (self executeSelector: #returnBlockWithVariableValue) 
 		equals: 3
 ```
@@ -217,11 +223,30 @@ CInterpreterTest >> testBlockValueWithTemporariesValue	self
 The handling of temporaries in `primitiveBlockValue` is very similary to a sequence of messages we wrote when activating a normal method in method `execute:withReceiver:andArguments:`. In particular in the `manageArgumentsTemps:of:`.
 
 ```
-CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection	| result |	self pushNewMethodFrame.	self topFrame parentScope: (CInstanceScope new			 receiver: anObject;			 parentScope: globalScope;			 yourself).	self tempAt: #___method put: anAST.	self topFrame receiver: anObject.	self manageArgumentsTemps: aCollection of: anAST.	result := self visitNode: anAST.	self popFrame.	^ result
+CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
+
+	| result |
+	self pushNewMethodFrame.
+	self topFrame parentScope: (CInstanceScope new
+			 receiver: anObject;
+			 parentScope: globalScope;
+			 yourself).
+	self tempAt: #___method put: anAST.
+	self topFrame receiver: anObject.
+	self manageArgumentsTemps: aCollection of: anAST.
+	result := self visitNode: anAST.
+	self popFrame.
+	^ result
 ```
 
 ```
-CInterpreter >>manageArgumentsTemps: aCollection of: anAST	anAST arguments		with: aCollection		do: [ :arg :value | self tempAt: arg name put: value ].	anAST temporaryNames do: [ :tempName |		self tempAt: tempName put: nil ]
+CInterpreter >>manageArgumentsTemps: aCollection of: anAST
+
+	anAST arguments
+		with: aCollection
+		do: [ :arg :value | self tempAt: arg name put: value ].
+	anAST temporaryNames do: [ :tempName |
+		self tempAt: tempName put: nil ]
 ```
 
 We solve this repetition by moving temporary initialization to the `visitSequenceNode:` method, since both method nodes and block nodes have sequence nodes inside them.
@@ -248,7 +273,11 @@ CInterpreter >> primitiveBlockValue
 
 We remove the temporary management from `manageArgumentsTemps:of:` and rename it. 
 ```
-CInterpreter >>manageArguments: aCollection of: anAST	anAST arguments		with: aCollection		do: [ :arg :value | self tempAt: arg name put: value ].
+CInterpreter >>manageArguments: aCollection of: anAST
+
+	anAST arguments
+		with: aCollection
+		do: [ :arg :value | self tempAt: arg name put: value ].
 ```
 
 The resulting code is nicer and simpler. This is a clear identication that the refactoring was a good move.
@@ -257,7 +286,7 @@ The resulting code is nicer and simpler. This is a clear identication that the r
 ### Capturing the Defining Context
 
 
-As we stated before, a closure is not just a function, it is a function that captures the context \(set of variables that can be accessible\) of its definition.  Block closures capture their _defining_ context or enclosing context, i.e., the context in which they are created.
+As we stated before, a closure is not just a function, it is a function that captures the context (set of variables that can be accessible) of its definition.  Block closures capture their _defining_ context or enclosing context, i.e., the context in which they are created.
 Blocks are able to read and write their own temporary variables, but also all the variables accessible to its enclosing context such as a temporary variable accessible during the block definition. 
 
 In this section we evolve our closure execution infrastructure to support closure temporaries and to provide access to the enclosing environment.
@@ -273,32 +302,28 @@ Indeed, the expression `[ ... ] value` is a message send where the block is the 
 However, the `self` variable should be bound to the instance of `CHInterpretable`.
 
 ```
-CHInterpretable >> readSelfInBlock [
+CInterpretable >> readSelfInBlock
 	^ [ self ] value
-]
 
-CHInterpreterTest >> testReadSelfInBlock [
+CInterpreterTest >> testReadSelfInBlock
 	self assert: (self executeSelector: #readSelfInBlock) equals: receiver
-]
 ```
-
 
 To make this test pass, we need to implement two different things in the evaluator.
 - First we need to capture the defining context at block _definition_ time in `visitBlockNode:`. 
 - Second we need to use _that_ captured context to resolve variables.
 
+### Capture Implementation 
 
 Capturing the defining context is as simple as storing the current `topFrame` at the moment of the method creation. 
 
-We extend `CHBlock` with a `definingContext` instance variable and corresponding accessors \(omitted here after\).
+We extend `CBlock` with a `definingContext` instance variable and corresponding accessors (omitted here after).
 
 ```
-Object subclass: #CHBlock
-	instanceVariableNames: 'code definingContext'
-	classVariableNames: ''
-	package: 'Champollion-Core'
+Object << #CBlock
+	slots: { #code . #definingContext };
+	package: 'Champollion'
 ```
-
 
 Since a block is created when the block node is visited we extend the previous block creation to store 
 the current context. 
@@ -306,22 +331,20 @@ Note that this is this context that will be let block access to the temporaries 
 the block is created. 
 
 ```
-CHInterpreter >> visitBlockNode: aRBBlockNode [
-	^ CHBlock new
+CInterpreter >> visitBlockNode: aRBBlockNode
+	^ CBlock new
 		code: aRBBlockNode;
 		definingContext: self topFrame;
 		yourself
-]
 ```
 
 
 
 ### Accessing Captured Receiver
 
-
 Resolving the block variables is a trickier case, as it can be resolved in many different ways.
 For now we choose to set the correct values and override the incorrect ones in the current frame upon block activation.
-SD: unclear to me.
+SD: HERE
 
 This solution will work as far as this primitive does not fail.
 We leave for the reader to think what happens in such a case.
@@ -331,31 +354,29 @@ of the method at the time the block was created.
 The following method is worth explaining
 
 - First we grab the block itself. It is simple since the method `primitiveBlockValue` is executed during the evaluation of the message `value` sent to a block. Therefore `self receiver` returns the block currently executed.
-- Second remmeber that self in a block refers to the receiver of the method at the time the block was created. So we need to set as receiver the receiver that we found in the context of the block creation. This is what `theBlock definingContext receiver` is returning.
+- Second remember that self in a block refers to the receiver of the method at the time the block was created. So we need to set as receiver the receiver that we found in the context of the block creation. This is what `theBlock definingContext receiver` is returning.
 - Finally we are evaluating the block body.
 
 
 ```
-CHInterpreter >> primitiveBlockValue [
+CInterpreter >> primitiveBlockValue
 	| theBlock |
 	theBlock := self receiver.
 	self receiver: theBlock definingContext receiver.
 	^ self visitNode: theBlock code body
-]
 ```
 
 
 
 ```
-CHInterpreter >> receiver: aValue [
+CInterpreter >> receiver: aValue
 	^ self tempAt: #self put: aValue
-]
 ```
 
 
 Note that in the `primitiveBlockValue` we use the frame of message `value` execution. 
 The evaluation of the block body uses this frame. When the evaluation is done such frame is simply 
-pop as any other method evaluations \(See `executeMethod:withReceiver:andArguments:`\), therefore
+pop as any other method evaluations (See `executeMethod:withReceiver:andArguments:`), therefore
 there is no worries to be made when we changed the value of receiver. 
 `receiver` is not a state of the interpreter but refer to the current frame. 
 
