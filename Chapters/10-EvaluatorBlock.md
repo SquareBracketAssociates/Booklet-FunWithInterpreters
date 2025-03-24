@@ -166,7 +166,7 @@ We will extend it in the following sections.
 
 
 
-### Closure temporaries
+### Closure Temporaries
 
 Our simplified closure implementation does not yet have support for closure temporaries.
 Indeed, a closure such as the following will fail with an interpreter failure because `temp` is not defined in the frame.
@@ -220,23 +220,19 @@ CInterpreterTest >> testBlockValueWithTemporariesValue
 ### Removing Logic Repetition
 
 
-The handling of temporaries in `primitiveBlockValue` is very similary to a sequence of messages we wrote when activating a normal method in method `execute:withReceiver:andArguments:`. In particular in the `manageArgumentsTemps:of:`.
+The handling of temporaries in `primitiveBlockValue` is very similary to a sequence of messages we wrote when activating a normal method in method `execute:withReceiver:andArguments:`. In particular in the `manageArgumentsTemps:of:` method.
+
+```
+CInterpreter >> primitiveBlockValue	"Receiver is an instance of CBlock"		| blockCode |	blockCode := self receiver.	blockCode code temporaryNames do: [ :e | self tempAt: e put: nil ].	self receiver: blockCode definingContext receiver.	^ self visitNode: blockCode code body
+```
+
 
 ```
 CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 
-	| result |
-	self pushNewMethodFrame.
-	self topFrame parentScope: (CInstanceScope new
-			 receiver: anObject;
-			 parentScope: globalScope;
-			 yourself).
-	self tempAt: #___method put: anAST.
-	self topFrame receiver: anObject.
+	...
 	self manageArgumentsTemps: aCollection of: anAST.
-	result := self visitNode: anAST.
-	self popFrame.
-	^ result
+	...
 ```
 
 ```
@@ -280,21 +276,24 @@ CInterpreter >>manageArguments: aCollection of: anAST
 		do: [ :arg :value | self tempAt: arg name put: value ].
 ```
 
-The resulting code is nicer and simpler. This is a clear identication that the refactoring was a good move.
+The resulting code is nicer and simpler. This is a clear indication that the refactoring was a good move.
 
 
 ### Capturing the Defining Context
 
+Stef Here
 
-As we stated before, a closure is not just a function, it is a function that captures the context (set of variables that can be accessible) of its definition.  Block closures capture their _defining_ context or enclosing context, i.e., the context in which they are created.
-Blocks are able to read and write their own temporary variables, but also all the variables accessible to its enclosing context such as a temporary variable accessible during the block definition. 
+As we stated before, a closure is not just a function, it is a function that captures the context (set of variables that it can access) at the time of its definition. Block closures capture their _defining_ context or enclosing context, i.e., the context in which they are created.
+Blocks are able to read and write their own temporary variables, but also all the variables accessible to its enclosing context such as a temporary variable accessible during the block definition. In this section, we evolve our closure execution infrastructure to support closure temporaries and to provide access to the enclosing environment.
 
-In this section we evolve our closure execution infrastructure to support closure temporaries and to provide access to the enclosing environment.
+The defining execution context gives the closure access to that context's receiver, arguments, and temporaries.
 
-The defining execution context gives the closure access to that context's receiver, arguments and temporaries.
-Moreover, it is a fairly common mistake to think that the captured context is the caller context, and not the defining context.
-This is the case, in the example above, where the context where the block closure is defined is both the defined and the caller. 
+Pay attention, it is a common mistake to think that the captured context is the caller context, and not the defining context.
+In the example above the distinction is not done because the definition context was the caller one. 
 However, as soon as we work on more complex scenarios, where blocks are sent as arguments of methods, or stored in temporary variables, this does not hold anymore.
+
+
+### self Capture
 
 A first scenario to check that our block properly captures the defining context is to evaluate `self` inside a block.
 In our current design, the receiver specified in the block's frame is the block itself.
@@ -326,8 +325,8 @@ Object << #CBlock
 ```
 
 Since a block is created when the block node is visited we extend the previous block creation to store 
-the current context. 
-Note that this is this context that will be let block access to the temporaries and arguments is use at the moment 
+the current context at this moment.
+Note that this is this context that will be let block access to the temporaries and arguments it uses at the moment 
 the block is created. 
 
 ```
@@ -338,24 +337,19 @@ CInterpreter >> visitBlockNode: aRBBlockNode
 		yourself
 ```
 
-
-
 ### Accessing Captured Receiver
 
 Resolving the block variables is a trickier case, as it can be resolved in many different ways.
-For now we choose to set the correct values and override the incorrect ones in the current frame upon block activation.
-SD: HERE
-
-This solution will work as far as this primitive does not fail.
-We leave for the reader to think what happens in such a case.
+For now, we choose to set the correct values in the current frame upon block activation and shadow the possible ones that would be defined in the definition context.
 
 The first variable we want to provide access to from a block is `self` which is the original receiver
-of the method at the time the block was created. 
+of the method _at the time the block was created_. 
+
 The following method is worth explaining
 
 - First we grab the block itself. It is simple since the method `primitiveBlockValue` is executed during the evaluation of the message `value` sent to a block. Therefore `self receiver` returns the block currently executed.
-- Second remember that self in a block refers to the receiver of the method at the time the block was created. So we need to set as receiver the receiver that we found in the context of the block creation. This is what `theBlock definingContext receiver` is returning.
-- Finally we are evaluating the block body.
+- Second remember that `self` in a block refers to the receiver of the method at the time the block was created. So we need to set as receiver the receiver that we found in the context of the block creation. This is what `theBlock definingContext receiver` is returning.
+- Finally we evaluate the block body.
 
 
 ```
@@ -366,8 +360,6 @@ CInterpreter >> primitiveBlockValue
 	^ self visitNode: theBlock code body
 ```
 
-
-
 ```
 CInterpreter >> receiver: aValue
 	^ self tempAt: #self put: aValue
@@ -376,15 +368,14 @@ CInterpreter >> receiver: aValue
 
 Note that in the `primitiveBlockValue` we use the frame of message `value` execution. 
 The evaluation of the block body uses this frame. When the evaluation is done such frame is simply 
-pop as any other method evaluations (See `executeMethod:withReceiver:andArguments:`), therefore
-there is no worries to be made when we changed the value of receiver. 
-`receiver` is not a state of the interpreter but refer to the current frame. 
-
-
-
+popped as any other method executions (See `executeMethod:withReceiver:andArguments:`), therefore
+there are no worries to be made when we change the value of receiver. 
+`receiver` is not a state of the interpreter but refers to the current frame. 
 
 Now that we can correctly resolve the receiver, instance variable reads and writes should work properly too.
-We leave as an exercise for the reader to verify their correctness.
+We leave it as an exercise for the reader to verify their correctness.
+
+
 
 ### Looking up Temporaries in Lexical Contexts
 
