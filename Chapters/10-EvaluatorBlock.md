@@ -609,3 +609,9 @@ CHInterpreter >> visitReturnNode: aReturnNode [
 
 
 In this chapter we have extended our evaluator with block closures. Our block closure implementation required adding a kind of object to our runtime, `CHBlock`, to represent blocks containing some AST. Then we refined our evaluator to define a block evaluation primitive, and correctly set up the lexical context. Our lexical context implementation gives blocks access to the defining context's receiver and temporaries. We then shown a first implementation of non-local returns, using exceptions to unwind the stack.
+
+
+
+## Todo 
+
+- make sure that methodScope does not have a separate field for receiver but use the frame in previous chapter.
