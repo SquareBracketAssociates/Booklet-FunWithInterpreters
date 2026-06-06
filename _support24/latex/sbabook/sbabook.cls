@@ -55,11 +55,13 @@
 %%%
 %%% Fonts & paragraph typography
 %%%
-\RequirePackage{fontspec,opensans,FiraMono}
+\RequirePackage{fontspec,gentiumbook,opensans,FiraMono}
 
-\setmainfont{GentiumBook}
+\setmainfont{Gentium Book Plus}
 \setsansfont{Open Sans}[
-  sBoldFont = {* Bold},
+  \@ifpackagelater{opensans}{2019/06/19}% test for font naming bug
+    {}% 2019/06/20 fixed it
+    {BoldFont = {* Bold},}
   Scale=MatchLowercase,
   Numbers=OldStyle
 ]
@@ -369,7 +371,7 @@
     listing only,
     listing options = {
       style = sbabook,
-      basicstyle = \small\codefamily,
+      basicstyle = \footnotesize\codefamily,
       language = {#1}
     },
     breakable,

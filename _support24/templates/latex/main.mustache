@@ -95,10 +95,10 @@ Layout and typography based on the \textcode{sbabook} \LaTeX{} class by Damien P
 
 «& content»
 
-% Index would go here
-\bibliographystyle{abbrv}
-\bibliography{«& bibFile»}
-
+% lulu requires an empty page at the end. That's why I'm using
+% \backmatter here.
 \backmatter
+
+% Index would go here
 
 \end{document}
