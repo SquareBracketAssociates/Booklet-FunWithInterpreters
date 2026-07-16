@@ -120,7 +120,11 @@ SD: currentScope is not connected to the stack and this is strange.
 Because it is defined as. 
 
 ```
-currentScope	^ CInstanceScope new		receiver: self receiver;		parentScope: globalScope;		yourself
+currentScope
+	^ CInstanceScope new
+		receiver: self receiver;
+		parentScope: globalScope;
+		yourself
 ```
 
 Note that we will have to improve the situation because the method `currentScope` (which is creating an instance scope) is not connected with the frame and this will be a problem. 

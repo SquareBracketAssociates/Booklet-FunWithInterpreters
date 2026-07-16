@@ -331,7 +331,7 @@ CInterpreterTest >> testReturnGlobal
 ```
 
 
-We introduce a new global scope class `CGlobalScope`,A globalDictionary is basically a dictionary.
+We introduce a new global scope class `CGlobalScope`: a globalDictionary is basically a dictionary.
 
 ```
 Object << #CGlobalScope
