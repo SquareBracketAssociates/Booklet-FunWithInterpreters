@@ -1,8 +1,6 @@
 ## Code Representation with Abstract Syntax Trees
 @cha:ast
 
-To execute actual code on top of our ObjVlisp kernel, we need code to execute.
-And since ObjVlisp does not force a way to represent code, we need to choose one oneselves.
 
 Probably the simplest way to represent code we can think about are strings.
 That is actually what we write in editors: strings.
@@ -12,7 +10,7 @@ However, in this book we are not interested in getting into the problems of pars
 We will use an already existing parser and we will borrow a syntax to not define our own: Pharo's parser and Pharo's syntax.
 
 Now that we have decided what syntax we will have at the surface of our language, we need to choose a data structure to represent our code.
-One fancy way to represent code is using abstract syntax trees, or in short, ASTs.
+One common way to represent code is using abstract syntax trees, or in short, ASTs.
 An abstract syntax tree is a tree data structure that represents a program from the syntax point of view.
 In other words, each node in the tree represents an element that is written in a program such as variables, assignments, strings, and message sends.
 To illustrate it, consider the piece of Pharo code below that assigns into a variable named `variable` the result of sending the `,` message to a `'constant'` string, with `self message` as argument.
@@ -374,12 +372,12 @@ methodNode selector
 
 ### Sequence Nodes
 
-
-Method nodes have a body, represented as an `ASTSequenceNode`.
+Method nodes have a body, represented as an `OCSequenceNode`.
 A sequence node is a sequence of instructions or statements.
 All expressions are statements, including all nodes we have already seen such as literals, variables, arrays, assignments and message sends.
 We will introduce later two more kinds of nodes that can be included as part of a sequence node: block nodes and return nodes.
 Block nodes are expressions that are syntactically and thus structurally similar to methods.
+
 Return nodes, representing the return instruction `^`, are statement nodes but not expression nodes, i.e., they can only be children of sequence nodes.
 
 If we take the previous example, we can access the sequence node body of our method with the `body` message.
@@ -430,7 +428,7 @@ methodNode body temporaries.
 ### Return Nodes
 
 AST return nodes represent the instructions that are syntactically identified by the caret character `^`.
-Return nodes, instances of `ASTReturnNode` are not expression nodes, i.e., they can only be found as a direct child of sequence nodes.
+Return nodes, instances of `OCReturnNode` are not expression nodes, i.e., they can only be found as a direct child of sequence nodes.
 Return nodes represent the fact of returning a value, and that value is an expression, which is accessible through the `value` message.
 
 ```language=smalltalk
@@ -464,7 +462,7 @@ x := ^ 5
 ```
 
 
-#### Block Nodes
+### Block Nodes
 
 
 Block nodes represent block closure expressions.
@@ -501,15 +499,15 @@ In the next chapter, we will see how the visitor pattern in conjunction with AST
 
 #### AST Iteration
 
-
 ASTs are indeed trees, and we can traverse them as any other tree.
 ASTs provide several protocols for accessing and iterating any AST node in a generic way.
+Here is a couple of common expressions: 
 
-- `aNode children`: returns a collection with the direct children of the node.
-- `aNode allChildren`: returns a collection with all recursive children found from the node.
-- `aNode nodesDo: aBlock`: iterates over all children and apply `aBlock` on each of them.
-- `aNode parent`: returns the direct parent of the node.
-- `aNode methodNode`: returns the method node that is the root of the tree. For consistency, expression nodes parsed using `parseExpression:` are contained within a method node too.
+- `aNode children`. It returns a collection with the direct children of the node.
+- `aNode allChildren`. It returns a collection with all recursive children found from the node.
+- `aNode nodesDo: aBlock`. It iterates over all children and apply `aBlock` on each of them.
+- `aNode parent`. It returns the direct parent of the node.
+- `aNode methodNode`. It returns the method node that is the root of the tree. For consistency, expression nodes parsed using `parseExpression:` are contained within a method node too.
 
 
 #### Property Store
@@ -518,15 +516,14 @@ Some manipulations require storing meta-data associated to AST nodes.
 Pharo ASTs provide a set of messages for storing arbitrary properties inside a node.
 Properties stored in a node are indexed by a key, following the API of Pharo dictionaries.
 
-- `aNode propertyAt: aKey put: anObject`: inserts `anObject` at `aKey`, overriding existing values at `aKey`.
-- `aNode hasProperty: aKey`: returns a boolean indicating if the node contains a property indexed by `aKey`.
-- `aNode propertyAt: aKey`: returns the value associated with `aKey`. If `aKey` is not found, fails with an exception.
-- `aNode propertyAt: aKey ifAbsent: aBlock`: returns the value associated with `aKey`. If `aKey` is not found, evaluate the block and return its value.
-- `aNode propertyAt: aKey ifAbsentPut: aBlock`: returns the value associated with `aKey`. If `aKey` is not found, evaluate the block, insert the value of the block at `aKey`, and return the value.
-- `aNode propertyAt: aKey ifPresent: aPresentBlock ifAbsent: anAbsentBlock`: Searches for the value associated with `aKey`. If `aKey` is found, evaluate `aPresentBlock` with its value. If `aKey` is not found, evaluate the block and return its value.
-- `aNode removeProperty: aKey`: removes the property at `aKey`. If `aKey` is not found, fails with an exception.
-- `aNode removeProperty: aKey ifAbsent: aBlock`: removes the property at `aKey`. If `aKey` is not found, evaluate the block, and return its value.
-
+- `aNode propertyAt: aKey put: anObject`. It inserts `anObject` at `aKey`, overriding existing values at `aKey`.
+- `aNode hasProperty: aKey`. It returns a boolean indicating if the node contains a property indexed by `aKey`.
+- `aNode propertyAt: aKey`. It returns the value associated with `aKey`. If `aKey` is not found, fails with an exception.
+- `aNode propertyAt: aKey ifAbsent: aBlock`. It returns the value associated with `aKey`. If `aKey` is not found, evaluate the block and return its value.
+- `aNode propertyAt: aKey ifAbsentPut: aBlock`. It returns the value associated with `aKey`. If `aKey` is not found, evaluate the block, insert the value of the block at `aKey`, and return the value.
+- `aNode propertyAt: aKey ifPresent: aPresentBlock ifAbsent: anAbsentBlock`. It searches for the value associated with `aKey`. If `aKey` is found, evaluate `aPresentBlock` with its value. If `aKey` is not found, evaluate the block and return its value.
+- `aNode removeProperty: aKey`. It removes the property at `aKey`. If `aKey` is not found, fails with an exception.
+- `aNode removeProperty: aKey ifAbsent: aBlock`. It removes the property at `aKey`. If `aKey` is not found, evaluate the block, and return its value.
 
 
 #### Testing Methods
