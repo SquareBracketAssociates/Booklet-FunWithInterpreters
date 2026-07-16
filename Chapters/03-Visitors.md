@@ -45,7 +45,7 @@ Now, let's consider the users of the file system library want to extend it with 
 If the users have access to the classes, they may extend them just by adding methods to them.
 When this is not the case, one way to handle such situation is to implement the Visitor **protocol** based on double dispatch: each class implements a generic `acceptVisitor: aVisitor`  method that performs a re-dispatch on the argument giving information about the receiver.
 
-For example, when a `FileNode` receives the `acceptVisitor:` message, it will send the argument the message `visitFileNode:`, identifying itself as a file node.
+For example, when a `FileNode` receives the `acceptVisitor:` message, it will send the argument the message `visitFileNode:`,  identifying itself as a file node.
 
 ```language=smalltalk
 FileNode >> acceptVisitor: aVisitor
@@ -59,7 +59,7 @@ In this way, we can re-implement the size definition we showed previously as a `
 When a size visitor visits a file, it asks the file for its size.
 When it visits a directory, it must iterate the children and sum the sizes.
 However, it cannot directly ask the `size` of the children, because only `FileNode` instances do understand it but directories do not. Because of this, we need to make a recursive call and re-ask the child node to accept the visitor.
-Then each node will again dispath on the size visitor.
+Then each node will again dispacth on the size visitor.
 
 
 ```language=smalltalk

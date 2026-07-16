@@ -1,9 +1,9 @@
-## Implementing an Evaluator
+## Implementing an Interpreter
 @cha:interpreterLiteral
 
-An evaluator is a kind of interpreter that executes a program.  A Pharo evaluator is an interpreter that takes as input a Pharo program and executes each one of its statements, finally returning the result of the execution.
+An Interpreter is a program that executes another program.  An interpreter that returns the value of expressions often called an evaluator. A Pharo evaluator is an interpreter that takes as input a Pharo program and executes each one of its statements, finally returns the result of the execution.
 
-In this chapter and the following ones, we will implement a Pharo evaluator as an AST interpreter, using the Visitor pattern we have seen before, meaning that the input of our evaluator will be AST nodes of a program to evaluate.
+In this chapter and the following ones, we will implement a Pharo evaluator as an AST interpreter, using the Visitor pattern we have seen before, meaning that the input of our evaluator will be AST nodes of a program to evaluate. We name such an interpreter Champollion.
 
 For presentation purposes, we will develop the evaluator in several stages, each in a different chapter.
 First, in this chapter, we will show how to implement a structural evaluator, i.e., an evaluator that reads and writes the structures of objects, starting the presentation from constant values.
@@ -21,7 +21,7 @@ Note that we will write the visitor from scratch but we will reuse the nodes of 
 
 ### Setting Up the Stage
 
-To start writing our Pharo evaluator in TDD style, we will start by creating out test class `CInterpreterTest`.
+To start writing our Pharo evaluator in TDD style, we start by creating out test class `CInterpreterTest`.
 Our class names are prefixed with `C` because we named the package of the interpreter Champollion.
 
 ```
@@ -29,8 +29,7 @@ TestCase << #CInterpreterTest
 	package: 'Champollion-Tests'
 ```
 
-
-This class will, until a change is imperative, host all our test methods.
+This class will host our test methods.
 
 #### Preparing the Scenarios
 
@@ -49,9 +48,8 @@ Object << #CInterpretable
 
 ### Evaluating Literals: Integers
 
-
 Testing our evaluator requires that we test and assert some observable behavior.
-In Pharo there are two main observable behaviors: either side-effects through assignments or results of methods through return statements.
+In Pharo, there are two main observable behaviors: either side-effects through assignments or results of methods through return statements.
 We have chosen to use return statements, to introduce variables and assignments later.
 To start, our first scenario is a method returning an integer, as in the code below:
 
@@ -62,8 +60,7 @@ CInterpretable >> returnInteger
 
 Executing such a method should return an integer with value 5.
 
-### Writing a Red Test
-
+### Writing a Failing Test
 
 Our first test implements what our scenario defined above: executing our method should return 5.
 This first test specifies not only part of the behavior of our interpreter but also helps us in defining the part of its API: we want our interpreter to be able to start executing from some method's AST.
@@ -84,7 +81,6 @@ Instead of invoking the parser to get an AST from source code, we will use Pharo
 
 ### Making the Test Pass: a First Literal Evaluator
 
-
 Executing our first test fails first because our test does not understand `interpreter`, meaning we need to implement a method for it in our test class.
 We implement it as a factory method in our test class, returning a new instance of `CInterpreter`, and we define the class `CInterpreter` as follows.
 
@@ -93,17 +89,18 @@ CInterpreterTest >> interpreter
 	^ CInterpreter new
 ```
 
-
 ```
 Object << #CInterpreter
 	package: 'Champollion'
 ```
 
 
-The class `CInterpreter`  is the main entry point for our evaluator, and it will implement a visitor pattern over the Pharo method ASTs.  Note that it does not inherit from the default Pharo AST Visitor.
-The Pharo AST visitor already implements generic versions of the `visitXXX:` methods that will do nothing instead of failing.
+The class `CInterpreter`  is the main entry point for our evaluator, and it will implement a Visitor pattern over the Pharo method ASTs.  Note that it does not inherit from the default Pharo AST Visitor.
+The Pharo AST Visitor already implements generic versions of the `visitXXX:` methods that will do nothing instead of failing.
 Not inheriting from it allows us to make it clear when something is not yet implemented: we will get problems such as does not understand exceptions that we will be able to implement them step by step in the debugger.
-We, nevertheless, follow the same API as the default AST visitor and we use the nodes' `accept:` visiting methods.
+We, nevertheless, follow the same API as the default AST visitor and we use the nodes' `acceptVisitor:` visiting methods.
+
+#### Call `visitNode:` 
 
 At this point, re-executing the test fails with a new error: our `CInterpreter` instance does not understand the message `execute:`.
 We implement `execute:` to call the visitor main entry point, i.e., the method `visitNode:`.
@@ -112,7 +109,6 @@ We implement `execute:` to call the visitor main entry point, i.e., the method `
 CInterpreter >> execute: anAST
 	^ self visitNode: anAST
 ```
-
 
 ```
 CInterpreter >> visitNode: aNode
@@ -128,6 +124,7 @@ CInterpreter >> visitMethodNode: aMethodNode
 	^ self visitNode: aMethodNode body
 ```
 
+#### Define visitSequenceNode:
 
 Execution then arrives at a missing `visitSequenceNode:`.
 Indeed, the body of a method is a sequence node containing a list of temporary variable definitions and a list of statements.
@@ -144,6 +141,7 @@ CInterpreter >> visitSequenceNode: aSequenceNode
 	^ self visitNode: aSequenceNode statements last
 ```
 
+#### Define `visitReturnNode:`
 
 Then the visitor visits the return node, for which we define the `visitReturnNode:` method.
 This method simply visits the contents of the return node (invoking recursively the visitor) and returns the obtained value.
@@ -154,6 +152,7 @@ CInterpreter >> visitReturnNode: aReturnNode
 	^ self visitNode: aReturnNode value
 ```
 
+#### Define `visitLiteralValueNode:`
 
 Finally, the contents of the return node, the integer `5` is represented as a literal value node.
 To handle this node, we define the method `visitLiteralValueNode:`.
@@ -165,7 +164,7 @@ CInterpreter >> visitLiteralValueNode: aLiteralValueNode
 ```
 
 
-Our first test is now green and we are ready to continue our journey.
+Our first test should pass now and we are ready to continue our journey.
 
 ### Literal Evaluation: Floats
 
@@ -180,7 +179,7 @@ CInterpretable >> returnFloat
 ```
 
 
-Executing such a method should return `3.14`.
+Evaluating such a method should return `3.14`.
 
 ### Writing a Test
 
@@ -197,11 +196,12 @@ CInterpreterTest >> testReturnFloat
 ```
 
 
-Two discussions come from writing this test. First, this test is already green, because the case of floating point constants and integer constants exercise the same code, so nothing is to be done on this side.
-Second, some would argue that this test is somehow repeating code from the previous scenario: we will take care of this during our refactoring step.
+Two discussions come from writing this test. 
+- First, this test is already green, because the case of floating point constants and integer constants exercise the same code, so nothing is to be done on this side.
+- Second, some would argue that this test is somehow repeating code from the previous scenario: we will take care of this during our refactoring step.
 
 
-### Refactor: Improving the Test Infrastructure
+### Refactor: Improve the Test Infrastructure
 
 Since we will write many tests with a similar structure during this book, it comes in handy to share some logic between them. The two tests we wrote so far show a good candidate of logic to share as repeated code we can extract.
 
@@ -234,7 +234,6 @@ CInterpreterTest >> testReturnFloat
 		equals: 3.14
 ```
 
-
 We are ready to write tests for the other constants efficiently.
 
 ### Boolean Evaluation
@@ -253,9 +252,7 @@ We define a test for our boolean scenario.
 
 ```
 CInterpreterTest >> testReturnBoolean
-
 	self deny: (self executeSelector: #returnBoolean)
-
 ```
 
 
@@ -282,7 +279,7 @@ CInterpretable >> returnRecursiveLiteralArray
 
 These two methods should return the respective arrays.
 
-### Writing a Red Test
+### Writing a Failing Test
 
 Writing tests to cover these two scenarios is again straightforward:
 
@@ -297,7 +294,6 @@ CInterpreterTest >> testReturnRecursiveLiteralArray
 		assert: (self executeSelector: #returnRecursiveLiteralArray)
 		equals: #(true 1 #('ahah'))
 ```
-
 
 ### Make the Test Pass: visiting literal array nodes
 
