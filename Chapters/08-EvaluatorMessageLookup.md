@@ -33,7 +33,7 @@ Now the lookup process is conceptually defined as follows:
 1. The lookup starts in the **class** of the **receiver**.
 1. If the method is defined in that class (i.e., if the method is defined in the method dictionary), it is returned.
 1. Otherwise the search continues in the superclass of the currently explored class.
-1. If no method is found and there is no superclass to explore (if we are in the class `Object`), this is an error (i.e., the method is not defined).
+1. If no method is found and there is no superclass to explore (if we are in the class `Object`), this is an error (i.e., the method is not defined) *@fig:LookupNoError@*.
 
 
 ![Looking for a method is a two-step process: first, go to the class of receiver then follow inheritance. % width=58&label=fig:LookupNoError](figures/Ref-LookupNoError.pdf)
@@ -54,7 +54,7 @@ Let us implement method lookup.
 
 ### Method Lookup Scenario
 
-To implement and test the method lookup, we should extend our scenario classes with a class hierarchy.
+To implement and test the method lookup, we should extend our scenario classes with a class hierarchy as shown in Figure *@fighierarchy@*.
 We introduce two superclasses above `CInterpretable`: `CInterpretableRoot` and its subclass `CInterpretableSuperclass`.
 With this setup, we can test all interesting situations, even the ones leading to infinite loops
 if our method lookup is wrongly implemented.
