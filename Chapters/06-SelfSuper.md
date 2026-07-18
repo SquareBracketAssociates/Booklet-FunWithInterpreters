@@ -110,9 +110,9 @@ The parser resolves `self` and `super` nodes statically and creates special node
 In more detail, the compiler performs a pass and enriches the variable node with an instance of the `Variable` hierarchy.
 You can see the differences in the returned trees by comparing the results of  `(Object >> #yourself) parseTree` (See Figure *@figResolved@*) and `OCParser parseMethod: (Object >> #yourself) sourceCode` (See Figure *@figUnresolved@*).
 
-![Inspecting `(Object >> #yourself) parseTree` shows that variables are resolved referring to an instance of the Variable hierarchy.%anchor=figResolved](figures/VarResolved)
+![Inspecting `(Object >> #yourself) parseTree` shows that variables are resolved referring to an instance of the Variable hierarchy.%anchor=figResolved](figures/VarResolved.png)
 
-![Inspecting `OCParser parseMethod: (Object >> #yourself) sourceCode` shows that variables are not resolved.%anchor=figUnresolved](figures/VarUnresolved)
+![Inspecting `OCParser parseMethod: (Object >> #yourself) sourceCode` shows that variables are not resolved.%anchor=figUnresolved](figures/VarUnresolved.png)
 
 ### Introducing `super`
 
