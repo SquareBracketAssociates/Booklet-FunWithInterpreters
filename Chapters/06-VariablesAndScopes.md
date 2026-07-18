@@ -54,7 +54,6 @@ CInterpreterTest >> testReturnInstanceVariableRead
 		equals: 100
 ```
 
-
 Our test is failing so we are ready to make it work.
 
 
@@ -63,10 +62,12 @@ Our test is failing so we are ready to make it work.
 Variables in Pharo are of different kinds: 
 - instance variables represent variables stored in the evaluated message receiver, 
 - temporaries and arguments are variables visible only within a particular method evaluation, 
-- shared variables group variables that are visible to a class, its instances and its subclasses, 
+- shared variables group variables that are visible to a class, its instances, and its subclasses, 
 - global variables are variables that are in the global scope and independent of the receiver.
 
-All these "contexts" defining variables are also named scopes because they define the reach of variable definitions.
+![A chain of scope.%anchor=ScopeOne](figures/ScopeOne.pdf)
+
+All these "contexts" defining variables are also named scopes because they define the reach of variable definitions (See Figure *@ScopeOne@*).
 At any point during program execution, we can organize scopes in a hierarchy of scopes following a parent relationship.
 
 - When a method evaluates, the current scope is the method scope with all the arguments and temporary variables defined in the method. 

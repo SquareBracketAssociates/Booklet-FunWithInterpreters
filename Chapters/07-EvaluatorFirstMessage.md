@@ -67,7 +67,7 @@ Metacello new
 A first step to introduce stack management without breaking all our previous tests is to replace the single `receiver` instance variable with a stack that will be initialized when the evaluator is created. The top of the stack will represent the current execution, and thus we will take the current receiver at each moment from the stack top. Moreover, each time we tell our interpreter to execute something we need to initialize our stack with a single frame.
 
 
-```caption=Replace the receiver instance variable by a stack
+```caption=Replace the receiver instance variable by a stack.
 Object << #CInterpreter
 	slots: { #stack . #globalScope };
 	package: 'Champollion'
