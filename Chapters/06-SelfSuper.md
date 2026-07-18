@@ -94,11 +94,7 @@ Our new test is still failing, but we are now ready to make it pass.
 
 ### Making the test pass: visiting self nodes
 
-The interpretation of `self` is done in the method `visitVariableNode:`.
-
-The Pharo parser resolves `self` and `super` nodes statically and creates special nodes for them, avoiding the need for name resolution.
-Implementing it is simple, it just returns the value of the receiver stored in the interpreter.
-Note that this method does not access the `receiver` variable directly, but uses instead the accessor, leaving us the possibility of redefining that method without breaking the visit.
+The interpretation of `self` is done in the method `visitVariableNode:`. In case a variable node represents the `self` pseudo variable, the interpreter just returns the receiver held in the interpreter. 
 
 ```
 CInterpreter >> visitVariableNode: aNode
@@ -106,9 +102,17 @@ CInterpreter >> visitVariableNode: aNode
 		ifTrue: [ ^ self receiver ]
 ```
 
-Note that in Pharo, the compiler performs a pass and enriches the variable node with an instance of the `Variable` hierarchy. 
-It uses then another visit method to be able to avoid such an ugly condition.
-You can see the differences in the returned trees by comparing the results of  `(CInterpretable >> #returnSelf) parseTree` and `OCParser parseMethod: (CInterpretable >> #returnSelf) sourceCode`.
+Note that this method does not access the `receiver` variable directly, but uses instead the accessor, leaving us the possibility of redefining that method without breaking the visit. Indeed, right now the interpreter holds the receiver directly but it will change to support nested message invocation as we will see later.
+
+#### Note. 
+The parser resolves `self` and `super` nodes statically and creates special nodes for them, avoiding the need for name resolution.
+
+In more detail, the compiler performs a pass and enriches the variable node with an instance of the `Variable` hierarchy.
+You can see the differences in the returned trees by comparing the results of  `(Object >> #yourself) parseTree` (See Figure *@figResolved@*) and `OCParser parseMethod: (Object >> #yourself) sourceCode` (See Figure *@figUnresolved@*).
+
+![Inspecting `(Object >> #yourself) parseTree` shows that variables are resolved referring to an instance of the Variable hierarchy.%anchor=figResolved](figures/VarResolved)
+
+![Inspecting `OCParser parseMethod: (Object >> #yourself) sourceCode` shows that variables are not resolved.%anchor=figUnresolved](figures/VarUnresolved)
 
 ### Introducing `super`
 
