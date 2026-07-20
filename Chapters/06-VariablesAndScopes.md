@@ -100,13 +100,37 @@ Finally, accessing the value of a variable is possible using the reflective meth
 ```
 CInstanceScope >> receiver: anObject
   	receiver := anObject
+```
 
+```
 CInstanceScope >> definedVariables
 	^ receiver class allInstVarNames 
+```
 
+```
 CInstanceScope >> read: aString 
 	^ receiver instVarNamed: aString
 ```
+
+### Better `read:` Definition
+
+The definition of the `read:` is a bit limited. It does not handle well the fact the argument could be `self`or `super`.
+The following method definitions addresses this concern:
+
+```
+CInstanceScope >> isSelfSuper: aString
+	^ #( 'self' 'super' ) includes: aString 
+```
+
+```
+CInstanceScope >> read: aString
+	(self isSelfSuper: aString) ifTrue: [ ^ receiver ].
+	^ receiver instVarNamed: aString
+```
+
+
+
+
 
 #### Add `currentScope`
 
@@ -484,7 +508,7 @@ We redefine `scopeDefining:` so that if the variable is not defined in the insta
 CInstanceScope >> scopeDefining: aString
 	(self definedVariables includes: aString)
 		ifTrue: [ ^ self ].
-	
+
 	^ self parentScope scopeDefining: aString
 ```
 
