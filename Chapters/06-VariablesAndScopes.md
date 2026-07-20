@@ -128,7 +128,8 @@ CInstanceScope >> read: aString
 	^ receiver instVarNamed: aString
 ```
 
-
+While this improves the `read:`' method, it should be noted that the logic of the method `visitVariableNode:`
+was already handling the fact that `self`' and `super`' refer to the receiver. The last definition makes sure that most of the logic is handled at the level of the scope.
 
 
 
@@ -508,7 +509,6 @@ We redefine `scopeDefining:` so that if the variable is not defined in the insta
 CInstanceScope >> scopeDefining: aString
 	(self definedVariables includes: aString)
 		ifTrue: [ ^ self ].
-
 	^ self parentScope scopeDefining: aString
 ```
 
