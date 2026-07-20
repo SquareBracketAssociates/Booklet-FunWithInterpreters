@@ -80,18 +80,24 @@ A class scope could be added later to resolve shared variables and shared pools.
 
 ### Creating an Instance Scope
 
-To make our tests go green, we need to model instance scopes.
+To make our tests pass, we need to model instance scopes.
 We model instance scopes with a new class named 'CInstanceScope`. 
-This class should know the receiver object, extracts the list of instance variables from it, and know how to read and write from/to it.
-For now we focus on the reading part. 
+This class should know the receiver object, extract the list of instance variables from it, and know how to read and write from/to it.
+For now, we focus on the reading part. 
 
-The method `definedVariables` simply returns all the instance variables that an instance should have. 
-Finally accessing the value of a variable is possible using the reflective method `instVarNamed:`. 
+
 ```
 Object <<#CInstanceScope
 	slots: {#receiver};
 	package: 'Champollion'
+```
 
+#### Add methods
+
+The method `definedVariables` simply returns all the instance variables that an instance should have. 
+Finally, accessing the value of a variable is possible using the reflective method `instVarNamed:`. 
+
+```
 CInstanceScope >> receiver: anObject
   	receiver := anObject
 
@@ -102,8 +108,10 @@ CInstanceScope >> read: aString
 	^ receiver instVarNamed: aString
 ```
 
-Now we can define the method `currentScope` in the interpreter with a first implementation. 
-We will refine in the following sections. 
+#### Add `currentScope`
+
+We define the method `currentScope` in the interpreter with a first implementation. 
+We will refine it in the following sections. 
 
 ```
 CInterpreter >> currentScope
@@ -112,10 +120,10 @@ CInterpreter >> currentScope
   		yourself
 ```
 
-### Using the Scope
+### Using Scopes
 
 The basic structure of our lexical scope implementation introduces the method `scopeDefining:`.
-This method returns the scope defining the given name. The method `scopeDefining:` forwards the search to the current scope, obtained through `currentScope`. Since we only have one scope for now we do not cover the case where the variable is not in the variables of the receiver. 
+This method returns the scope defining the specified name. The method `scopeDefining:` forwards the search to the current scope, obtained through `currentScope`. Since we only have one scope for now we do not cover the case where the variable is not in the variables of the receiver. 
 
 
 ```
@@ -125,7 +133,7 @@ CInstanceScope >> scopeDefining: aString
 	Error signal: 'Variable ', aString, ' not found'
 ```
 
-Now we can simply define the method scopeDefining: within the interpreter. 
+Now we can simply define the method `scopeDefining:`' within the interpreter. 
 It just delegates to the current scope. 
 
 ```
@@ -138,7 +146,7 @@ We should redefine the method `visitVariableNode:` to handle variables that are 
 ```
 CInterpreter >> visitVariableNode: aVariableNode
 	
-	^ aVariableNode name = #self | (aVariableNode name = #super)
+	^ aVariableNode isSelfVariable | (aVariableNode isSuperVariable)
 		ifTrue: [ self receiver ]
 		ifFalse: [ (self scopeDefining: aVariableNode name) read: aVariableNode name ]
 ```
@@ -155,7 +163,7 @@ Instead of having to explicitly create and manage a receiver object, we add the 
 
 ```
 TestCase << #CInterpreterTest
-	slots: { #interpreter . #receiver};
+	slots: {  #receiver};
 	package: 'Champollion'
 ```
 
@@ -197,10 +205,12 @@ CInterpreterTest >> testReturnInstanceVariableRead
 ### Instance Variable Writes
 
 We have support for instance variable reads. Let us work on instance variable writes.
-In our scenario, a method writes a literal integer into an instance variable `x` and then returns the value of the assignment. This scenario has two observable behaviors that we will be tested separately.
+In our scenario, a method writes a literal integer into an instance variable `x` and then returns the value of the assignment. This scenario has two observable behaviors that we will test separately.
+
+#### Test Addition
 
 First, such an assignment should be observable from the outside by reading that variable.
-Second, an assignment is an expression whose value is the assigned value, thus the return value should also be the assigned value.
+Second, an assignment is an expression whose value is the assigned value. Thus, the return value should also be the assigned value.
 
 ```
 CInterpretable >> store100IntoInstanceVariableX
@@ -208,7 +218,7 @@ CInterpretable >> store100IntoInstanceVariableX
 ```
 
 
-To test this behavior, we evaluate the method above and then we validate that effectively the instance variable was mutated.
+To test this behavior, we evaluate the method above, and then we validate that the instance variable was effectively mutated.
 To make sure the value was modified, we set an initial value to the variable before the evaluation.
 After the evaluation, we should not keep that value.
 The case of the return is similar to our previous tests.
@@ -224,6 +234,8 @@ CInterpreterTest >> testAssignmentReturnsAssignedValue
 		assert: (self executeSelector: #store100IntoInstanceVariableX)
 		equals: 100
 ```
+
+#### Scope Extension
 
 We should extend the instance scope to support the modification of a variable. 
 This is what we do using the method `instVarNamed:put:`.
@@ -250,7 +262,7 @@ CHInterpreter >> visitAssignmentNode: anAssignmentNode
 Evaluating an assignment node with the form `variable := expression` requires that we evaluate the `expression` of the assignment, also called the right-hand side of the assignment, and then set that value to the left-side variable.
 
 Our visit method then looks as follows: 
-- We recursively visit the right side of the assignment (got through the `value` accessor). Note that the expression can be complex such as the result of multiple messages or other assignments.
+- We recursively visit the right side of the assignment (got through the `value` message). Note that the expression can be complex, such as the result of multiple messages or other assignments.
 - We set that value to the variable by delegating to the instance scope (message `write:withValue:`), and 
 - We finally return the stored value.
 
@@ -259,30 +271,30 @@ Now the tests should pass.
 
 ### Evaluating Variables: Global Reads
 
-We finish this chapter with the reading of global variables, which covers two cases: proper global variables and access to classes.
+We finish this chapter with the reading of global variables. It will cover two cases: proper global variables and access to classes.
 It illustrates the chain of scopes where an instance scope parent is a global scope. 
 
-To better control our testing environment, we decided to not use the Pharo environment by default.
-Instead, the interpreter will know its global scope in an instance variable and look up globals in it using a simple API, making it possible to use the system's global environment instead if we wanted to.
+#### Dedicated Class Environment
+
+To better control our testing environment, we decide not to use the Pharo class environment.
+Instead, the interpreter will have its global scope in an instance variable and look up globals in it using a simple API, making it possible to use the system's global environment instead if we want to.
 We also leave outside of this chapter the writing to global variables.
 The case of global variable writing is similar to the instance variable assignment.
 
 
+### Global Read Little Setup
 
-### Little Setup
+Our first testing scenario for global variable read, similar to the previous ones, is as follows: we will define a method `returnGlobal` that reads and returns the global named `Global`.
 
-Our first testing scenario, similar to the previous ones, is as follows: we will define a method `returnGlobal` that reads and returns the global named `Global`.
-Now the question is that from the CInterpretable class the global variable `Global` should be a Pharo global variable. 
-Note that when the interpreter encounters such a variable, it uses its own private environment. 
+Before this, we have to define the variable so that the Pharo compiler finds it and does not ask the user extra information or cancel the compilation. 
 
-So to make sure that you can compile the code and execute your tests, we define the class method initialize as follows: 
+To make sure that you can compile the code and execute your tests, we define the _class_ method `initialize` as follows: 
 
 ```
 CInterpretable class >> initialize
 	self setUpGlobal
-	
-CInterpretable class >> setUpGlobal
 
+CInterpretable class >> setUpGlobal
 	self environment at: #Global put: 33
 ```
 
@@ -292,17 +304,34 @@ Such a detail is only necessary to keep Pharo itself happy and it does not have 
 Remember that we are writing our own Pharo implementation in the interpreter, and we will decide what to do with `Global` ourselves.
 
 
+
 ### Implementing Global reads
 
-
-Define the method `returnGlobal` as follows: 
+Once we have made the Pharo compiler happy, we define the method `returnGlobal` as follows: 
 
 ```
 CInterpretable >> returnGlobal
 	^ Global
 ```
 
+
+#### Interpreter Instance in Test Class
+
 We start by enriching the class `CInterpreterTest` with an instance variable pointing to a new interpreter. 
+We also add a getter to access such an interpreter.
+
+```
+TestCase << #CInterpreterTest
+	slots: { #interpreter . #receiver};
+	package: 'Champollion'
+```
+```
+CInterpreterTest >> interpreter
+
+	^ interpreter
+```
+
+The `setUp` method is then the following one: 
 
 ```
 CInterpreterTest >> setUp
@@ -312,16 +341,9 @@ CInterpreterTest >> setUp
 	receiver := CInterpretable new
 ```
 
-This implies that we should modify the getter to be 
-
-```
-CInterpreterTest >> interpreter
-
-	^ interpreter
-```
+#### Test Addition
 
 We define a test that specifies that the interpreter's environment has a binding whose key is `#Global` and value is a new object.
-You see here that we parametrize the interpreter so that it has a globalEnvironment that is different from the one its class.
 
 ```
 CInterpreterTest >> testReturnGlobal
@@ -331,25 +353,37 @@ CInterpreterTest >> testReturnGlobal
 	self assert: (self executeSelector: #returnGlobal) equals: globalObject
 ```
 
+You see here that we parameterize the interpreter so that it has a `globalEnvironment` that is different from that of its class. Indeed, the one of its class is used by the Pharo compiler, while `globalEnvironment` is the environment defined and used by our interpreter.
+We are ready to define a global scope.
 
-We introduce a new global scope class `CGlobalScope`: a globalDictionary is basically a dictionary.
+### Global Scope Definition
+
+We introduce a new global scope class `CGlobalScope`. This class will represent the global scope of programs. Basically it will manage all the global variables as well as classes since in Pharo global variables and classes share the same environment. The global scope defines an instance variable named `globalDictionary` that will hold all the variables defined and accessible within the global scope. 
 
 ```
 Object << #CGlobalScope
 	slots: { #globalDictionary };
 	package: 'Champollion'
-
+```
+```
 CGlobalScope >> initialize
 	super initialize.
 	globalDictionary := Dictionary new
-
-CGlobalScope >> globalDictionary: anObject 
-	globalDictionary := anObject
-
-CGlobalScope >> at: aKey ifAbsent: aBlock
-  ^ globalDictionary at: aKey ifAbsent: aBlock
 ```
 
+```'
+CGlobalScope >> globalDictionary: anObject 
+	globalDictionary := anObject
+```
+
+```
+CGlobalScope >> at: aKey ifAbsent: aBlock
+	^ globalDictionary at: aKey ifAbsent: aBlock
+```
+
+### Global Scope Addition
+
+An interpreter should have access to the global
 We add an instance variable named `globalScope` in the class `CInterpreter` initialized to a global scope.
 
 
@@ -357,56 +391,79 @@ We add an instance variable named `globalScope` in the class `CInterpreter` init
 Object << #CInterpreter
 	slots: { #receiver . #globalScope };
 	package: 'Champollion2
+```
 
+```
 CInterpreter >> initialize
 	super initialize.
 	globalScope := CGlobalScope new
+```
 
+```
 CInterpreter >> globalEnvironment
 	^ globalScope
 ```
 
+#### Support for Globals Addition
 
-We define the method `globalEnvironmentAt:put:` to easily add new globals from our test and make sure that we can 
+We define the method `globalEnvironmentAt:put:` to easily add new globals from our tests and make sure that we can 
 set the value of a global in the global scope.
 
 ```
 CInterpreter >> globalEnvironmentAt: aSymbol put: anObject
 	globalScope at: aSymbol put: anObject
+```
 
+```
 CGlobalScope >> at: aKey put: aValue
 	globalsDictionary at: aKey put: aValue
 ```
 
-### Introduce scopeDefining: 
+### Specializing `scopeDefining:'
 
-We define the methods `scopeDefining:` and a `read:` method in our global scope.
+We define the method `scopeDefining:` n the global scope. 
 
 ```
 CGlobalScope >> scopeDefining: aString
 	"I'm the root scope..."
 	^ self
+```
+Note that we could check if the variable named `aString` is defined in the global scope and raise
+an error if this is the case.
 
+### Supporting Scope Global Access
+
+We define a simple `read:` method as follows: 
+
+```
 CGlobalScope >> read: aString
 	^ globalDictionary at: aString
 ```
 
 
-### Supporting parentScope 
+### Supporting Parent Scope Access
 
-We add support to represent parent scope to the class `CinstanceScope`. We add the instance variable `parentScope` to the class `CInstanceScope`.
+We add support to represent parent scope to the class `CinstanceScope`. 
+For this, we add the instance variable `parentScope` to the class `CInstanceScope`.
 
 ```
 Object <<#CInstanceScope
 	slots: {#receiver . #parentScope};
 	package: 'Champollion'
+```
 
+```
 CInstanceScope >> parentScope: anObject
 	parentScope := anObject
+```
 
+```
 CInstanceScope >> parentScope
 	^ parentScope
 ```
+
+
+### Simple Scope Chain Definition
 
 We can define the scope chain by defining that an instance scope has (for now) a global scope as parent. 
 In this method we see clearly that an instance scope lives in the context of a global one and we defined previously that 
@@ -435,9 +492,9 @@ Now all the tests should be green.
 
 ### Conclusion
 
-In this chapter, we introduced support for variables and name resolution to support instance variables and global variables. 
+In this chapter, we introduced support for variables and name resolution. We did this for instance variables and global variables. 
 This first evaluator serves as a basis for implementing the execution of the main operations in Pharo: messages.
 
-The following chapters will start by decomposing message resolution into method-lookup and apply operations, introduce the execution stack, the management of temporary variables and argument, and 'super' message-sends.
+The following chapters will start by decomposing message resolution into method-lookup and apply operations, introduce the execution stack, the management of temporary variables and argument, and `super` message-sends.
 
 We further invite the reader to explore changing the language semantics by modifying this simple evaluator: How could we implement read-only objects? Log all variable reads and writes?
