@@ -1,4 +1,4 @@
-## Implementing Message Sends: The Calling Infrastructure
+## The Calling Infrastructure of Message Sends
 @cha:callingInfra
 
 In the previous chapters, we focused on structural evaluation: reading literal objects and reading and writing values from objects and globals. However, the key abstraction in object-oriented programming, and in Pharo in particular is _message-sending_. 
@@ -8,27 +8,28 @@ The work we did in the previous chapter is nevertheless important to set up the 
 ### Message Concerns 
 
 Message-sends deserve a chapter on their own because they introduce many different concerns. 
+
 On the one hand, each message-send is resolved in two steps: 
-- first the method-lookup searches in the receiver's hierarchy the method to be executed, and 
+- first the method-lookup searches in the receiver's hierarchy for the method to be executed, and 
 - second that method is applied on the receiver (i.e., it is evaluated with self-bound to the receiver). 
 
-On the other hand, each method application needs to set up an execution context to store the receiver, arguments, and temporary variables for that specific method execution.
-These execution contexts form the _execution stack_ or _call stack_.
-Sending a message pushes a new context in the call stack, and returning from a method pops a context from the call stack.
-This are the mechanics that we will cover in this chapter so that in the following chapter we can implement logic and support late-binding.
+On the other hand, each method application needs to set up an execution context to store the receiver, arguments, and temporary variables for that specific method execution. These execution contexts form the _execution stack_ or _call stack_. Sending a message pushes a new context in the call stack, and returning from a method pops a context from the call stack.
+
+
+These are the mechanics that we will cover in this chapter so that in the following chapter we can implement logic and support late-binding.
 
 
 ### Introduction to Stack Management
 
-The way we managed the receiver so far is overly simplistic.
-Indeed, each time a program sends a message to another object, we should change the receiver and when a method execution ends, we should restore the previous receiver. Moreover, the same happens with method arguments and temporaries as we will see later. Therefore to introduce the notion of message-send we need a stack: each element in the stack needs to capture all the execution state required to come back to it later on when a message-send will return. 
+Up until now, the way we managed the receiver so far is overly simplistic.
+Indeed, each time a program sends a message to another object, we should change the receiver and when a method execution ends, we should restore the previous receiver. Moreover, the same applies to method arguments and temporaries, as we will see later. Therefore, to introduce the notion of message-send, we need a stack: each element in the stack must capture all the execution state required to come back to it later on when a message-send will return. 
 
 Each element in the call stack is usually named a _stack frame_, an activation record, or in Pharo's terminology a _context_.
- For the rest of this book we will refer to them as frames, for shortness, and to distinguish them from the reified contexts from Pharo. 
+ For the rest of this book, we will refer to them as __frames__, for shortness, and to distinguish them from the on-demand reified contexts from Pharo. 
 
-Figure *@callstack@* presents a call stack with two methods. The first method in the stack (at its bottom) is method `foo`. Method `foo` calls method `bar` and thus it follows it in the stack. In addition, the message `foo` is sent to self so both frame points to the same object receiving the message. The current method executing is the one on the top of the stack. When a method returns, we can restore all the state of the previous method just by _popping_ the top of the stack.
+Figure *@callstack@* presents a call stack with two message sends. The first frame in the stack (at its bottom) is for the message send `foo`. Method `foo` calls method `bar` and thus a second frame to represent such message send follows the first one in the stack. In addition, the message `foo` is sent to `self`' so both frame points to the same object receiving the message. The currently executed method is the one on the top of the stack. When a method execution returns, we must restore all the state of the previous method just by _popping_ the top of the stack.
 
-![A call-stack with two frames, executing the method `foo` which sends the message `self bar`. % width=80&anchor=callstack](figures/callstack.pdf)
+![A call-stack with two frames, executing the message  `someObject foo` which sends the message `self bar`. % width=80&anchor=callstack](figures/callstack.pdf)
 
 
 
