@@ -2,35 +2,31 @@
 @cha:messageArgs
 
 In the previous chapter, we extended the interpreter to support simple messages sent between different instances of the same class.
-In this chapter, we will extend this message passing implementation to support parameters and temporaries. 
-We will take advantage of the 
-
+In this chapter, we extend this message-passing implementation to support parameters and temporaries. 
 
 ### Message Argument Evaluation
 
-So far we have worked only with unary messages. Unary messages have no arguments, so the number of programs we can express with them only is limited. The next step towards having a full-blown interpreter is to support message arguments, which will open the door to support binary and keyword messages. From the evaluator's point of view, as well as from the AST point of view, we will not distinguish between unary, binary, and keyword messages. The parser already takes care of distinguishing them and handling their precedence. Indeed, message nodes in the AST are the same for all kinds of messages, they have a selector and a collection of argument nodes. 
-Precedence is then modeled as relationships between the AST nodes.
+So far we have worked only with unary messages. Unary messages have no arguments, so the number of programs we can express with them only is limited. The next step towards having a full-blown interpreter is to support message arguments, which opens the door to support binary and keyword messages. 
+
+From the evaluator's point of view, as well as from the AST point of view, we will not distinguish between unary, binary, and keyword messages. The parser already takes care of distinguishing them and handling their precedence. Indeed, message nodes in the AST are the same for all kinds of messages, they have a selector and a collection of argument nodes. Precedence is then modeled as relationships between the AST nodes as we show in Chapter *@cha:ast@*.
 
 
 In addition to simply passing arguments, the evaluator needs to care about evaluation order too. This is particularly important because Pharo is an imperative language where messages can trigger side effects. Evaluating two messages in one order may not have the same result as evaluating them in a different order. Arguments in Pharo are evaluated eagerly after evaluating the receiver expression, but before evaluating the message, from left to right. Once all expressions are evaluated, the resulting objects are sent as part of the message-send.
 
+### Initial Argument Evaluation Setup
 
-#### Initial Argument Setup
+To implement some initial support for arguments, our first test scenario is to simply send a message with an argument. We already have one message with an argument: the `x:` setter. We define the method `changeCollaboratorWithArgument` which uses it.
 
-To implement some initial support for arguments, our first scenario is to simply send a message with an argument. We already one message with an argument: the `x:` setter. We define the method `changeCollaboratorWithArgument` which uses it.
-
-```language=smalltalk
+```language=pharo
 CInterpretable >> changeCollaboratorWithArgument
 	collaborator x: 500
 ```
 
-
 In the following test, we verify that the method evaluation effectively modifies the collaborator object 
 as written in `changeCollaboratorWithArgument`, and not the initial receiver object.
 
-```language=smalltalk
+```language=pharo
 CInterpreterTest >> testArgumentAccess
-
 	receiver x: 200.
 	collaborator x: 300.
 
@@ -45,9 +41,10 @@ Since we have not implemented any support for arguments yet, this test should fa
 ### Enhance Method Scope
 
 The current method scope is limited to managing the receiver. It is not enough.
-Method scopes should support variables as well as parsent scope. 
+Method scopes should support variables as well as parent scope. 
 
-We add the `parentScope:` instance variable and its accessors as well as 
+We add the `parentScope` instance variable and its accessors. In addition, we add
+the instance variable `variables`.
 
 ```
 Object << #CMethodScope
@@ -55,21 +52,25 @@ Object << #CMethodScope
 	package: 'Champollion'
 ```
 
-To support variables, we add a dictionary 
-to hold them and some utility methods.
+Note that we use the term `variables` because it covers both method parameter values and temporary variable values.
+To support variables, we use a dictionary to store them, along with some utility methods.
 
 ```
 CMethodScope >>initialize
-
 	super initialize.
-	variables := Dictionary new.
-	
+	variables := Dictionary new
+```
+
+```	
 CMethodScope >> at: aKey
 	^ variables at: aKey
-	
+```
+```	
 CMethodScope >> at: aKey put: aValue
 	variables at: aKey put: aValue
 ```
+
+### Define `scopeDefining:`
 
 In addition, we add support for identifying the scope. 
 We define the method `scopeDefining:` as follows:  It checks whether the looked up name is
@@ -79,11 +80,10 @@ a variable one.
 CMethodScope >> scopeDefining: aString
 	(variables includesKey: aString)
 		ifTrue: [ ^ self ].
-
 	^ self parentScope scopeDefining: aString
 ```
 
-Note that the `scopeDefining:` delegates to its parent scope when the variable is not locally found. 
+The method `scopeDefining:` delegates to its parent scope when the variable is not locally found. 
 
 Finally we add a `read:` method using the variable implementation logic.
 
@@ -92,12 +92,17 @@ CMethodScope >> read: aString
 	^ variables at: aString
 ```
 
+Note that such definitions imply that the parent scope should be an instance scope since it is handling
+the case for `self` and `super`.
+Here variables cannot contain a key for self or super because the parser should not allow temporaries or parameters to be named with such reserved terms.
+
+SD: if the parent is an instance scope, self should be handled there.
 
 ### Support for Parameters/Arguments
 
 Implementing argument support requires two main changes:
 
-- On the caller side, we need to evaluate the arguments in the context of the caller method and then store those values in the new frame. 
+- On the caller side, we need to evaluate the arguments in the context of the caller method and then store those values in the new frame.
 - On the callee side, when an argument access is evaluated, those accesses will not re-evaluate the expressions in the caller. Instead, argument access will just read the variables pre-stored in the current frame.
 
 
@@ -109,7 +114,6 @@ Previously the method `execute:withReceiver:` was defined as follows:
 
 ```
 execute: anAST withReceiver: anObject
-
 	| result |
 	self pushNewMethodFrame.
 	self topFrame receiver: anObject.
@@ -130,7 +134,9 @@ pushNewMethodFrame
 
 #### Improved Version
 
-The new version is the following one: 
+The new version is the following one: It pushes a new frame for the method, but set as parent a new instance scope.
+
+SD: Why do we need to put receiver in the methodScope
 
 ```
 CInterpreter >> execute: anAST withReceiver: anObject
@@ -140,18 +146,17 @@ CInterpreter >> execute: anAST withReceiver: anObject
 		receiver: anObject;
 		parentScope: globalScope;
 		yourself).
-
 	self topFrame receiver: anObject.
 	result := self visitNode: anAST.
 	self popFrame.
 	^ result
 ```
 
-After pushing to the stack a new frame representing the method execution, we should make sure that the parent scope 
+After pushing to the stack a new frame representing the method execution, we make sure that the parent scope 
 of the method scope is an instance scope. This is what we were doing in the `currentScope` method.
 
 Also notice that the instance scope and the method scope have both a receiver. 
-SD: When can they be different? And why the instance one is not enough since it is in the parent scope of the method. 
+SD: Why? When can they be different? And why the instance one is not enough since it is in the parent scope of the method. 
 
 
 We have still to make sure that `currentScope` refers to the top frame of the interpreter.
@@ -162,9 +167,9 @@ CInterpreter >> currentScope
 	^ self topFrame
 ```
 
+### Evaluate Arguments
 
-
-Then we need to update `visitMessageNode:` to compute the arguments by doing a recursive evaluation, and then use those values during the new method activation.
+We need to update `visitMessageNode:` to compute the arguments by doing a recursive evaluation, and then use those values during the new method activation.
 
 ```
 CInterpreter >> visitMessageNode: aMessageNode
@@ -172,9 +177,8 @@ CInterpreter >> visitMessageNode: aMessageNode
 	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
 	newReceiver := self visitNode: aMessageNode receiver.
 	method := newReceiver class compiledMethodAt: aMessageNode selector.
-	^ self executeMethod: (self astOf: method) withReceiver: newReceiver andArguments: args
+	^ self execute: (self astOf: method) withReceiver: newReceiver andArguments: args
 ```
-
 
 To include arguments in the method activation, we add a new `arguments` parameter to our method `execute:withReceiver:` to get `execute:withReceiver:withArguments:`. 
 
@@ -189,7 +193,6 @@ CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 		receiver: anObject;
 		parentScope: globalScope;
 		yourself).
-
 	self topFrame receiver: anObject.
 	anAST arguments 
 		with: aCollection
@@ -200,13 +203,13 @@ CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 ```
 
 
-Instead of just removing the old `executeMethod:withReceiver:` method, we redefine it calling the new one with a default empty collection of arguments. 
+Instead of just removing the old `execute:withReceiver:` method, we redefine it calling the new one with a default empty collection of arguments. 
 This method was used by our tests and is part of our public API, so keeping it will avoid migrating extra code and an empty collection of arguments is a sensible and practical default value.
  
 ```
-CInterpreter >> executeMethod: anAST withReceiver: anObject
+CInterpreter >> execute: anAST withReceiver: anObject
 	^ self 
-		executeMethod: anAST 
+		execute: anAST 
 		withReceiver: anObject 
 		andArguments: #()
 ```
@@ -217,7 +220,7 @@ Our tests should all pass now.
 
 ### Refactoring the Terrain
 
-Let's now refactor a bit the existing code to clean it up and expose some existing but hidden functionality. Let us extract the code that accesses `self` and the frame parameters into two other methods that make more intention revealing that we are accessing values in the current frame.
+Let's now refactor a bit the existing code to clean it up and expose some existing but hidden functionality. Let us extract the code that sets the frame parameters into another method.
 
 ```
 CInterpreter >> tempAt: aSymbol put: anInteger
@@ -232,7 +235,6 @@ CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 		receiver: anObject;
 		parentScope: globalScope;
 		yourself).
-  
 	self topFrame receiver: anObject.
 	anAST arguments 
 		with: aCollection
@@ -244,7 +246,7 @@ CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 
 
 
-### Temporary Evaluation
+### Temporary Evaluation Preparation
 
 Temporary variables, or local variables, are variables that live within the scope of a method's **execution**.
 Memory for such variables is allocated when a method is activated, and released when the method returns.
@@ -277,6 +279,9 @@ CInterpreterTest >> testUnassignedTempHasNilValue
 		equals: nil
 ```
 
+This test should fail.
+
+### Temporary Evaluation
 
 The current subset of Pharo that we interpret does not contain blocks and their local/temporary variables -- We will implement blocks and more complex lexical scopes in a subsequent chapter.
 Therefore the temporary variable management we need to implement is simple.
@@ -284,14 +289,13 @@ Therefore the temporary variable management we need to implement is simple.
 To make our test pass, we modify the `execute:withReceiver:andArguments:` method to define the temporaries needed with `nil` as value.
 
 ```
-CInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aCollection
+CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 	| result  |
 	self pushNewMethodFrame.
 	self topFrame parentScope: (CHInstanceScope new
 		receiver: anObject;
 		parentScope: globalScope;
-		yourself);
-  
+		yourself).
 	self topFrame receiver: anObject.
 	anAST arguments with: aCollection do: [ :arg :value | self tempAt: arg name put: value ].
 	anAST temporaryNames do: [ :tempName | self tempAt: tempName put: nil ].
@@ -302,11 +306,19 @@ CInterpreter >> executeMethod: anAST withReceiver: anObject andArguments: aColle
 
 The tests should pass.
 
+
 ### Another Refactoring 
 
-We take the opportunity to refactor a bit the method `execute:withReceiver:andArguments:`. We extract the temporary and argument management into 
-a new method named `manageArgumentsTemps:of:`.
+We take the opportunity to refactor a bit the method `execute:withReceiver:andArguments:`. We extract the temporary and argument management into a new method named `manageArgumentsTemps:of:`.
 
+```
+CInterpreter >> manageArgumentsTemps: aCollection of: anAST
+	anAST arguments
+		with: aCollection
+		do: [ :arg :value | self tempAt: arg name put: value ].
+	anAST temporaryNames do: [ :tempName |
+		self tempAt: tempName put: nil ]
+```
 
 ```
 CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
@@ -324,22 +336,13 @@ CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 	^ result
 ```
 
-```
-CInterpreter >> manageArgumentsTemps: aCollection of: anAST
 
-	anAST arguments
-		with: aCollection
-		do: [ :arg :value | self tempAt: arg name put: value ].
-	anAST temporaryNames do: [ :tempName |
-		self tempAt: tempName put: nil ]
-```
-
+HERE 
 
 ### Temporary Variable Write Evaluation
-The next aspect we have to address is temporary writing. 
-
-We test that writes to temporary variables are working too.
-We define our scenario method `writeTemporaryVariable`, which defines a temporary variable, assigns to it and returns it. 
+The next aspect we have to address is temporary variable writing. 
+We need to test this. 
+We define our scenario method `writeTemporaryVariable`. It defines a temporary variable, assigns to it and returns it. 
 
 ```
 CInterpretable >> writeTemporaryVariable
@@ -368,6 +371,7 @@ CMethodScope >> write: aString withValue: aValue
 	variables at: aString put: aValue
 ```
 
+HERE 
 
 ### Evaluation Order
 
