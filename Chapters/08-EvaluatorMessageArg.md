@@ -167,7 +167,7 @@ CInterpreter >> currentScope
 	^ self topFrame
 ```
 
-### Evaluate Arguments
+### Argument Evaluation
 
 We need to update `visitMessageNode:` to compute the arguments by doing a recursive evaluation, and then use those values during the new method activation.
 
@@ -337,9 +337,8 @@ CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 ```
 
 
-HERE 
-
 ### Temporary Variable Write Evaluation
+
 The next aspect we have to address is temporary variable writing. 
 We need to test this. 
 We define our scenario method `writeTemporaryVariable`. It defines a temporary variable, assigns to it and returns it. 
@@ -371,21 +370,70 @@ CMethodScope >> write: aString withValue: aValue
 	variables at: aString put: aValue
 ```
 
-HERE 
 
-### Evaluation Order
+### About Name Conflict Resolution
+
+Inside the scope of a method, statements have access to parameters, temporaries, instances and global variables. A name conflict appears when two variables that should be visible in a method share the same name. In a conflict scenario, the language designer needs to devise a resolution strategy for these problems, to avoid ambiguities.
+
+For example, consider a method `m:` that has an argument named `integer` and defines a temporary variable also named `integer`. 
+How should the values of that name be resolved? 
+How are assignments resolved? 
+A conflict resolution strategy provides a set of deterministic rules to answer these questions and let developers understand what their programs do in a non-ambiguous way.
+
+A first simple strategy to avoid conflicts is preventing them at construction time. 
+That is, the language should not allow developers to define variables if they generate a name conflict. 
+For example, a method should not be able to define a temporary variable with the same name as an instance variable of its class. 
+Usually, these validations are done once at compile time, and programs that do not follow these rules are rejected.
+
+Another strategy to solve this problem is to allow shadowing. 
+That is, we give each variable in our program a priority, and then the actual variable to read or write is looked up using this priority system.
+Typically priorities in these schemas are modelled as lexical scopes. 
+Lexical scoping divides a program into a hierarchy of scopes. 
+Each scope defines variables and all but the top-level scope have a parent scope. 
+For example, the top-level scope defines global variables, the instance scope defines the instance variables, the method scope defines the parameters and temporaries. 
+In this way, variable visibility can be defined in terms of a scope: the variables visible in a scope are those defined in the scope or in the parents of the scope. 
+Moreover, scoping also gives a conflict resolution strategy: variables defined closer to the current scope in the scope hierarchy have more priority than those defined higher in the scope hierarchy.
+
+This is the strategy we chose in the interpreter.
+
+### About Return
+
+As a reader, you may wonder why we did not do anything for return expression and this is an interesting question. 
+Up to now interpreting a return is just returning the value of the interpretation of the return expression. 
+In fact, up until now, a method execution has a single path of execution: it means that the complete method body
+should be executed and that we did not introduce different condition control flow. 
+This is when we will introduce block closure and conditional control flow and we will have to revisit the interpretation of return.
+
+### Conclusion
+
+Supporting message sends and in particular method execution is the core of the computation in an object-oriented language and this is what this chapter covered.
+
+Implementing messages implied modeling the call stack and keeping it balanced on method returns.
+We have seen that a call stack is made up of frames, each frame representing the activation of a method: it stores the method, receiver, arguments, and temporaries of the method that is executing. When a message takes place, the receiver and arguments are evaluated in order from left to right, a new frame is created and all values are stored in the frame.
 
 
-The last thing we need to make sure is that arguments are evaluated in the correct order.
-The evaluation order in Pharo goes as follows: 
+
+
+
+
+## About Evaluation Order
+
+In the previous chapter we introduced the evaluation of arguments and temporaries.
+We did not go deep into the evaluation order of arguments. 
+
+In this chapter we will make sure is that arguments are evaluated in the correct order.
+
+### Testing Evaluation Order Strategy
+
+The argument evaluation order in Pharo goes as follows: 
 
 - Before evaluating a message, the receiver and all arguments are evaluated. 
 - The receiver is evaluated before the arguments. 
 - Arguments are evaluated in left-to-right order.
 
-Testing the evaluation order in a black-box fashion, as we have been doing so far, is rather challenging with our current evaluator. Indeed, our evaluator does not yet handle arithmetics, allocations, or other kinds of primitive, so we cannot easily count! A simple approach to test is to make a counter out of [Peano Axioms](https://en.wikipedia.org/wiki/Peano_axioms). 
+Testing the evaluation order in a black-box fashion, as we have been doing so far, is rather challenging with our current evaluator. Indeed, our evaluator does not yet handle arithmetics, allocations, or other kinds of primitive behavior, so we cannot easily count! A simple approach to test is to make a counter out of [Peano Axioms](https://en.wikipedia.org/wiki/Peano_axioms).
 
-The main idea is to implement numbers as nested sets, where 
+The main idea is to implement numbers as nested sets, where:
 - the empty set _(S())_ represents the number `0`, 
 - the set _(S(S())_ that contains the empty set (`0`) represents the number `1`, 
 the set _(S(S(S())))_ that contains the number `1` represents the number `2`, and so on. 
@@ -395,8 +443,7 @@ the set _(S(S(S())))_ that contains the number `1` represents the number `2`, an
 
 First we implement peano numbers. The code illustrating the idea follows.
 
-
-First we add a counter named `currentPeanoNumber` to the interpreter and we initialize it with the peano number zero represented by an empty Set. 
+We add a slot named `currentPeanoNumber` to the interpretable object and we initialize it with the peano number zero represented by an empty Set. 
  
 ```
 CInterpretable >> initialize
@@ -431,13 +478,12 @@ CInterpreterTest >> peanoToInteger: aPeanoNumber
 
 ### Using Peano Numbers
 
-Using the peano encoding, we can express our evaluation order scenario and test as follows:
-We want to get information about the message receiver and each of its arguments: we will compute and store a peano number for each of these sitations.
+Using the peano encoding, we can now express our evaluation order scenario and test as follows:
+We want to get information about the message receiver and each of its arguments: we will compute and store a peano number for each of these situations.
 
 Let us implement this now.
 The message receiving the arguments will receive as argument three generated peano values, that we will return as dynamic literal array. 
 If the evaluation order is right, the evaluation order of the receiver should be 0, the evaluation of the first argument should be 1, and so on.
-
 
 We add a new instance variable to `CInterpretable` to store the evaluation order of the receiver of a message. 
 
@@ -447,12 +493,9 @@ Object << #CInterpretable
 	package: 'Champollion'
 ```
 
-```
-CInterpretable >> evaluationOrder
-	^ evaluationOrder
-```
+#### Receiver Evaluation
 
-We define the method `evaluateReceiver` which will store the current peano number in the `evaluationOrder` instance variable.
+We define the method `evaluateReceiver` which stores the current peano number in the `evaluationOrder` instance variable.
 Notice that this method returns the receiver so that we can use it as receiver of a message with multiple arguments (to compute the peano number of arguments).
 
 ```
@@ -460,6 +503,8 @@ CInterpretable >> evaluateReceiver
 	evaluationOrder := self currentButComputeNextPeanoNumber.
 	^ self
 ```
+
+#### Argument Evaluation
 
 We then define a method `returnEvaluationOrder` as follows: 
 
@@ -475,6 +520,7 @@ CInterpretable >> messageArg1: arg1 arg2: arg2 arg3: arg3
 ```
 This method invokes the receiver evaluation and computes the next peano number before passing it as arguments to the message.
 
+### Evalution Order Tests
 
 To verify the evaluation order we define two simple tests: one checking that the receiver receives the peano number zero. 
 And one that checks that we get an array of numbers 1, 2, and 3. This array indicates that the value of the first argument was executing before the second
@@ -483,8 +529,10 @@ and that the second was executed before the third.
 ```
 CInterpreterTest >> testEvaluationOrderOfReceiver
 	self executeSelector: #returnEvaluationOrder.
-	self assert: (self peanoToInteger: receiver evaluationOrder) equals: 0.
+	self assert: (self peanoToInteger: receiver evaluateReceiver) equals: 0
+```
 	
+```	
 CInterpreterTest >> testEvaluationOrderOfArguments
 	| argumentEvaluationOrder |
 	argumentEvaluationOrder := self executeSelector: #returnEvaluationOrder.
@@ -515,48 +563,9 @@ CInterpreter >> visitMessageNode: aMessageNode
 	args := aMessageNode arguments collect: [ :each | self visitNode: each ].
 	method := newReceiver class compiledMethodAt: aMessageNode selector.
 	^ self execute: (self astOf: method) withReceiver: newReceiver andArguments: args
-	
 ```
-
-
-### About Name Conflict Resolution
-
-
-Inside the scope of a method, statements have access to parameters, temporaries, instances and global variables. A name conflict appears when two variables that should be visible in a method share the same name. In a conflict scenario, the language developer needs to devise a resolution strategy for these problems, to avoid ambiguities.
-
-For example, consider a method `m:` that has an argument named `integer` and defines a temporary variable also named `integer`. 
-How should the values of that name be resolved? 
-How are assignments resolved? 
-A conflict resolution strategy provides a set of deterministic rules to answer these questions and let developers understand what their programs do in a non-ambiguous way.
-
-A first simple strategy to avoid conflicts is preventing them at construction time. 
-That is, the language should not allow developers to define variables if they generate a name conflict. 
-For example, a method should not be able to define a temporary variable with the same name as an instance variable of its class. 
-Usually, these validations are done once at compile time, and programs that do not follow these rules are rejected.
-
-Another strategy to solve this problem is to allow shadowing. 
-That is, we give each variable in our program a priority, and then the actual variable to read or write is looked up using this priority system.
-Typically priorities in these schemas are modelled as lexical scopes. 
-Lexical scoping divides a program into a hierarchy of scopes. 
-Each scope defines variables and all but the top-level scope have a parent scope. 
-For example, the top-level scope defines global variables, the class scope defines the instance variables, the method scope defines the parameters and temporaries. 
-In this way, variable visibility can be defined in terms of a scope: the variables visible in a scope are those defined in the scope or in the parents of the scope. 
-Moreover, scoping also gives a conflict resolution strategy: variables defined closer to the current scope in the scope hierarchy have more priority than those defined higher in the scope hierarchy.
-
-SD: We should add something about the interpreter.
-
-### About Return
-
-As a reader, you may wonder why we did not do anything for return expression and this is an interesting question. 
-Up to now interpreting a return is just returning the value of the interpretation of the return expression. 
-In fact, up until now, a method execution has a single path of execution: it means that the complete method body
-should be executed and that we did not introduce different condition control flow. 
-This is when we will introduce block closure and conditional control flow and we will have to revisit the interpretation of return. 
 
 ### Conclusion
 
-Supporting message sends and in particular method execution is the core of the computation in an object-oriented language and this is what this chapter covered.
-
-Implementing messages implied modeling the call stack and keeping it balanced on method returns.
-We have seen that a call stack is made up of frames, each frame representing the activation of a method: it stores the method, receiver, arguments, and temporaries of the method that is executing. When a message takes place, the receiver and arguments are evaluated in order from left to right, a new frame is created and all values are stored in the frame.
-
+We have used peano numbers as a way to test the argument evaluation order. 
+We are now ready to tackle an important aspect of message passing: the method lookup and error when no method is found. 
