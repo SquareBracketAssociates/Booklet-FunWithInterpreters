@@ -1,11 +1,36 @@
-## Handling Unknown Messages
+## Deeper into Messages: Handling Unknown Messages
 @cha:dnu
 
-In the previous chapter, we presented method lookup and showed the precise semantics of the messages sent to `super`. We only took into account the case where the method we are looking up actually exists.
+In the previous chapter, we presented method lookup and showed the precise semantics of the messages sent to `super`. 
+We only took into account the case where the method we are looking up actually exists.
 In this chapter, we show how to handle this case. We extend the interpreter with support for the 
  support error and the famous `doesNotUnderstand:`.
 
 We start by revisiting the current method lookup implementation. Doing so, we will be ready to handle the case of unknown messages.
+
+
+### Refactoring the Terrain
+
+Before starting to implement new functionalities, it is time to step back and take advantage that all the tests pass to improve the existing code base.
+
+We refactor `visitMessageNode:` to use the new message `send:receiver:lookupFromClass:arguments:` as follows: 
+
+```
+CInterpreter >> visitMessageNode: aMessageNode
+	| newReceiver args lookupClass | 
+	newReceiver := self visitNode: aMessageNode receiver.
+	args := self handleArgumentsOf: aMessageNode.
+	lookupClass := aMessageNode isSuperSend 
+		ifTrue: [ self currentMethod methodClass superclass ] 
+		ifFalse: [ newReceiver class ].
+	^ self
+		send: aMessageNode selector
+		receiver: newReceiver
+		lookupFromClass: lookupClass
+		arguments: args asArray
+```
+
+All the tests should pass and we are ready for the next point.
 
 
 ### Overridden Messages
@@ -13,7 +38,9 @@ We start by revisiting the current method lookup implementation. Doing so, we wi
 We have made sure that sending a message to `super` starts looking at methods in the superclass of the class defining the method. 
 Now we would like to make sure that the lookup works even in the presence of overridden methods.
 
-Let's define the method `overriddenMethod` in a superclass returning a value, and in a subclass just doing a super send with the same selector.
+![Testing overridden methods. %width=80&anchor=figoverriddent](figures/OverriddenMethods.pdf)
+
+Let's define the method `overriddenMethod` in a superclass returning a value, and in a subclass just doing a super send with the same selector (as shown in Figure *@figoverriddent@*).
 
 
 ```
@@ -39,15 +66,17 @@ CInterpreterTest >> testLookupRedefinedMethod
 
 
 This test should pass.
+We suggest you add more tests for example with a super message in the subclass `CInterpretable` finding a method in the root class `CInterpretableRoot`.
+Such tests should also pass.
 
 
 
 ### Correct Semantics Verification
 
-To ensure that the method lookup is correctly implemented, especially in the presence of `super` messages, we need to stress our implementation with an extra scenario. Several books wrongly define that `super` messages lookup methods starting from the superclass of the class of the receiver. This is plain wrong.
+To ensure that the method lookup is correctly implemented, especially in the presence of `super` messages, we need to stress our implementation with an extra scenario. Indeed, several books wrongly define that `super` messages lookup methods starting from the superclass of the class of the receiver. This is plain wrong!
 
 This definition, illustrated in the code snippet below, is incorrect: it only works when the inheritance depth is limited to two classes, a class, and its superclass. 
-In other cases, this definition creates an infinite loop.
+In other cases, this definition creates an infinite loop as you can experiment it with the `redefinedMethod` method definitions below.
 
 ```
 CInterpreter >> visitMessageNode: aMessageNode
@@ -59,8 +88,11 @@ CInterpreter >> visitMessageNode: aMessageNode
 	lookupClass := aMessageNode isSuperSend 
 		ifTrue: [ newReceiver class superclass ] 
 		ifFalse: [ newReceiver class ].
-	method := self lookup: aMessageNode selector fromClass: lookupClass.	
-	^ self executeMethod: method withReceiver: newReceiver andArguments: args
+	^ self
+			send: aMessageNode selector
+			receiver: newReceiver
+			lookupFromClass: lookupClass
+			arguments: args asArray
 ```
 
 A scenario showing such a problem is shown in Figure *@fighierarchyFullWrong@*.
@@ -75,7 +107,9 @@ Let us define the situation that will loop with the wrong semantics.
 ```
 CInterpretableRoot >> redefinedMethod
 	^ 5
-  
+```
+
+```
 CInterpretableSuperClass >> redefinedMethod
 	^ super redefinedMethod
 ```
@@ -88,57 +122,14 @@ CInterpreterTest >> testLookupSuperMessageNotInReceiverSuperclass
 	self assert: (self executeSelector: #redefinedMethod) equals: 5
 ```
 
-#### Before executing our new test.
+### Stepping in Wrong Semantics
 
 With the incorrect semantics, our test will start by activating `CInterpretableSuperclass>>#redefinedMethod`.
 
 When the interpreter finds the super send, it will start the lookup from the superclass of the receiver's class: `CInterpretableSuperclass`. 
 Starting the lookup from this class will again find and activate `CInterpretableSuperclass>>#redefinedMethod`, which will lead to activating the same method over and over again...
 
-Coming back to our previous correct definition, it works properly, and makes our test pass:
-
-```
-CInterpreter >> visitMessageNode: aMessageNode
-
-	| newReceiver method args lookupClass pragma | 
-	newReceiver := self visitNode: aMessageNode receiver.
-	args := self handleArgumentsOf: aMessageNode arguments.
-	
-	lookupClass := aMessageNode isSuperSend 
-		ifTrue: [ self currentMethod methodClass superclass ] 
-		ifFalse: [ newReceiver class ].
-	method := self lookup: aMessageNode selector fromClass: lookupClass.	
-	^ self executeMethod: method withReceiver: newReceiver andArguments: args
-```
-
-
-
-
-
-
-
-We can refactor a bit more and make `visitMessageNode:` use the new message `send:receiver:lookupFromClass:arguments:` as follows: 
-
-```
-CInterpreter >> visitMessageNode: aMessageNode
-
-	| newReceiver args lookupClass |
-	newReceiver := self visitNode: aMessageNode receiver.
-	args := aMessageNode arguments collect: [ :each | 
-				self visitNode: each ].
-
-	lookupClass := aMessageNode receiver isSuperVariable
-					ifTrue: [ self currentMethod methodClass superclass ]
-					ifFalse: [ newReceiver class ].
-	^ self
-		send: aMessageNode selector
-		receiver: newReceiver
-		lookupFromClass: lookupClass
-		arguments: args asArray
-```
-
-
-
+Coming back to our previous correct definition, it works properly, and makes our test pass!
 
 The astute reader should think that we are not done. Indeed we can ask ourselves about the situation where the lookup does not find the method to execute. 
 
@@ -279,6 +270,7 @@ CInterpreter >> send: aSelector receiver: newReceiver lookupFromClass: lookupCla
 Note that reifying does not understand requires that our interpreter knows two new things about our language: what selector is used for report the error (`#doesNotUnderstand:`), and what class is used to reify `Message`. 
 In this case we are implementing a Pharo evaluator that runs in the same environment as the evaluated program: they share the same memory, classes, global variables. 
 Because of this we make use of the existing selector and classes in Pharo. 
+
 In contrast, implementing an evaluator that runs on a different environment than the evaluated program (e.g., a Pharo evaluator implemented in C), such dependencies need to be made explicit through a clear language-interpreter interface. 
 This is for this reason that the Pharo virtual machine needs to know the selector of the message to be sent in case of message not understood. 
 

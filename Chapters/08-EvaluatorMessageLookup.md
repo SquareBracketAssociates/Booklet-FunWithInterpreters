@@ -140,8 +140,8 @@ CInterpreter >> lookup: aSelector fromClass: aClass
 	"Otherwise lookup recursively in the superclass.
 	If we reach the end of the hierarchy return nil"
 	^ aClass superclass
-		ifNil: [ nil ]
-		ifNotNil: [ self lookup: aSelector fromClass: aClass superclass ]
+			ifNil: [ nil ]
+			ifNotNil: [ self lookup: aSelector fromClass: aClass superclass ]
 ```
 
 The method `lookup:fromClass:` does not raise an error because this way the `visitMessageNode:` method will be able to send the `doesNotUnderstand:` message to the receiver, as we will see later in this chapter.
@@ -258,7 +258,9 @@ CInterpreter >> visitMessageNode: aMessageNode
 	lookupClass := aMessageNode isSuperSend 
 		ifTrue: [ self currentMethod methodClass superclass ] 
 		ifFalse: [ newReceiver class ].
-	method := self lookup: aMessageNode selector fromClass: lookupClass.	
+	method := self 
+		lookup: aMessageNode selector 
+		fromClass: lookupClass.	
 	^ self execute: (self astOf: method) withReceiver: newReceiver andArguments: args
 ```
 
@@ -305,11 +307,13 @@ CInterpreter >> send: aSelector
 	arguments: arguments
 
 	| method |
-	method := self lookup: aSelector fromClass: lookupClass.
+	method := self 
+		lookup: aSelector 
+		fromClass: lookupClass.
 	^ self 
-		execute: (self astOf: method) 
-		withReceiver: newReceiver 
-		andArguments: arguments
+			execute: (self astOf: method) 
+			withReceiver: newReceiver 
+			andArguments: arguments
 ```
 
 And we use it in the test method infrastructure. It is good because it removes 
@@ -318,10 +322,10 @@ the duplication of logic around getting the AST and its associated class.
 ```
 CInterpreterTest >> executeSelector: aSymbol withReceiver: aReceive
 	^ self interpreter
-		send: aSymbol
-		receiver: aReceiver
-		lookupFromClass: aReceiver class
-		arguments: #()
+			send: aSymbol
+			receiver: aReceiver
+			lookupFromClass: aReceiver class
+			arguments: #()
 ```
 
 With this change most of our tests should pass. 
@@ -351,8 +355,9 @@ CInterpreterTest >> testReturnSuper
 		withReceiver: receiver) == receiver
 ```
 
-Now all our tests pass. 
-
+Now all our tests pass.
+In the following chapter, we will take advantage of the method `send:receiver:lookupFromClass:arguments:`
+and use it more systematically.
 
 ### Conclusion
 
