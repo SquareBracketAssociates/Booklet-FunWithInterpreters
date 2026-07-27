@@ -138,17 +138,15 @@ This is what we will see now.
 
 ### Unknown Messages
 
-
 ![When a message is not found, another message is sent to the receiver supporting reflective operation. % width=65&label=fig:LookupWithError](figures/Ref-LookupWithError.pdf)
 
 
+When the method is not found, the message `error` is sent as shown in Figure *@fig:LookupWithError@*. Sending a message instead of simply reporting an error using a trace or an exception is a key design decision. Indeed classes can define their own implementation of the method `error` and perform specific actions to the case of messages that are not understood.  For example, it is possible to implement proxies (objects representing other remote objects) or compile code on the fly by redefining such a message locally.
 
-### Handling unknown messages
 
+### Handling Unknown Messages
 
-When the method is not found, the message `error` is sent as shown in Figure *@fig:LookupWithError@*. Sending a message instead of simply reporting an error using a trace or an exception is a key design decision. In Pharo, this is done via the `doesNotUnderstand:` message, and it is an important reflective hook. Indeed classes can define their own implementation of the method `error` and perform specific actions to the case of messages that are not understood.  For example, it is possible to implement proxies (objects representing other remote objects) or compile code on the fly by redefining such a message locally.
-
-Here is a sketch of the lookup algorithm with error handling.
+Here is a sketch of the lookup algorithm with error handling. The key point is that the lookup returns a method or nil.
 
 ```
 lookup (selector class):
@@ -159,7 +157,9 @@ lookup (selector class):
            else lookup (selector superclass(class))
 ```
 
-And then we redefine sending a message as follows:
+And then we define sending a message as follows:
+First the lookup is performed and depending on its result (i.e. the method is not found)
+another message is sent else the method is executed.
 
 ```
 sending a message (receiver argument)
@@ -169,17 +169,19 @@ sending a message (receiver argument)
       else return apply(methodOrNil receiver arguments)
 ```
 
-Before extending the interpreter to support unknow messages we should discuss 
 
-### Does not understand and Message Reification
+### Unknown Messages in Pharo
 
 In Pharo, when an object receives a message for which the lookup does not find a corresponding method, it sends instead the `doesNotUnderstand:` message to that object, with the "original message" as an argument.
 This original message is not only the selector but it comprises the arguments too. 
 
-The interpreter should take a selector and arguments to create an object representation of the message. 
-We say the interpreter reifies the message.
+In fact since the original unknowm message can have difference numbers of parameters and the message `doesNotUnderstand:` only define one parameterm there is a need to collect all the information of the unknown message (selector and arguments) into a single object. This is what is done in Pharo, an instance of the class `Message` is created, fill up with the unknown message information and passed as arguments of the `doesNotUnderstand:` message.
 
-##### About Reification.
+So the interpreter should take the selector and arguments of the unknown message and create an object representation of the message. We say the interpreter reifies the message.
+
+Before jumping in  the support for `doesNotUnderstand:` we want to discuss the notion of reification. 
+
+### About Reification
 
 Reification is the process of making concrete something that was not. 
 In the case of the interpreter of a programming language, many of the operations of the language are implicit and hidden in the interpreter's execution. 
@@ -198,8 +200,12 @@ This is what we will do with message reifications: we will create them when a me
 
 ### Implementing `doesNotUnderstand:`
 
-To implement the does not understand feature, let's start by setting up our testing scenario: a method sending a not understood `messageIDoNotUnderstandWithArg1:withArg:2` message.
+To implement the support for unknown message feature, let's start by setting up our testing scenario: a method sending a not understood `messageIDoNotUnderstandWithArg1:withArg2:` message.
 
+```
+CInterpretable >> sendMessageNotUnderstood
+	^ self messageIDoNotUnderstandWithArg1: 17 withArg2: 27
+```
 This message should be looked-up and not found, so the interpreter should send a `doesNotUnderstand:` message to the same receiver with the message reification. 
 
 For the message reification, we are going to follow Pharo's behavior and expect an instance of `Message` that should have the selector and an array with all the arguments. 
@@ -213,13 +219,7 @@ CInterpretable >> doesNotUnderstand: aMessage
 	^ aMessage
 ```
 
-
-To put in place our test scenario we define a new method sending an unknown message and a couple of tests.
-
-```
-CInterpretable >> sendMessageNotUnderstood
-	^ self messageIDoNotUnderstandWithArg1: 17 withArg2: 27
-```
+### Tests for DNU support
 
 We define two tests covering that the implementation captures the message information.
 
@@ -228,7 +228,8 @@ CInterpreterTest >> testDoesNotUnderstandReifiesMessageWithSelector
 	self
 		assert: (self executeSelector: #sendMessageNotUnderstood) selector
 		equals: #messageIDoNotUnderstandWithArg1:withArg2:
-
+```
+```
 CInterpreterTest >> testDoesNotUnderstandReifiesMessageWithArguments
 	self
 		assert: (self executeSelector: #sendMessageNotUnderstood) arguments
@@ -237,6 +238,9 @@ CInterpreterTest >> testDoesNotUnderstandReifiesMessageWithArguments
 
 
 These two tests will fail in the interpreter, because the method lookup will return `nil`, which will fail during method activation. 
+
+### Support for DNU
+
 To address it, we need to handle this problem and send the `doesNotUnderstand:` message, as we said before.
 For this we modify the method ` send:receiver:lookupFromClass:arguments:` as follows: 
 
@@ -246,7 +250,10 @@ For this we modify the method ` send:receiver:lookupFromClass:arguments:` as fol
 
 
 ```
-CInterpreter >> send: aSelector receiver: newReceiver lookupFromClass: lookupClass arguments: arguments [
+CInterpreter >> send: aSelector 
+	receiver: newReceiver 
+	lookupFromClass: lookupClass 
+	arguments: arguments
 
 	| method |
 	method := self lookup: aSelector fromClass: lookupClass.
@@ -259,15 +266,21 @@ CInterpreter >> send: aSelector receiver: newReceiver lookupFromClass: lookupCla
 			selector: aSelector
 			arguments: arguments.
 		^ self
-			send: #doesNotUnderstand:
-			newReceiver: receiver
-			lookupFromClass: lookupClass
-			arguments: { messageReification } ].
-
-	^ self execute: method withReceiver: newReceiver andArguments: arguments
+				send: #doesNotUnderstand:
+				receiver: newReceiver
+				lookupFromClass: lookupClass
+				arguments: { messageReification } ].
+	
+	^ self 
+			execute: (self astOf: method) 
+			withReceiver: newReceiver 
+			andArguments: arguments
 ```
 
-Note that reifying does not understand requires that our interpreter knows two new things about our language: what selector is used for report the error (`#doesNotUnderstand:`), and what class is used to reify `Message`. 
+All the tests should now pass. 
+
+#### Remark.
+Note that reifying does not understand requires that our interpreter knows two new things about our language: what selector is used for report the error (here `#doesNotUnderstand:`), and what class is used to reify `Message`. 
 In this case we are implementing a Pharo evaluator that runs in the same environment as the evaluated program: they share the same memory, classes, global variables. 
 Because of this we make use of the existing selector and classes in Pharo. 
 
@@ -275,8 +288,7 @@ In contrast, implementing an evaluator that runs on a different environment than
 This is for this reason that the Pharo virtual machine needs to know the selector of the message to be sent in case of message not understood. 
 
 
-All the tests should now pass. 
 
 ### Conclusion
 
-In this chapter, we have shown how the `doesNotUnderstand:` feature is implemented, by handling the lookup error, and we introduced the concept of reification to concretize and lift up the failing message from our evaluator to the language.
+In this chapter, we have tested more thoroughly the support for `super` and shown how the `doesNotUnderstand:` feature is implemented, by handling the lookup error, and we introduced the concept of reification to concretize and lift up the failing message from our evaluator to the language.
