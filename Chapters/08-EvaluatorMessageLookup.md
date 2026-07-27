@@ -205,12 +205,11 @@ Once we can access this method we will be able to find its class and from this c
 
 
 We can store this information in the current frame during the method's activation.
-We add it for now as a fake temporary variable in the frame, with the name ___`method`.
-By prefixing the variable's name with ___ we make it less probable this fake variable creates a conflict with a real variable. 
+We add it for now as a fake temporary variable in the frame, with the name `___method`.
+By prefixing the variable's name with `___`, we make it less probable this fake variable creates a conflict with a real variable. 
 If we would have just named it e.g., `method`, any method with a normal normal temporary called `method` would be broken.
 
 
-HERE: quid of the currentMethod methodClass rerturning nil!
 HERE: self tempAt: \#self put: anObject.?
 ```
 CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
@@ -249,7 +248,7 @@ When a message is sent a new frame is pushed with a new method, and on return th
 So the top frame always contains the method it executes.
 
 
-Finally, we redefine the `visitMessageNode:` method to change the class where to start looking for the method. 
+Finally, we redefine the `visitMessageNode:` method to change the class where to start looking for the method e.g., in the superclass of the class defining the method for `super` receivers (`self currentMethod methodClass superclass`).
 
 ```
 CInterpreter >> visitMessageNode: aMessageNode
@@ -263,46 +262,103 @@ CInterpreter >> visitMessageNode: aMessageNode
 	^ self execute: (self astOf: method) withReceiver: newReceiver andArguments: args
 ```
 
-HERE may be astOf: should set the class of the method in the ast as properties or something like that.
+We are getting closer and closer to get the test pass.
+The test still fails because it uses an old method `executeSelector:withReceiver:` that was defined as 
+
+```
+CInterpreterTest >> testLookupSuperMessage
+	self assert: (self executeSelector: #doesSuperLookupFromSuperclass)
+```
+
+### Revisiting Old Logic
+
+The method `executeSelector:withReceiver:` was quite basic and does not support lookup logic.
+
+The test `testLookupSuperMessageNotInReceiverSuperclass` does not pass because it fails 
+before being able to execute the method. 
+
+
+In particular the ast did not know its methodClass. We address this to make sure that the test passes. 
+
+```
+executeSelector: aSymbol withReceiver: aReceiver
+	| ast |
+	ast := OCParser parseMethod: (CInterpretable >> aSymbol) sourceCode.
+	ast methodClass: CInterpretable.
+	^ self interpreter execute: ast withReceiver: aReceiver
+```
 
 With this last change, your tests should now all pass.
 
+This change is not satisfactory because it hardcodes the  and we should do better.
+The method `executeSelector:withReceiver:` makes the strong assumption that the executed method is defined in the class `CInterpretable` and this clearly not always the case. So it is not working for any method defined in another class.
 
-### Overridden Messages
+### Introduction of `send:`
 
-We have made sure that sending a message to `super` starts looking at methods in the superclass of the class defining the method. 
-Now we would like to make sure that the lookup works even in the presence of overridden methods.
-
-Let's define the method `overriddenMethod` in a superclass returning a value, and in a subclass just doing a super send with the same selector.
-
-
-```
-CInterpretableSuperClass >> overriddenMethod
-	^ 5
-
-CInterpretable >> overriddenMethod
-	^ super overriddenMethod
-```
-
-
-If our implementation is correct, sending the message `overriddenMethod` to our test receiver should return `5`. 
-If it is not, the test should fail, or worse, loop infinitely.
-
-Then we check that our test returns the correct value. If the test loops infinitely the test will timeout.
+To address this limit, we introduce the following method in the interpreter: `send:receiver:lookupFromClass:arguments:`.
+It first looks for the method in the class of the receive then executes the method. 
 
 ```
-CInterpreterTest >> testLookupRedefinedMethod
-	self assert: (self executeSelector: #overriddenMethod) equals: 5
+CInterpreter >> send: aSelector 
+	receiver: newReceiver 
+	lookupFromClass: lookupClass 
+	arguments: arguments
+
+	| method |
+	method := self lookup: aSelector fromClass: lookupClass.
+	^ self 
+		execute: (self astOf: method) 
+		withReceiver: newReceiver 
+		andArguments: arguments
 ```
 
+And we use it in the test method infrastructure. It is good because it removes 
+the duplication of logic around getting the AST and its associated class.
 
-This test should pass.
+```
+CInterpreterTest >> executeSelector: aSymbol withReceiver: aReceive
+	^ self interpreter
+		send: aSymbol
+		receiver: aReceiver
+		lookupFromClass: aReceiver class
+		arguments: #()
+```
+
+With this change most of our tests should pass. 
+
+
+### The Last Failing Test
+
+The following test is failing, and this is obvious because there is no `returnSuper` in the class Object.
+
+```
+CInterpreterTest >> testReturnSuper
+	receiver := Object new.
+	"Convey our intention of checking identity by using an explicit identity check"
+	self assert: (self
+		executeSelector: #returnSuper
+		withReceiver: receiver) == receiver
+```
+
+We update it as follows: 
+
+```
+CInterpreterTest >> testReturnSuper
+	receiver := CInterpretable new.
+	"Convey our intention of checking identity by using an explicit identity check"
+	self assert: (self
+		executeSelector: #returnSuper
+		withReceiver: receiver) == receiver
+```
+
+Now all our tests pass. 
 
 
 ### Conclusion
 
 In this chapter we extended the interpreter to implement method lookup. 
 We took in particular the case of `super`. 
-In the following chapter, we will present how to support the case where the looked up method
+In the following chapter, we will make sure that we test against the wrong definition of super semantics as well as make sure that our solution handles correctly overridden methods. 
+We will also cover the case where the looked up method
 is not found. 
 

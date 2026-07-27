@@ -8,6 +8,40 @@ In this chapter, we show how to handle this case. We extend the interpreter with
 We start by revisiting the current method lookup implementation. Doing so, we will be ready to handle the case of unknown messages.
 
 
+### Overridden Messages
+
+We have made sure that sending a message to `super` starts looking at methods in the superclass of the class defining the method. 
+Now we would like to make sure that the lookup works even in the presence of overridden methods.
+
+Let's define the method `overriddenMethod` in a superclass returning a value, and in a subclass just doing a super send with the same selector.
+
+
+```
+CInterpretableSuperClass >> overriddenMethod
+	^ 5
+```
+
+```
+CInterpretable >> overriddenMethod
+	^ super overriddenMethod
+```
+
+
+If our implementation is correct, sending the message `overriddenMethod` to our test receiver should return `5`. 
+If it is not, the test should fail, or worse, loop infinitely.
+
+Then we check that our test returns the correct value. If the test loops infinitely the test will timeout.
+
+```
+CInterpreterTest >> testLookupRedefinedMethod
+	self assert: (self executeSelector: #overriddenMethod) equals: 5
+```
+
+
+This test should pass.
+
+
+
 ### Correct Semantics Verification
 
 To ensure that the method lookup is correctly implemented, especially in the presence of `super` messages, we need to stress our implementation with an extra scenario. Several books wrongly define that `super` messages lookup methods starting from the superclass of the class of the receiver. This is plain wrong.
@@ -78,80 +112,10 @@ CInterpreter >> visitMessageNode: aMessageNode
 ```
 
 
-### Make the Test Pass
-
-The test `testLookupSuperMessageNotInReceiverSuperclass` does not pass because it fails 
-before being able to execute the method. Indeed, the method `executeSelector:withReceiver:`
-makes the strong assumption that the executed method is defined in the class `CInterpretable`
-and this clearly not always the case. 
-
-```
-executeSelector: aSymbol withReceiver: aReceiver
-	| ast |
-	ast := OCParser parseMethod: (CInterpretable >> aSymbol) sourceCode.
-	ast methodClass: CInterpretable.
-	^ self interpreter execute: ast withReceiver: aReceiver
-```
-
-When we analyze the problem we see that a method lookup phase is missing.
-Starting from the receiver class, we should look for the correct compiled method. Here the method `redefinedMethod` is defined in the superclas sof `Cinterpretable`.
-To address this limit, we introduce the following method in the interpreter:
-It first looks for the method in the class of the receive then executes the method. 
-
-```
-CInterpreter >> send: aSelector 
-	receiver: newReceiver 
-	lookupFromClass: lookupClass 
-	arguments: arguments
-
-	| method |
-	method := self lookup: aSelector fromClass: lookupClass.
-	^ self 
-		execute: (self astOf: method) 
-		withReceiver: newReceiver 
-		andArguments: arguments
-```
-
-And we use it in the test method infrastructure. It is good because it removes 
-the duplication of logic around getting the AST and its associated class.
 
 
-```
-CInterpreterTest >> executeSelector: aSymbol withReceiver: aReceive
-	^ self interpreter
-		send: aSymbol
-		receiver: aReceiver
-		lookupFromClass: aReceiver class
-		arguments: #()
-```
 
-With this change most of our tests should pass. 
 
-The following is failing, and this is obvious because there is no `returnSuper` in the class Object.
-
-```
-testReturnSuper
- 
-  receiver := Object new.
-  "Convey our intention of checking identity by using an explicit identity check"
-	self assert: (self
-      executeSelector: #returnSuper
-      withReceiver: receiver) == receiver
-```
-
-We update it as follows 
-
-```
-testReturnSuper
- 
-  receiver := CInterpretable new.
-  "Convey our intention of checking identity by using an explicit identity check"
-	self assert: (self
-      executeSelector: #returnSuper
-      withReceiver: receiver) == receiver
-```
-
-Now all our tests pass. 
 
 We can refactor a bit more and make `visitMessageNode:` use the new message `send:receiver:lookupFromClass:arguments:` as follows: 
 
