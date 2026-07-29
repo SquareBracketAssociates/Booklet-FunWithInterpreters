@@ -280,8 +280,9 @@ CInterpreter >> send: aSelector
 All the tests should now pass. 
 
 #### Remark.
-Note that reifying does not understand requires that our interpreter knows two new things about our language: what selector is used for report the error (here `#doesNotUnderstand:`), and what class is used to reify `Message`. 
-In this case we are implementing a Pharo evaluator that runs in the same environment as the evaluated program: they share the same memory, classes, global variables. 
+Note that reifying does not understand requires that our interpreter knows two new things about our language: what selector is used for report the error (here `#doesNotUnderstand:`), and what class is used to reify the message. 
+
+In our case,  we are implementing a Pharo evaluator that runs in the same environment as the evaluated program: they share the same memory, classes, global variables. 
 Because of this we make use of the existing selector and classes in Pharo. 
 
 In contrast, implementing an evaluator that runs on a different environment than the evaluated program (e.g., a Pharo evaluator implemented in C), such dependencies need to be made explicit through a clear language-interpreter interface. 

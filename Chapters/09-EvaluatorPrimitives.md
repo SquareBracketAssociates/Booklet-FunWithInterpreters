@@ -1,8 +1,7 @@
 ## Primitive Operations
 @cha:prims
 
-
-Our interpreter does not handle yet any essential behavior such as basic number operations.  This prevents us from evaluating complex programs.
+Our interpreter does not yet handle any essential behavior such as basic number operations.  This prevents us from evaluating complex programs.
 This chapter introduces the concept of primitive methods as done in Pharo and extends the interpreter to evaluate them. 
 
 We will study how primitive methods work in Pharo, and how they should be properly implemented, including the evaluation of their fallback code (i.e., what happens when a primitive fails).
@@ -11,7 +10,7 @@ This opens the door to the evaluation of more interesting programs.
 
 ### The need for Primitives in Pharo
 
-We call primitive behavior, behavior that needs to be implemented in the interpreter or evaluator because it cannot be purely expressed in the programming language, Pharo in this case. 
+We call _primitive_ behavior a behavior that needs to be implemented in the interpreter or evaluator because it cannot be purely expressed in the programming language, Pharo in this case. 
 
 Let's consider, for example, the operation of adding up two numbers (`+`).
 We cannot express in a pure and concise way a normal method of executing an addition.
@@ -28,9 +27,9 @@ In addition to essential behavior, primitive behavior is often used to implement
 Differently, from languages such as Java or C, which express arithmetics as special operators that are compiled/interpreted differently, Pharo maintains the message send metaphor for primitive behavior. 
 Indeed, in Pharo,  `+` is a message that triggers a method look-up and a method  activation. 
 
-This separation makes redefining operators as simple as implementing a method with the selector `+` in our own class, without the need for special syntax for it. The primitive should just be tagged with an id so that the Virtual machine finds its definition and executes it. 
+This separation makes redefining operators as simple as implementing a method with the selector `+` in our own class, without the need for special syntax for it. The primitive should just be tagged with an id so that the virtual machine finds its definition and executes it. 
 
-In Pharo the design of primitives is split in three different parts: _messages_, _primitive methods_ (the Pharo method that is annotated), and the _primitive_ itself which is provided by the interpreter - in the case of our interpreter this is a method that implements the primitive behavior. In the case of a Virtual Machine, it is a C function. 
+In Pharo the design of primitives is split in three different parts: _messages_, _primitive methods_ (the Pharo method that is annotated), and the _primitive_ itself which is provided by the interpreter - in the case of our interpreter this is a method that implements the primitive behavior. In the case of a virtual machine, it is a C function. 
 
 
 ###Study: Primitives invoked as Messages
@@ -77,18 +76,18 @@ The only difference between this method and a normal one is that this method als
 Before diving into how _primitive methods_ are executed, let us introduce the third component in place: the _interpreter primitives_.
 A primitive is a piece of code (another method) defined in the interpreter that will be executed when a primitive method is executed. 
 
-To make a parallel between our interpreter and the Pharo virtual machine: the virtual machine executes a C-function when a primitive method is executed.
+To make a parallel between our interpreter and the Pharo virtual machine: the virtual machine executes a C function when a primitive method is executed.
 
 The virtual machine interpreter defines a set of supported primitives with unique ids. We will mimic this behavior and in our interpreter, the primitive with id `1` implements the behavior that adds up two integers.
 
 
 When a primitive method is activated, 
-the body of the method is normally not executed. Instead the primitive 1 is executed.
-The method body is only executed, if the primitive failed.
+the body of the method is normally not executed. Instead, the primitive 1 is executed.
+The method body is only executed if the primitive failed.
 
-More concretely, when a primitive method is activated, 
+More concretely, when a primitive method is activated:
 
-- it first looks up what _primitive_ to execute based on its primitive id number, and executes it.
+- It first looks up what _primitive_ to execute based on its primitive id number, and executes it.
 - The primitive performs some validations if required, executes the corresponding behavior, and returns either with a success if everything went ok, or a failure if there was a problem.
 - On success, the method execution returns with the value computed by the primitive. 
 - On failure, the body of the method is executed instead. Because of this, the body of a primitive method is also named the "fall-back code".
@@ -110,7 +109,9 @@ Doing `1 + 5` the primitive should always be a success and return `6`.
 ```
 CInterpretable >> smallintAdd
 	^ 1 + 5
+```
 
+```
 CInterpreterTests >> testSmallIntAddPrimitive
 	self
 		assert: (self executeSelector: #smallintAdd)
@@ -120,22 +121,51 @@ CInterpreterTests >> testSmallIntAddPrimitive
 
 ### Primitive Table Addition
 
-We extend the method evaluation in a simple way: During the activation of a primitive method, we need to look for the primitive to execute and check for failures.
-Therefore we need to map primitive ids to primitive methods.
+We extend the method evaluation simply: During the activation of a primitive method, we need to look for the primitive to execute and check for failures.
+Therefore, we need to map primitive ids to primitive methods.
 
-We implement such a mapping using a table with the form `<id, evaluator_selector>`. 
+
+To implement such a mapping, we use a table with the form `<id, evaluator_selector>`. 
+We add an instance variable named `primitives` in the interpreter.
+
+```
+Object << #CInterpreter
+	slots: { #stack . #globalScope . #primitives };
+	package: 'Champollion2'
+```
+
+We define the method `initializePrimitiveTable` to initialize the mapping between the primitive id and the Pharo method to be executed. 
+
 The `primitives` instance variable is initialized to a dictionary as follows: 
 
 ```
 CInterpreter >> initialize
+	
 	super initialize. 
-	stack := Stack new.
+	stack := CTStack new.
+	globalScope := CGlobalScope new.
 	primitives := Dictionary new.
-	self initializePrimitiveTable.
+	self initializePrimitiveTable
 ```
 
+We define `initializePrimitiveTable` as an empty method for now. 
 
-Then we define the method `initializePrimitiveTable` to initialize the mapping between the primitive id and the Pharo method to be executed. 
+```
+CInterpreter >> initializePrimitiveTable
+	"For now left empty"
+```	
+
+We introduce a way to access the value of an argument with the method `argumentAt:`.
+
+```
+CInterpreter >> argumentAt: anInteger
+	^ self tempAt: (self currentMethod arguments at: anInteger) name
+```
+
+### `primitiveSmallIntegerAdd` implementation
+
+To define the primitive behavior for small integers addition, 
+We have to declare in the primitive table that the primitive behavior associated with the `+` operation is specified in the primitive method `primitiveSmallIntegerAdd`.
 
 ```
 CInterpreter >> initializePrimitiveTable
@@ -143,7 +173,7 @@ CInterpreter >> initializePrimitiveTable
 ```
 
 
-We define the primitive `primitiveSmallIntegerAdd` as follows: 
+We define a first basic version (without any robutness checks) of the primitive `primitiveSmallIntegerAdd` as follows: 
 
 ```
 CInterpreter >> primitiveSmallIntegerAdd
@@ -153,12 +183,7 @@ CInterpreter >> primitiveSmallIntegerAdd
 	^ receiver + argument
 ```
 
-We introduce a way to access the value of an argument with the method `argumentAt:`.
-
-```
-CInterpreter >> argumentAt: anInteger
-	^ self tempAt: (self currentMethod arguments at: anInteger) name
-```
+Now that a first primitive is declared and implemented, we should put in place the handling for primitives at the level of the message-passing mechanism (i.e. message evaluation).
 
 
 
@@ -192,7 +217,7 @@ CInterpreter >> visitMethodNode: aMethodNode
 	^ self visitNode: aMethodNode body
 ```
 
-Our new test pass.
+All the tests should pass.
 
 
 ### Primitive Failure Preparation
