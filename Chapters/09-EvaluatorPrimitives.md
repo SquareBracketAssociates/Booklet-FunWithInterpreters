@@ -236,7 +236,9 @@ To produce one of such failing cases, we can implement primitive 1 in our `CInte
 CInterpretable >> failingPrimitive
 	<primitive: 1>
 	^ 'failure'
+```
 
+```
 CInterpretable >> callingFailingPrimitive
 	^ self failingPrimitive
 ```
@@ -253,12 +255,11 @@ CInterpreterTest >> testFailingPrimitive
 ### Primitive Failure Implementation
 
 To add primitive failures cleanly, we introduce them as exceptions.
+We define a new subclass of `Exception` named `CPrimitiveFailed`.
 
-We define a new subclass of `Exception` named `CPrimitiveFailed`
-
+We then improve the definition of the primitive `primitiveSmallIntegerAdd`.
 In the primitive `primitiveSmallIntegerAdd`, if we detect a failure condition, we raise a `CPrimitiveFailed` error.
-Note that this primitive implementation is incomplete since we should also test that the argument and the result are small integers
-as shown in the following sections.
+Note that this primitive implementation is incomplete since we should also test that the argument and the result are small integers as shown in the following sections.
 
 
 ```
@@ -279,14 +280,42 @@ CInterpreter >> visitMethodNode: aMethodNode
 	[ aMethodNode isPrimitive ifTrue: [ 
 		^ self executePrimitiveMethod: aMethodNode ]]
 		on: CPrimitiveFailed do: [ :err | 
-			"Nothing, just continue with the method body" ].
+			"Nothing, just continue with the execution of method body which 
+			for primitive is the fallback code." ].
 	
 	^ self visitNode: aMethodNode body
 ```
 
-
 With these changes, everything should work fine now.
   
+
+
+### Analysing `visitMethodNode:`
+
+The `visitMethodNode:` definition can be confusing let us take a moment to analyse it again. 
+To be clear we need to see the three pieces together: the first definition, the _interpreter_ primitive implementation and the _Pharo_ primitive implementation.
+
+
+```
+CInterpreter >> primitiveSmallIntegerAdd
+     ...
+```
+
+```
+SmallInteger >> + aNumber
+	<primitive: 1>
+	^ super + aNumber
+```     
+
+The argument of the `visitMethodNode:` is a Pharo method. When such a method is a _Pharo_ primitive (i.e., it has the pragma annotation) the condition is basically doing a special interpretation: it executes the corresponding _interpreter_ method primitive that we implemented inside the 
+class `CInterpreter`. When such an execution raises a `CPrimitiveFailed` exception, the interpretation continues with the interpretation of the _Pharo_ primitive fallback code. 
+
+What we see is that there is a go-and-back between the _Pharo_ primitive and the definition of the corresponding primitive in the interpreter. 
+- First, the _Pharo_ primitive pragma is used to identify the _interpreter_ primitive, then the interpreter executes the interpreter primitive. 
+- This is only on failure of such a logic (which in a runtime is implemented in C, for example) that the interpreter should execute the fallback code of _Pharo_ primitive.
+
+
+
 ### Typical Primitive Failure Cases
 
 For primitives to work properly, and for Pharo to be a safe language, primitives should properly do a series of checks.
@@ -306,9 +335,10 @@ We define the method `numberOfArguments` as follows:
 
 ```
 CInterpreter >> numberOfArguments
-	
 	^ self currentMethod numArgs
 ```
+
+### Better Definition of Addition
 
 We define a better implementation of the addition primitive with checks: 
 We verify that the receiver, argument, and result are small integers.
@@ -333,47 +363,27 @@ CInterpreter >> primitiveSmallIntegerAdd
 	^ result
 ```
 
+At the moment, since the interpreter does not support conditional and block execution, we cannot execute the primitive fallback code of many primitives and in particular of the `SmallInteger` `+` method. We will come back to this once the interpreter supports blocks.
 
-### Stepping 
-
-The `visitMethodNode:` definition above can be confusing let us take a moment to analyse it again. 
-To be clear we need to see the three pieces together: the first definition, the _interpreter_ primitive implementation and the _Pharo_ primitive implementation.
-
-```
-CInterpreter >> visitMethodNode: aMethodNode
-
-	[ aMethodNode isPrimitive ifTrue: [ 
-		^ self executePrimitiveMethod: aMethodNode ]]
-		on: CPrimitiveFailed do: [ :err | 
-			"Nothing, just continue with the method body" ].
-	
-	^ self visitNode: aMethodNode body
-```
-
-```
-CInterpreter >> primitiveSmallIntegerAdd
-     ...
-```
 
 ```
 SmallInteger >> + aNumber
+	"Primitive. Add the receiver to the argument and answer with the result
+	if it is a SmallInteger. Fail if the argument or the result is not a SmallInteger."
+
 	<primitive: 1>
 	^ super + aNumber
-```     
-
-The argument of the `visitMethodNode:` is a Pharo method. When such a method is a _Pharo_ primitive (i.e., it has the pragma annotation)
-the condition is basically doing a special interpretation: it executes the corresponding _interpreter_ method primitive that we implemented inside the 
-class `CInterpreter`. When such an execution raises a `CPrimitiveFailed` exception, the interpretation continues with the interpretation of the _Pharo_ primitive fallback code. 
-
-What we see is that there is a go and back between the _Pharo_ primitive and the definition of the corresponding primitive
-in the interpreter. 
-First the _Pharo_ primitive pragma is used to identify the _interpreter_ primitive, then the interpreter executes the interpreter primitive. 
-This is only on failure of the such a logic (which in a runtime is implemented in C for example) that the interpreter should execute
-the fallback code of _Pharo_ primitive.
-
-At the moment since the interpreter does not support conditional and block execution, we cannot execute the primitive fallback code. 
-
-
+	
+Integer >> + aNumber
+	
+	aNumber isInteger ifTrue:
+		[^ self negative == aNumber negative
+			  ifTrue: [ (self digitAdd: aNumber) normalize]
+			  ifFalse: [ self digitSubtract: aNumber]].
+	aNumber isFraction ifTrue:
+		[^Fraction numerator: self * aNumber denominator + aNumber numerator denominator: aNumber denominator].
+	^ aNumber adaptToInteger: self andSend: #+
+```
 
 ### Conclusion
 
