@@ -530,7 +530,10 @@ Following the definition of `primitiveSmallIntegerLessThan`, implement the follo
 - `primitiveSmallIntegerLessOrEqualsThan`, and 
 - `primitiveSmallIntegerGreaterOrEqualsThan`.
 
+### Primitive Identical 
 
+The primitive identical and non identical perform only one check: they expect one argument of any kind.
+Here are their definitions:
 
 ```
 CInterpreter >> primitiveIdentical
@@ -540,15 +543,48 @@ CInterpreter >> primitiveIdentical
 	^ self receiver == (self argumentAt: 1)
 ```
 
-Define some tests to ensure that your implementation is correct.
+```
+CInterpreter >> primitiveNotIdentical
+	self numberOfArguments < 1
+		ifTrue: [ CPrimitiveFailed signal ].
 
+	^ self receiver ~= (self argumentAt: 1)
+```
 
+We add the following helper method in the test class:
 
+```
+CInterpreterTest >> executeSelector: aSymbol withReceiver: aReceiver andArgs: args
+	
+	^ self interpreter
+		send: aSymbol
+		receiver: aReceiver
+		lookupFromClass: aReceiver class
+		arguments: args
+```
+This way we can define tests without the need for the definition of helpers in the class CInterpretable.
+We define some tests to ensure that your implementation is correct.
+
+```
+CInterpreterTest >> testIdenticalIsTrue
+
+	self executeSelector: #== withReceiver: 1 andArgs: {1}.
+	self executeSelector: #== withReceiver: receiver andArgs: { receiver }
+```
+
+```
+CInterpreterTest >> testNotIdenticalIsTrue
+
+	self executeSelector: #== withReceiver: 1 andArgs: {2}.
+	self executeSelector: #== withReceiver: receiver andArgs: { 2 }
+```
 ### Essential Primitives:  Array Manipulation
 
-So far our interpreter is able to manipulate only objects with instance variables, but not objects with variable size such as arrays or their variants e.g., strings.
+So far our interpreter is only able to manipulate objects with instance variables, but not objects with variable size such as arrays or their variants e.g., strings.
 Arrays are special objects whose state is accessed with primitives, usually in methods named `at:`, `at:put:`, and `size`.
-Array access primitives check that the receiver is of the right kind and that the index arguments are integers within the bounds of the array.
+
+Array access primitives have different constraints: they must check that the receiver is of the right kind (support index access) and that the index arguments are integers within the bounds of the array.
+
 The following definition illustrates `Array` access primitives for general Arrays, and Strings.
 
 ```
@@ -568,72 +604,78 @@ The primitive `primitiveAt` verifies that the receiver is an object supporting t
 
 ```
 CInterpreter >> primitiveAt
-
+	| argument |
 	self numberOfArguments = 1
 		ifFalse: [ CPrimitiveFailed signal ].
 
 	self receiver class classLayout isVariable
 		ifFalse: [ CPrimitiveFailed signal ].
-	
-	((self argumentAt: 1) isKindOf: SmallInteger)
+
+	argument := self argumentAt: 1.
+	(argument isKindOf: SmallInteger)
 		ifFalse: [ CPrimitiveFailed signal ].
 		
 	"Bounds check"
-	((self argumentAt: 1) between: 1 and: self receiver size)
+	(argument between: 1 and: self receiver size)
 		ifFalse: [ CPrimitiveFailed signal ].
-		
-	^ self receiver basicAt: (self argumentAt: 1)
+
+	^ self receiver basicAt: argument
 ```
 
 Here is a simple test verifying that the implementation is correct.
 
 
 ```
-CInterpretable >> at
-
-	^ #(11 22 33) at: 2
-```
-
-```
-CInterpreterTest >> testAt
-	self assert: (self executeSelector: #at) equals: 22
+CInterpreterTest >> testAtForArray
+	self 
+		assert: (self executeSelector: #at: 
+			withReceiver: #(1  22 333) 
+			andArgs: {2} )
+		equals: 22
 ```	
 
-Note that at this point, since the interpreter is not able to execute conditional and blocks, it cannot interpret 
+Note that at this point, since the interpreter is not able to execute conditionals and blocks, it cannot interpret 
 failure of the primitive at: because it contains conditionals. 
 
 
 
 
-
-
-
-
+### String Access Primitive
 
 The primitive `primitiveStringAt` verifies that the receiver is from a class whose elements are bytes.
 It uses the class format information using the method `isBytes`.
 
-
 ```
 CInterpreter >> primitiveStringAt
+	| argument |
 	self numberOfArguments = 1
 		ifFalse: [ CPrimitiveFailed signal ].
-		
+
 	self receiver class classLayout isBytes
 		ifFalse: [ CPrimitiveFailed signal ].
-	
-	((self argumentAt: 1) isKindOf: SmallInteger)
+	argument := self argumentAt: 1.
+	(argument isKindOf: SmallInteger)
 		ifFalse: [ CPrimitiveFailed signal ].
+
 	"Bounds check"
-	
-	((self argumentAt: 1) between: 1 and: self receiver size)
+	(argument between: 1 and: self receiver size)
 		ifFalse: [ CPrimitiveFailed signal ].
-	
-	^ self receiver at: (self argumentAt: 1)
+
+	^ self receiver at: argument
 ```
 
+The following test shows that it the string access.
 
+```
+CInterpreterTest >> testAtForString
+	self 
+		assert: (self executeSelector: #at: 
+			withReceiver: 'Abcdef' 
+			andArgs: {2} )
+		equals: $b
+```
 
+### Size Collection Primitive
 
 The primitive `primitiveSize` verifies that the receiver is an object that has the notion of size. It uses the layout of the class to do so.
 
@@ -641,45 +683,44 @@ The primitive `primitiveSize` verifies that the receiver is an object that has t
 CInterpreter >> primitiveSize
 	self receiver class classLayout isVariable
 		ifFalse: [ CPrimitiveFailed signal ].
-
 	^ self receiver basicSize
 ```
 
 We define a simple test as follows:
 
-
 ```
-CInterpretable >> atSize
-
-	^ #(11 22 33)
-```
-
-```
-CInterpreterTest >> testAtSize
-	self assert: (self executeSelector: #atSize) equals: 3
+CInterpreterTest >> testSize
+	self 
+		assert: (self executeSelector: #size withReceiver: 'Abcdef')
+		equals: 6.
+	self 
+		assert: (self executeSelector: #size withReceiver: #(1 22 333))
+		equals: 3
 ```
 
+
+### Array Modification
 
 Now we implement the primitive that supports the modification of arrays.
 
 
 ```
 CInterpreter >> primitiveAtPut
-
+	| argument |
 	self numberOfArguments = 2
 		ifFalse: [ CPrimitiveFailed signal ].
 
 	self receiver class classLayout isVariable
 		ifFalse: [ CPrimitiveFailed signal ].
-	
-	((self argumentAt: 1) isKindOf: SmallInteger)
+	argument := self argumentAt: 1.
+	(argument isKindOf: SmallInteger)
 		ifFalse: [ CPrimitiveFailed signal ].
 		
 	"Bounds check"
-	((self argumentAt: 1) between: 1 and: self receiver size)
+	(argument between: 1 and: self receiver size)
 		ifFalse: [ CPrimitiveFailed signal ].
 		
-	^ self receiver basicAt: (self argumentAt: 1) put: (self argumentAt: 2)
+	^ self receiver basicAt: argument put: (self argumentAt: 2)
 ```
 
 We test it as follows:
