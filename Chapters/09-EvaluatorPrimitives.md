@@ -743,14 +743,14 @@ CInterpreterTest >> testAtPut
 
 ### Essential Primitives:  Object Allocation
 
-We will implement important primitives: the primitives for object allocation.
+We implement now some really important primitives: the primitives for object allocation.
 Object allocation is implemented by primitives `new` and `new:`.
 
 - The method `new` allocates a new object from a fixed-slot class.
 - The method `new:` allocates a new object from a variable-slot class such as `Array`, using the number of slots specified as argument. 
 
-Both these primitives validate that the receiver are classes of the specified kinds.
-In addition `new:` does check that there is an argument, it is a positive small integer.
+These primitives should validate that their receivers are classes of the specified kinds.
+In addition, `new:` does check that there is an argument, it is a positive small integer.
 
 ```
 CInterpreter >> initializePrimitiveTable
@@ -761,7 +761,8 @@ CInterpreter >> initializePrimitiveTable
 ```
 
 
-To interpret basic new we rely on the one of Pharo because our interpreter does not its own memory management. 
+
+To interpret `basicNew`, we rely on the one of Pharo because our interpreter does not its own memory management. 
 
 ```
 CInterpreter >> primitiveBasicNew
@@ -783,17 +784,17 @@ Here we make sure that the Pharo Point class is accessible in the global scope o
 
 ```
 CInterpreterTest >> testPointNew
-	
 	| p |
 	self interpreter globalEnvironmentAt: #Point put: Point.
-	p := (self executeSelector: #newPoint).
+	p := self executeSelector: #newPoint.
 	self
 		assert: p class 
-		equals: Point.
-	 
+		equals: Point
 ```
 
-For `basicNew:` we follow the same approach as before. We validate that the class is a class supporting variable number of instance variables.
+### BasicNew: Primitive
+
+For `basicNew:`, we follow the same approach as before. We validate that the class is a class supporting variable number of instance variables.
 
 ```
 CInterpreter >> primitiveBasicNewVariable
@@ -804,11 +805,11 @@ CInterpreter >> primitiveBasicNewVariable
 		ifFalse: [ CPrimitiveFailed signal ].
 	self receiver classLayout isVariable
 		ifFalse: [ CPrimitiveFailed signal ].
-	
-	((self argumentAt: 1) isKindOf: SmallInteger)
+	argument := self argumentAt: 1.
+	(argument isKindOf: SmallInteger)
 		ifFalse: [ CPrimitiveFailed signal ].
 	
-	^ self receiver basicNew: (self argumentAt: 1)
+	^ self receiver basicNew: argument
 ```
 
 The following test verifies that the primitive is working. We also expose Array as a global variable of the interpreter.
@@ -828,12 +829,11 @@ CInterpreterTest >> testArrayNew
 
 ```
 CInterpretable >> newArray
-
 	^ Array basicNew: 4  
 ```
 
 
 ### Conclusion
 
-This chapter shows the implementation of multiple primitives behavior. 
+This chapter presented the implementation of multiple important primitives.
 The short list of essential primitives we presented are required to execute more interesting Pharo programs.
