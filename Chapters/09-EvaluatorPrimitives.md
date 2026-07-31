@@ -307,7 +307,7 @@ SmallInteger >> + aNumber
 	^ super + aNumber
 ```     
 
-The argument of the `visitMethodNode:` is a Pharo method. When such a method is a _Pharo_ primitive (i.e., it has the pragma annotation) the condition is basically doing a special interpretation: it executes the corresponding _interpreter_ method primitive that we implemented inside the 
+The argument of the `visitMethodNode:` is a Pharo method node (it is an AST that contains all the nodes of the method definitions). When such a method is a _Pharo_ primitive (i.e., it has the pragma annotation) the condition is basically doing a special interpretation: it executes the corresponding _interpreter_ method primitive that we implemented inside the 
 class `CInterpreter`. When such an execution raises a `CPrimitiveFailed` exception, the interpretation continues with the interpretation of the _Pharo_ primitive fallback code. 
 
 What we see is that there is a go-and-back between the _Pharo_ primitive and the definition of the corresponding primitive in the interpreter. 
@@ -399,11 +399,12 @@ With such implementation we will be able to execute more realistic programs.
 
 
 
-## Essential Primitives
+## More Essential Primitives
+@chap:moreessential
 
-In this chapter, we will focus on implementing more primitives.
-We will implement more mathematical primitives but also support for comparisons, and 
-array allocation. 
+In this chapter, we implement more primitives. In particular we will define
+more mathematical primitives but also support for string comparisons and 
+object allocation such as array.
 
 
 
@@ -419,10 +420,10 @@ For space reasons, we do not include subtraction and multiplication, their imple
 ```
 CInterpreter >> initializePrimitiveTable
 	...
-	primitives at: 1 	  put: #primitiveSmallIntegerAdd.
-	primitives at: 2 	  put: #primitiveSmallIntegerMinus.
-	primitives at: 9 	  put: #primitiveSmallIntegerMultiply.
-	primitives at: 10  put: #primitiveSmallIntegerDivide.
+	primitives at: 1	put: #primitiveSmallIntegerAdd.
+	primitives at: 2	put: #primitiveSmallIntegerMinus.
+	primitives at: 9	put: #primitiveSmallIntegerMultiply.
+	primitives at: 10	put: #primitiveSmallIntegerDivide.
 	...
 ```
 
@@ -451,21 +452,21 @@ CInterpreter >> primitiveSmallIntegerDivide
 	^ result
 ```
 
-We let you define integer subtraction and multiplication. 
+We let you define integer subtraction and multiplication and define corresponding tests.
 
 
 
 
 ### Essential Primitives:  Comparison
 
-Comparison primitives span in two different sets. 
-- The first set contains the primitives implementing number comparisons such as less than or greater or equals than. 
-- The second set contains the primitives for object identity comparison: identity equals to and identity not equals to.
+Comparison primitives span in two different sets:
+- The first set contains the primitives implementing number comparisons such as less, greater than, or equals. 
+- The second set contains the primitives for object identity comparison: identity equality and its inverse.
 
-All number comparisons all require a small integer receiver, a small integer argument.
+All number comparisons all require a small integer receiver and a small integer argument.
 Identity comparisons only require that the primitive receives an argument to compare to.
 
-The following definitions illustrate the two kinds of methods with small integer less than and object idenity equality.
+The following definitions illustrate the two kinds of methods with small integer less than and object identity equality.
 
 ```
 CInterpreter >> initializePrimitiveTable
@@ -483,11 +484,11 @@ CInterpreter >> initializePrimitiveTable
 	...
 ```
 
-The following primitives following the same patterns and are self-explanatory.  
+The following primitives follow the same patterns and are self-explanatory.  
 
 ```
 CInterpreter >> primitiveSmallIntegerLessThan
-	| receiver argument result |
+	| receiver argument |
 	self numberOfArguments < 1
 		ifTrue: [ CPrimitiveFailed signal ].
 
@@ -500,6 +501,28 @@ CInterpreter >> primitiveSmallIntegerLessThan
 		ifFalse: [ CPrimitiveFailed signal ].
 
 	^ receiver < argument
+```
+
+We add a test to cover simply when the primitive does not fail because the interpreter does not support block closures yet.
+
+```
+CInterpretable >> lessThanIsFalse
+	^ 1 < 5
+```
+
+```
+CInterpretable >> lessThanIsTrue
+	^ 1 < 5
+```
+
+```
+CInterpreterTest >> testLessThanIsFalse
+	self deny: (self executeSelector: #lessThanIsFalse)
+```
+
+```
+CInterpreterTest >> testLessThanIsTrue
+	self assert: (self executeSelector: #lessThanIsTrue)
 ```
 
 Following the definition of `primitiveSmallIntegerLessThan`, implement the following primitives
