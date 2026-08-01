@@ -191,44 +191,41 @@ We will extend it in the following sections.
 
 In Pharo, blocks are _lexical_ closures i.e., basically anonymous functions without a name that capture the environment in which they are defined.
 
-A block can have its own temporary variables. Such variables are initialized during each block execution and are local to the block. We will see later how such variables are kept. Now the question we want to make clear is what is happening when a block refers to other (non-local) variables. A block will close over the external variables it uses. It means that even if the block is executed later in an environment that does not lexically contain the variables used by a block, the block will still have access to the variables during its execution. 
+A block can have its own temporary variables. Such variables are initialized during each block execution and are local to the block. We will see later how such variables are kept. Now the question we want to make clear is what happens when a block refers to other (non-local) variables. A block will close over the external variables it uses. It means that even if the block is executed later in an environment that does not lexically contain the variables used by a block, the block will still have access to the variables during its execution. 
 
-In Pharo, private variables (such as self, instance variables, method temporaries and arguments) are lexically scoped: an expression in a method can access to the variables visible from that method, but the same expression put in another method or class cannot access the same variables because they are not in the scope of the expression (i.e. visible from the expression). 
+In Pharo, private variables (such as self, instance variables, method temporaries, and arguments) are lexically scoped: an expression in a method can access the variables visible from that method, but the same expression put in another method or class cannot access the same variables because they are not in the scope of the expression (i.e., visible from the expression). 
 
-SD: can we say that this is a stack frame (I mean the Pharo block refer to a context?)
-At runtime, the variables that a block can access, are bound (get a value associated to them) in _the context_  in which the block that contains them is _defined_, rather than the context in which the block is evaluated. It means that a block, when evaluated somewhere else can access variables that were in its scope (visible to the block) when the block was _created_. Traditionally, the context in which a block is defined is named the _block home context_.
+SD: can we say that this is a stack frame (I mean the Pharo block refers to a context?)
+At runtime, the variables that a block can access are bound (get a value associated with them) in _the context_  in which the block that contains them is _defined_, rather than the context in which the block is evaluated. It means that a block, when evaluated somewhere else, can access variables that were in its scope (visible to the block) when the block was _created_. Traditionally, the context in which a block is defined is named the _block home context_.
 
-The block home context represents a particular point of execution (since this is a program execution that created the block in the first place), therefore this notion of block home context is represented by an object that represents program execution: a context object in Pharo. In essence, a context (called stack frame or activation record in other languages) represents information about the current evaluation step such as the context from which the current one is executed, the next byte code to be executed, and temporary variable values. A context is a Pharo execution stack element.
+The block home context represents a particular point of execution (since this is a program execution that created the block in the first place), therefore, this notion of block home context is represented by an object that represents program execution: a context object in Pharo. In essence, a context (called a stack frame or activation record in other languages) represents information about the current evaluation step, such as the context from which the current one is executed, the next bytecode to be executed, and temporary variable values. A context is a Pharo execution stack element.
 
 A block is an anonymous function created inside a context (an object that represents a point in the execution).
 
-
+Let us start with a simple management of closure temporaries.
 
 
 
 
 ### Closure Temporaries
 
-Our simplified closure implementation does not yet have support for closure temporaries.
+Our simplified closure implementation does not yet have support for closure variables (temporaries).
 Indeed, a closure such as the following will fail with an interpreter failure because `temp` is not defined in the frame.
 
 ```
 [ | temp | temp ] value
 ```
 
-
-To solve this we need to declare all block temporaries when activating the block, as we did previously for methods.
+To solve this, we need to declare all block temporaries when executing the block, as we did previously for methods.
 As a first attempt to make our test green, let's declare block temporaries once the block is activated:
 
 ```
 CInterpreter >> primitiveBlockValue
-	"Initialize all temporaries to nil"
 	| blockCode |
 	blockCode := self receiver code.
 	blockCode temporaryNames do: [ :e | self tempAt: e put: nil ].
 	^ self visitNode: blockCode body
 ```
-
 
 We are now able to execute the following expression
 
@@ -243,7 +240,6 @@ Let us define the following test:
 
 ```
 CInterpretable >> returnBlockWithVariableValue
-
 	^ [ | a b |
 		a := 1.
 		b := 2.
@@ -260,17 +256,18 @@ CInterpreterTest >> testBlockValueWithTemporariesValue
 
 ### Removing Logic Repetition
 
-
-The handling of temporaries in `primitiveBlockValue` is very similary to a sequence of messages we wrote when activating a normal method in method `execute:withReceiver:andArguments:`. In particular in the `manageArgumentsTemps:of:` method.
+The handling of temporaries in `primitiveBlockValue` is very similar to a sequence of messages we wrote when activating a normal method in method `execute:withReceiver:andArguments:`. In particular, in the `manageArgumentsTemps:of:` method.
 
 ```
-CInterpreter >> primitiveBlockValue	"Receiver is an instance of CBlock"		| blockCode |	blockCode := self receiver.	blockCode code temporaryNames do: [ :e | self tempAt: e put: nil ].	self receiver: blockCode definingContext receiver.	^ self visitNode: blockCode code body
+CInterpreter >> primitiveBlockValue
+	| blockCode |
+	blockCode := self receiver.
+	blockCode code temporaryNames do: [ :e | self tempAt: e put: nil ].
+	^ self visitNode: blockCode code body
 ```
-
 
 ```
 CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
-
 	...
 	self manageArgumentsTemps: aCollection of: anAST.
 	...
@@ -278,7 +275,6 @@ CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 
 ```
 CInterpreter >>manageArgumentsTemps: aCollection of: anAST
-
 	anAST arguments
 		with: aCollection
 		do: [ :arg :value | self tempAt: arg name put: value ].
@@ -290,7 +286,8 @@ We solve this repetition by moving temporary initialization to the `visitSequenc
 
 ```
 CInterpreter >> visitSequenceNode: aSequenceNode
-	"Initialize all temporaries to nil"
+	"Visit the sequence and return the result of the last statement.
+	Initialize the sequence temporaries to nil."
 
 	aSequenceNode temporaryNames do: [ :e | self tempAt: e put: nil ].
 
@@ -311,13 +308,12 @@ CInterpreter >> primitiveBlockValue
 We remove the temporary management from `manageArgumentsTemps:of:` and rename it. 
 ```
 CInterpreter >>manageArguments: aCollection of: anAST
-
 	anAST arguments
 		with: aCollection
 		do: [ :arg :value | self tempAt: arg name put: value ].
 ```
 
-The resulting code is nicer and simpler. This is a clear indication that the refactoring was a good move.
+All the tests should pass and the resulting code is nicer and simpler. This is a clear indication that the refactoring was a good move.
 
 
 ### Capturing the Defining Context
@@ -432,17 +428,16 @@ In our test, the enclosing environment creates a temporary. The block reads that
 When the block executes and returns, the value of its temporary should have been updated from 0 to 1.
 
 ```
-CHInterpretable >> increaseEnclosingTemporary [
+CInterpretable >> increaseEnclosingTemporary
 	| temp |
 	temp := 0.
 	[ temp := temp + 1 ] value.
 	^ temp
-]
 
-CHInterpreterTest >> testIncreaseEnclosingTemporary [
+CInterpreterTest >> testIncreaseEnclosingTemporary 
 	self assert: (self executeSelector: #increaseEnclosingTemporary) equals: 1
-]
 ```
+
 
 
 !!note should add some diagrams here
@@ -458,25 +453,29 @@ However, so far the only object in our design knowing the defining frame is the 
 One possibility is to store a block reference in its frame when it is activated, and then go from a frame to its block to its defining frame and continue the lookup. Another possibility, which we will implement, is to directly store the defining context in the frame when the block is activated.
 
 ```
-CHInterpreter >> primitiveBlockValue [
+CInterpreter >> primitiveBlockValue
 	| theBlock |
 	theBlock := self receiver.
 	self receiver: (theBlock definingContext at: #self).
 	self tempAt: #__definingContext put: theBlock definingContext.
 	^ self visitNode: theBlock code body
-]
 ```
 
 
 ```
-CHInterpreter >> lookupFrameDefiningTemporary: aName [
+CInterpreter >> lookupFrameDefiningTemporary: aName
 	| currentLookupFrame |
 	currentLookupFrame := self topFrame.
 	[ currentLookupFrame includesKey: aName ]
 		whileFalse: [ currentLookupFrame := currentLookupFrame at: #__definingContext ].
 	^ currentLookupFrame
-]
 ```
+
+
+
+
+
+
 
 
 !!note should add some diagrams here
@@ -487,18 +486,17 @@ This is what what the method `visitTemporaryNode:` does.
 
 
 ```
-CHInterpreter >> visitTemporaryNode: aTemporaryNode [
+CInterpreter >> visitTemporaryNode: aTemporaryNode
 	| definingFrame |
 	definingFrame := self lookupFrameDefiningTemporary: aTemporaryNode name.
 	^ definingFrame at: aTemporaryNode name
-]
 ```
 
 
 Temporary writes are similar to read. We need to lookup the frame where the variable is defined and write the value to it.
 
 ```
-CHInterpreter >> visitAssignmentNode: aRBAssignmentNode [
+CInterpreter >> visitAssignmentNode: aRBAssignmentNode [
 	| rightSide |
 	rightSide := self visitNode: aRBAssignmentNode value.
 	aRBAssignmentNode variable variable isTempVariable
@@ -512,6 +510,27 @@ CHInterpreter >> visitAssignmentNode: aRBAssignmentNode [
 	^ rightSide
 ]
 ```
+
+```
+setVariableAndDefineBlock
+	| t |
+	t := 42.
+	self evaluateBlock: [ t traceCr ]
+```
+
+```	
+evaluateBlock: aBlock
+	| t |
+	t := nil.
+	aBlock value	
+	
+setVariableAndDefineBlock 
+--> 42
+```
+
+
+
+
 
 
 ### Block Non-Local Return
