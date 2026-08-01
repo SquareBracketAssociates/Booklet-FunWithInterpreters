@@ -118,7 +118,7 @@ Let us write a testing scenario for this case: evaluating the following block sh
 
 ```
 CInterpretable >> returnBlockValue
-	^ [ 1 . 5 ] value
+	^ [ 'a' . 5 ] value
 ```
 
 
@@ -127,9 +127,10 @@ CInterpreterTest >> testBlockValueIsLastStatementValue
 	self assert: (self executeSelector: #returnBlockValue) equals: 5
 ```
 
+This test should fail because the method `value` is special for blocks.
 
 Closures are executed when they receive the message `value` or one of its variants such as value `value:`, `value:value:`...
-On the reception of such messages, their bodies should be executed. Theses messages are defined in Pharo as primitives as shown in the following: 
+On the reception of such messages, their bodies should be executed. Theses messages are defined in Pharo as primitives as shown in the following method definition: 
 
 ```
 BlockClosure >> value
@@ -147,7 +148,7 @@ BlockClosure >> value
 ### Block Execution Implementation
 
 We follow the design of Pharo and we add a new primitive responsible for the block body execution. 
-For this we define a method value on the CBlock and tag it as a primitive. Then we declare a new primitive
+For this we define a method value on the `CBlock` and tag it as a primitive. Then we declare a new primitive
 in the interpreter table and finally we define a first version of the primitive corresponding to the value execution. 
 
 We define the method `value` on the class `CBlock` as a primitive number 207. 
@@ -163,19 +164,22 @@ CBlock >> value
 
 We now need to implement the new primitive in the evaluator.
 A first version of it is to just visit the body of the block's code.
-Remember that primitives are executed in their own frame already, so the block's body will share the frame 
-created for the primitive method.
 
 ```
-CInterpreter >> initializePrimitiveTable
-  ...
-  primitives at: 207 put: #primitiveBlockValue.
-  ...
-
 CInterpreter >> primitiveBlockValue
 	^ self visitNode: self receiver code body
 ```
+Remember that primitives are executed in their own frame already, so the block's body will share the frame 
+created for the primitive method.
 
+And we declare the primitive.
+
+```
+CInterpreter >> initializePrimitiveTable
+   ...
+  primitives at: 207 put: #primitiveBlockValue.
+   ...
+```
 
 So far we implemented only a simple version of closures. 
 We will extend it in the following sections. 
