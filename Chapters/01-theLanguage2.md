@@ -18,6 +18,17 @@ define interpreters of increasing level of power:
 - Chapter *@cha:callingInfra@* introduces the infrastructure to support sending messages: a stack as well as a method scope. 
 - Chapter *@cha:messageArgs@* extends the previous one to introduce support for parameters and temporaries.
 
+
+### Convention
+
+In this book we follow the convention that results are prefixed with `>>>`.
+Hence the execution of `1 + 2` yields the value `3`.
+
+```
+1 + 2 
+>>> 3
+```
+
 ### Todo
 
 Write in chapter  *@cha:callingInfra@* why we use methodScope as a stack frame element

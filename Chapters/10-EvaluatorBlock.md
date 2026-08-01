@@ -1,31 +1,67 @@
 ## Block Closures and Control Flow Statements
 
-
-In this chapter we will extend our evaluator to manage block closures. Block closures, also named lexical closures, or just blocks in Pharo, are an important concept in most modern programming languages, including Pharo. A lexical closure is an anonymous function that captures its definition environment.
+In this chapter, we extend our evaluator to manage block closures. Block closures, also named lexical closures, or just blocks in Pharo, are an important concept in most modern programming languages, including Pharo. A lexical closure is an anonymous function that captures its definition environment.
 
 This chapter starts by explaining what blocks are and how they are evaluated.
 Block evaluation, being a core part of the language definition, is a service that is requested to the evaluator/interpreter through a primitive.
-We then dive into the lexical capture feature of blocks: when a block closure is created, it captures its defining context, namely its enclosing context (i.e., the visible variables that the block can see). This makes blocks able to read and write not only its own temporary variables but also all the variables accessible to its enclosing context and to maintain such a link even when passed around.
+
+We then dive into the lexical capture feature of blocks: when a block closure is created, it captures its defining context, namely its enclosing context (i.e., the visible variables that the block can see). This makes blocks able to read and write not only their own temporary variables but also all the variables accessible to its enclosing context and to maintain such a link even when passed around.
 Finally, we implement non-local returns: return instructions that return to the block _definition context_ instead of the current one. 
-Non-local returns are really important in Pharo since they are used to express early returns (the fact that the execution of a method can be stopped at a given point) a frequent language feature similar to `break` statements in other languages.
-Without non-local return it would difficult to quit the current execution.
+
+Non-local returns are really important in Pharo since they are used to express early returns (the fact that the execution of a method can be stopped at a given point), a frequent language feature similar to `break` statements in other languages. Without non-local return, it would be difficult to quit the current execution.
 
 ### Closures
 
-Closures allow developers to abstract general algorithms from their particular details. For example, a sorting algorithm can be separated from its sorting criteria by making the sorting criteria a block closure passed as argument to it. This allows developers to have the sorting algorithm defined and tested in a single place, and being able to reuse it with multiple criterion in different contexts.
+Closures allow developers to abstract general algorithms from their particular details. For example, a sorting algorithm can be separated from its sorting criteria by making the sorting criteria a block closure passed as an argument to it. This allows developers to have the sorting algorithm defined and tested in a single place, and being able to reuse it with multiple criteria in different contexts.
 
-In Pharo, blocks are _lexical_ closures i.e., basically functions without a name that capture the environment in which they are defined. 
-Lexical closures are at the center of the Pharo language, because Pharo leverages closures to define its _control-flow_ instructions: conditionals, iterations, and early returns. This means that implementing block closures is enough to support all kind of control flow statements in Pharo.
-Moreover, Pharo libraries make usage of block closures to define library-specific control flow instructions, such as the `do:` and `select:` messages understood by collections. Pharo developers often use closures in the Domain Specific languages that they design. 
-Developers are also encouraged to define their own control flow statements, to hide implementation details of their libraries from their users.
+In Pharo, blocks are _lexical_ closures i.e., basically anonymous functions without a name that capture the environment in which they are defined.
 
-### Representing a Block Closure
 
-When a block expression is executed `[ 1+2 ]`, the instructions inside the block definition are not executed.
+Lexical closures are at the center of the Pharo language, because Pharo leverages closures to define its _control-flow_ instructions: conditionals, iterations, and early returns. 
+
+The following example of factorial illustrates this.
+
+```
+Integer >> slowFactorial
+	self > 0
+		ifTrue: [ ^ self * (self - 1) slowFactorial ].
+	self = 0
+		ifTrue: [ ^ 1 ].
+	self error: 'Not valid for negative integers'
+```
+
+
+
+This means that implementing block closures is enough to support all kinds of control flow statements in Pharo.
+Moreover, Pharo libraries make use of block closures to define library-specific control flow instructions, such as the `do:` and `select:` messages understood by collections. Pharo developers often use closures in the Domain Specific Languages that they design.
+
+Developers are also encouraged to define their own control flow statements to hide implementation details of their libraries from their users.
+
+
+
+When a block _expression_ is executed `[ 1+2 ]`, the instructions inside the block definition are not executed.
 Instead, a block object is created, containing those instructions.
+
+```
+[ 1 + 2 ]
+>>> [ 1 + 2 ]
+```
+
 The execution of those instructions is delayed until we send the message `value` to the block object.
 
-This means that from the evaluator point of view, the evaluation of the closure will be different from the evaluation of its execution. Evaluating a block node will return a block object, and the method `value` will require a primitive to request the interpreter the block's execution. This means that we need a way to represent a closure object in our evaluator, and that closure should store the code it is supposed to evaluate later when receiving the `value` message.
+```
+[ 1 + 2 ] value
+>>> 3
+```
+
+
+
+
+
+This means that from the evaluator's point of view, the evaluation of the closure will be different from the evaluation of its execution. Evaluating a block node will return a block object, and the method `value` will require a primitive to request the interpreter the block's execution. This means that we need a way to represent a closure object in our evaluator, and that closure should store the code it is supposed to evaluate later when receiving the `value` message.
+
+
+### Representing a Block Closure
 
 Let us define the class `CBlock` to represent a block.
 It has an instance variable `code` to hold the block's AST, instance of the `BlockNode` class.
