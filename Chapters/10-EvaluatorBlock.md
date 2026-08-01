@@ -1,4 +1,4 @@
-## Block Closures and Control Flow Statements
+## Block Closures
 
 In this chapter, we extend our evaluator to manage block closures. Block closures, also named lexical closures, or just blocks in Pharo, are an important concept in most modern programming languages, including Pharo. A lexical closure is an anonymous function that captures its definition environment.
 
@@ -10,12 +10,9 @@ Finally, we implement non-local returns: return instructions that return to the 
 
 Non-local returns are really important in Pharo since they are used to express early returns (the fact that the execution of a method can be stopped at a given point), a frequent language feature similar to `break` statements in other languages. Without non-local return, it would be difficult to quit the current execution.
 
-### Closures
+### Closures: Control Flow Building Bricks
 
 Closures allow developers to abstract general algorithms from their particular details. For example, a sorting algorithm can be separated from its sorting criteria by making the sorting criteria a block closure passed as an argument to it. This allows developers to have the sorting algorithm defined and tested in a single place, and being able to reuse it with multiple criteria in different contexts.
-
-In Pharo, blocks are _lexical_ closures i.e., basically anonymous functions without a name that capture the environment in which they are defined.
-
 
 Lexical closures are at the center of the Pharo language, because Pharo leverages closures to define its _control-flow_ instructions: conditionals, iterations, and early returns. 
 
@@ -31,12 +28,15 @@ Integer >> slowFactorial
 ```
 
 
-
 This means that implementing block closures is enough to support all kinds of control flow statements in Pharo.
 Moreover, Pharo libraries make use of block closures to define library-specific control flow instructions, such as the `do:` and `select:` messages understood by collections. Pharo developers often use closures in the Domain Specific Languages that they design.
 
 Developers are also encouraged to define their own control flow statements to hide implementation details of their libraries from their users.
 
+
+### Block
+
+In Pharo, blocks are _lexical_ closures i.e., basically anonymous functions without a name that capture the environment in which they are defined.
 
 
 When a block _expression_ is executed `[ 1+2 ]`, the instructions inside the block definition are not executed.
@@ -54,20 +54,16 @@ The execution of those instructions is delayed until we send the message `value`
 >>> 3
 ```
 
-
-
-
-
-This means that from the evaluator's point of view, the evaluation of the closure will be different from the evaluation of its execution. Evaluating a block node will return a block object, and the method `value` will require a primitive to request the interpreter the block's execution. This means that we need a way to represent a closure object in our evaluator, and that closure should store the code it is supposed to evaluate later when receiving the `value` message.
+The evaluation of a closure s different from the evaluation of its execution
+From an interpreter point of view, evaluating a block node should return a block object, and the method `value` requires a primitive to request the interpreter the block's execution. This means that we need a way to represent a closure object in our evaluator, and that closure should store the code it is supposed to evaluate later when receiving the `value` message.
 
 
 ### Representing a Block Closure
 
 Let us define the class `CBlock` to represent a block.
-It has an instance variable `code` to hold the block's AST, instance of the `BlockNode` class.
-Notice that we do not use the existing `BlockClosure` class from Pharo, since this class is tied up with the Pharo bytecode.
+It has an instance variable `code` to hold the block's AST, instance of the `OCBlockNode` class. We omit the accessors.
 
-For the sake of simplicity, we will not reconciliate bytecode and AST implementations, meaning that we need our own AST-based block implementation.
+Notice that we do not use the existing `BlockClosure` class from Pharo, since this class is tied up with the Pharo bytecode. For the sake of simplicity, we will not reconciliate bytecode and AST implementations, meaning that we need our own AST-based block implementation.
 
 ```
 Object << #CBlock
@@ -75,23 +71,8 @@ Object << #CBlock
 	package: 'Champollion-Core'
 ```
 
-```
-CBlock >> code: aBlockNode 
-	code := aBlockNode
-```
-
-
-```
-CBlock >> code
-	^ code
-```
-
-
-
-
 
 #### Block Definition
-
 
 When the interpreter encounters a block node, it creates a block object for it.
 We define the method `visitBlockNode:` as follows: 
@@ -105,6 +86,10 @@ CInterpreter >> visitBlockNode: aBlockNode
 
 We add a simple test to verify the correct definition of block objects.
 
+```
+CInterpretable >> returnBlock
+	^ [ 'a' . 5 ]
+```
 
 ```
 CInterperter >> testBlockDefinition
@@ -117,13 +102,10 @@ CInterperter >> testBlockDefinition
 		
 	self 
 		assert: bk code class 
-		equals: RBBlockNode 
+		equals: OCBlockNode 
 ```
 
-```
-CInterpretable >> returnBlock
-	^ [ 1 . 5 ]
-```
+
 
 ### Block Execution
 
@@ -197,6 +179,25 @@ CInterpreter >> primitiveBlockValue
 
 So far we implemented only a simple version of closures. 
 We will extend it in the following sections. 
+
+
+
+
+### Closure and Variables
+
+In Pharo, blocks are _lexical_ closures i.e., basically anonymous functions without a name that capture the environment in which they are defined.
+
+A block can have its own temporary variables. Such variables are initialized during each block execution and are local to the block. We will see later how such variables are kept. Now the question we want to make clear is what is happening when a block refers to other (non-local) variables. A block will close over the external variables it uses. It means that even if the block is executed later in an environment that does not lexically contain the variables used by a block, the block will still have access to the variables during its execution. 
+
+In Pharo, private variables (such as self, instance variables, method temporaries and arguments) are lexically scoped: an expression in a method can access to the variables visible from that method, but the same expression put in another method or class cannot access the same variables because they are not in the scope of the expression (i.e. visible from the expression). 
+
+SD: can we say that this is a stack frame (I mean the Pharo block refer to a context?)
+At runtime, the variables that a block can access, are bound (get a value associated to them) in _the context_  in which the block that contains them is _defined_, rather than the context in which the block is evaluated. It means that a block, when evaluated somewhere else can access variables that were in its scope (visible to the block) when the block was _created_. Traditionally, the context in which a block is defined is named the _block home context_.
+
+The block home context represents a particular point of execution (since this is a program execution that created the block in the first place), therefore this notion of block home context is represented by an object that represents program execution: a context object in Pharo. In essence, a context (called stack frame or activation record in other languages) represents information about the current evaluation step such as the context from which the current one is executed, the next byte code to be executed, and temporary variable values. A context is a Pharo execution stack element.
+
+A block is an anonymous function created inside a context (an object that represents a point in the execution).
+
 
 
 

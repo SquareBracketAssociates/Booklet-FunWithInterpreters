@@ -1,6 +1,6 @@
 ## Interpreting Pharo
 
-We are going to write a programming language interpreter. And this raises the question of the language we are going to interpret.
+We are going to write a programming language interpreter. This raises the question of the language we are going to interpret.
 A language that is too complex would take ages to implement, the book would be too long.
 Think of implementing any programming language you know: how many features does it have?
 Complex languages have a lot of accidental complexity (think C, C++, Java).
@@ -19,7 +19,7 @@ define interpreters of increasing level of power:
 - Chapter *@cha:messageArgs@* extends the previous one to introduce support for parameters and temporaries.
 
 
-### Convention
+### Conventions
 
 In this book we follow the convention that results are prefixed with `>>>`.
 Hence the execution of `1 + 2` yields the value `3`.
