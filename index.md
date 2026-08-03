@@ -20,4 +20,5 @@
 <!inputFile|path=Chapters/08-EvaluatorMessageLookup.md!>
 <!inputFile|path=Chapters/08-EvaluatorMessageError.md!>
 <!inputFile|path=Chapters/09-EvaluatorPrimitives.md!>
+<!inputFile|path=Chapters/10-Cascade.md!>
 <!inputFile|path=Chapters/10-EvaluatorBlock.md!>

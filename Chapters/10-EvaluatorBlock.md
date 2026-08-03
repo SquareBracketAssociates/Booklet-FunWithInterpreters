@@ -274,7 +274,7 @@ CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 ```
 
 ```
-CInterpreter >>manageArgumentsTemps: aCollection of: anAST
+CInterpreter >> manageArgumentsTemps: aCollection of: anAST
 	anAST arguments
 		with: aCollection
 		do: [ :arg :value | self tempAt: arg name put: value ].
@@ -318,19 +318,56 @@ All the tests should pass and the resulting code is nicer and simpler. This is a
 
 ### Capturing the Defining Context
 
-Stef Here
+In this section, we evolve our closure execution infrastructure to support closure temporaries and to provide access to the enclosing environment.
+ 
+As we stated before, a closure is not just a function. It is a function that captures the context (set of variables that it can access) at the time of its definition. Block closures capture their _defining_ context or enclosing context, i.e., the context in which they are created.
 
-As we stated before, a closure is not just a function, it is a function that captures the context (set of variables that it can access) at the time of its definition. Block closures capture their _defining_ context or enclosing context, i.e., the context in which they are created.
-Blocks are able to read and write their own temporary variables, but also all the variables accessible to its enclosing context such as a temporary variable accessible during the block definition. In this section, we evolve our closure execution infrastructure to support closure temporaries and to provide access to the enclosing environment.
+Blocks are able to read and write their own temporary variables, but also all the variables accessible to their enclosing context. For example, a temporary variable is accessible during the block definition will be accessible during the block execution.
 
 The defining execution context gives the closure access to that context's receiver, arguments, and temporaries.
 
 Pay attention, it is a common mistake to think that the captured context is the caller context, and not the defining context.
-In the example above the distinction is not done because the definition context was the caller one. 
+
+In the previous example the distinction is not done because the definition context was the caller one. 
 However, as soon as we work on more complex scenarios, where blocks are sent as arguments of methods, or stored in temporary variables, this does not hold anymore.
 
+Let us check the following example.
+A variable is looked up in the block definition context. We define two methods `setVariableAndDefineBlock` and `setVariableAndDefineBlock:`. The first one defines a variable `t` and sets it to 42, and a block `[t traceCr]`.
+The second one defines a new variable with the same name and executes a block defined elsewhere.
 
-### self Capture
+```
+CInterpretable >> setVariableAndDefineBlock
+	| t |
+	t := 42.
+	self evaluateBlock: [ t traceCr ]
+	
+CInterpretable >> evaluateBlock: aBlock
+	| t |
+	t := nil.
+	aBlock value	
+
+CInterpretable new setVariableAndDefineBlock 
+>>> 42
+````
+
+
+Executing the `CInterpretable new setVariableAndDefineBlock` expression prints 42 in the Transcript (message `traceCr`). 
+
+- The value of the temporary variable `t` defined in the `setVariableAndDefineBlock` method is the one used rather than the one defined inside the method `evaluateBlock:` even if the block is evaluated during the execution of this method.
+- The variable `t` is  looked up in the context of the block creation (context created during the execution of the method `setVariableAndDefineBlock` and not in the context of the block evaluation (method `evaluateBlock:`).
+
+![Non-local variables are looked up the method activation context where the block was _created_ and not where it is _evaluated_.%width=80&anchor=fig:variable](./figures/variable.pdf)
+
+Let's look at it in detail. Figure *@fig:variable@* shows the execution of the expression `CInterpretable new setVariableAndDefineBlock`. 
+
+- During the execution of method `setVariableAndDefineBlock`, a variable `t` is allocated in the current context and it is assigned 42. Then a block is created and this block refers to the method activation context - which holds temporary variables (Step 1). 
+-  The method `evaluateBlock:` allocates its own local variable `t` with the same name than the one in the block. This is not this variable, however, that is used when the block is evaluated. While executing the method `evaluateBlock:` the block is evaluated (Step 2), during the execution of the expression `t traceCr` the non-local variable `t` is looked up in the `home context` of the block \ie the method context that _created_ the block and not the context of the currently executed method.
+
+
+
+
+
+### Capture of `self`
 
 A first scenario to check that our block properly captures the defining context is to evaluate `self` inside a block.
 In our current design, the receiver specified in the block's frame is the block itself.
@@ -345,8 +382,10 @@ CInterpreterTest >> testReadSelfInBlock
 	self assert: (self executeSelector: #readSelfInBlock) equals: receiver
 ```
 
+Verify that this test fails.
+
 To make this test pass, we need to implement two different things in the evaluator.
-- First we need to capture the defining context at block _definition_ time in `visitBlockNode:`. 
+- First we need to capture the defining context at block _definition_ time in the method `visitBlockNode:`. 
 - Second we need to use _that_ captured context to resolve variables.
 
 ### Capture Implementation 
@@ -363,31 +402,24 @@ Object << #CBlock
 
 Since a block is created when the block node is visited we extend the previous block creation to store 
 the current context at this moment.
-Note that this is this context that will be let block access to the temporaries and arguments it uses at the moment 
+Note that this is this context that will be used when a block accesses temporaries and arguments.
 the block is created. 
 
 ```
-CInterpreter >> visitBlockNode: aRBBlockNode
+CInterpreter >> visitBlockNode: aOCBlockNode
 	^ CBlock new
-		code: aRBBlockNode;
+		code: aOCBlockNode;
 		definingContext: self topFrame;
 		yourself
 ```
 
-### Accessing Captured Receiver
+### Accessing the Captured Receiver
 
 Resolving the block variables is a trickier case, as it can be resolved in many different ways.
 For now, we choose to set the correct values in the current frame upon block activation and shadow the possible ones that would be defined in the definition context.
 
 The first variable we want to provide access to from a block is `self` which is the original receiver
 of the method _at the time the block was created_. 
-
-The following method is worth explaining
-
-- First we grab the block itself. It is simple since the method `primitiveBlockValue` is executed during the evaluation of the message `value` sent to a block. Therefore `self receiver` returns the block currently executed.
-- Second remember that `self` in a block refers to the receiver of the method at the time the block was created. So we need to set as receiver the receiver that we found in the context of the block creation. This is what `theBlock definingContext receiver` is returning.
-- Finally we evaluate the block body.
-
 
 ```
 CInterpreter >> primitiveBlockValue
@@ -397,14 +429,22 @@ CInterpreter >> primitiveBlockValue
 	^ self visitNode: theBlock code body
 ```
 
+The previous method is worth explaining
+
+- First we grab the block itself. It is simple since the method `primitiveBlockValue` is executed during the evaluation of the message `value` sent to a block. Therefore `self receiver` returns the block currently executed.
+- Second remember that `self` in a block refers to the receiver of the method at the time the block was created. So we need to set as receiver the receiver that we found in the context of the block creation. This is what `theBlock definingContext receiver` is returning.
+- Finally we evaluate the block body.
+
+To make this works we need to define the method `receiver:`. 
+
 ```
 CInterpreter >> receiver: aValue
 	^ self tempAt: #self put: aValue
 ```
 
 
-Note that in the `primitiveBlockValue` we use the frame of message `value` execution. 
-The evaluation of the block body uses this frame. When the evaluation is done such frame is simply 
+Note that in the `primitiveBlockValue` we use the frame of the message `value` execution. 
+The evaluation of the block body uses this frame. When the evaluation is done such a frame is simply 
 popped as any other method executions (See `executeMethod:withReceiver:andArguments:`), therefore
 there are no worries to be made when we change the value of receiver. 
 `receiver` is not a state of the interpreter but refers to the current frame. 
@@ -511,22 +551,7 @@ CInterpreter >> visitAssignmentNode: aRBAssignmentNode [
 ]
 ```
 
-```
-setVariableAndDefineBlock
-	| t |
-	t := 42.
-	self evaluateBlock: [ t traceCr ]
-```
 
-```	
-evaluateBlock: aBlock
-	| t |
-	t := nil.
-	aBlock value	
-	
-setVariableAndDefineBlock 
---> 42
-```
 
 
 
