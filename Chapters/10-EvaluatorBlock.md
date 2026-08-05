@@ -1,3 +1,30 @@
+## Better Debugging
+
+
+### Improving Scope `printOn:`
+
+```
+CInstanceScope >> printOn: aStream
+	super printOn: aStream.
+	receiver ifNotNil: [ 
+			aStream nextPutAll: ' inst: '.
+			receiver printOn: aStream ]
+```
+
+```
+CMethodScope >> currentMethod
+	^ variables at: #___method
+```
+
+```
+CMethodScope >> printOn: aStream
+	super printOn: aStream.
+	receiver ifNotNil: [ 
+			aStream nextPutAll: ' rec: '.
+			receiver printOn: aStream.
+			aStream nextPutAll: ' selector: #' , self currentMethod selector ]
+```
+
 ## Block Closures
 
 In this chapter, we extend our evaluator to manage block closures. Block closures, also named lexical closures, or just blocks in Pharo, are an important concept in most modern programming languages, including Pharo. A lexical closure is an anonymous function that captures its definition environment.
@@ -460,7 +487,7 @@ We leave it as an exercise for the reader to verify their correctness.
 A problem we have not solved yet involves the reads and writes of temporary variables that are not part of the current frame.
 This is the case when a block tries to access a temporary of a parent lexical scope, such as another surrounding scope, or the home method. Our next scenario should check that blocks can correctly read and write temporaries of their enclosing contexts.
 
-The following method `readEnclosingTemporary` shows that the block `[ temp + temp ]` should be able to access the temporary variable `temp` defined in the method `readEnclosingTemporary`. Note that such temporary could have been defined in another method and passed as an argument to another method.
+The following method `readEnclosingTemporary` shows that the block `[ temp + temp ]` should be able to access the temporary variable `temp` defined in the method `readEnclosingTemporary` (See Figure *@nonlocalvariable@*). Note that such temporary could have been defined in another method and passed as an argument to another method.
 
 ```
 CInterpretable >> readEnclosingTemporary
@@ -469,7 +496,12 @@ CInterpretable >> readEnclosingTemporary
 	^ [ temp + temp ] value.
 ```
 
+Figure *@nonlocalvariable@* illustrates that 
+
+![Reading `temp` in `[ temp + temp ].` i.e., blocks should access temporaries defined in the definition context. %anchor=nonlocalvariable ](./figures/ReadNonLocalTemp.pdf)
+
 To validate this scenario the following test make sures that the correct behavior is implemented. 
+
 ```
 CInterpreterTest >> testReadEnclosingTemporary 
 	self 
@@ -477,10 +509,20 @@ CInterpreterTest >> testReadEnclosingTemporary
 		equals: 2
 ```
 
+The following scenario is also interesting. It shows that each block has a specific defining context that different temporary variables and that the second context is nested into the first one (see Figure *@nonlocalvariable2@*).
 
-![Reading `temp` in `[ temp + temp ]` ](./figures/ReadNonLocalTemp.pdf)
+![ Temporaries  in `[ tempMethod + tempBlock ]`. %anchor=nonlocalvariable2 ](./figures/ReadNonLocalTemp2.pdf)
 
+```
+CInterpretable >> readDoublyNestedEnclosingTemporary
+	| tempMethod |
+	tempMethod := 1.
+	^ [ | tempBlock |
+		tempBlock := 2.
+		[ tempMethod + tempBlock ] value ] value
+```
 
+![Browsing frames from `[ tempMethod + tempBlock ].` i.e., blocks should access temporaries defined in the definition context. %anchor=nonlocalvariable ](./figures/ReadDoublyScreenshot.png)
 
 ### Temporary Lookup Implementation
 
@@ -490,12 +532,18 @@ The lookup should stop when the current lookup context does not have a defining 
 
 To simplify temporary variable lookup we define first a helper method `lookupFrameDefiningTemporary:` that returns the frame in which a temporary is defined. 
 
+We defined the `includesVariableName:` little helper method as follows: 
+
+```
+CMethodScope >> includesVariableName: aName
+	^ variables includesKey: aName
+```
 
 ```
 CInterpreter >> lookupFrameDefiningTemporary: aName
 	| currentLookupFrame |
 	currentLookupFrame := self topFrame.
-	[ currentLookupFrame includesKey: aName ]
+	[ currentLookupFrame includesVariableName: aName ]
 		whileFalse: [ currentLookupFrame := currentLookupFrame at: #__definingContext ].
 	^ currentLookupFrame
 ```
@@ -556,6 +604,7 @@ When the block executes and returns, the value of its temporary should have been
 ```
 CInterpreterTest >> testIncreaseEnclosingTemporary 
 	self assert: (self executeSelector: #increaseEnclosingTemporary) equals: 1
+```
 
 ```
 CInterpreter >> visitAssignmentNode: anAssignmentNode
@@ -585,7 +634,7 @@ CInterpreter >> visitAssignmentNode: anAssignmentNode
 We have seen so far that blocks implicitly return the value of their last expression. 
 For example the method `lastExpression` will return 43.
 ```
-CHInterpretable >> lastExpression
+CInterpretable >> lastExpression
 	| tmp | 
 	tmp := 1.  
 	tmp := true ifTrue: [ tmp := 42. tmp := tmp + 1].
@@ -598,7 +647,7 @@ Return statements, instead, break the execution of the defining method, namely t
 For example, let's consider a method using `ifTrue:` to implement a guard which should stop the method execution if the guard fails:
 
 ```
-CHInterpretable >> methodWithGuard
+CInterpretable >> methodWithGuard
 	true ifTrue: [ ^ nil ].
 	^ self doSomethingExpensive
 ```
