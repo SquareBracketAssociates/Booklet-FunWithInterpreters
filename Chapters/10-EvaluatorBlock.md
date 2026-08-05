@@ -1,29 +1,7 @@
 ## Better Debugging
 
 
-### Improving Scope `printOn:`
 
-```
-CInstanceScope >> printOn: aStream
-	super printOn: aStream.
-	receiver ifNotNil: [ 
-			aStream nextPutAll: ' inst: '.
-			receiver printOn: aStream ]
-```
-
-```
-CMethodScope >> currentMethod
-	^ variables at: #___method
-```
-
-```
-CMethodScope >> printOn: aStream
-	super printOn: aStream.
-	receiver ifNotNil: [ 
-			aStream nextPutAll: ' rec: '.
-			receiver printOn: aStream.
-			aStream nextPutAll: ' selector: #' , self currentMethod selector ]
-```
 
 ## Block Closures
 
@@ -210,6 +188,35 @@ CInterpreter >> initializePrimitiveTable
 
 So far we implemented only a simple version of closures. 
 We will extend it in the following sections. 
+
+
+### Improving Scope `printOn:`
+
+We take a moment to improve the printing of scopes since it will help you to navigate through the scopes.
+
+```
+CInstanceScope >> printOn: aStream
+	super printOn: aStream.
+	receiver ifNotNil: [ 
+			aStream nextPutAll: ' inst: '.
+			receiver printOn: aStream ]
+```
+
+We also that the method `currentMethod` to the method scope. 
+
+```
+CMethodScope >> currentMethod
+	^ variables at: #___method
+```
+
+```
+CMethodScope >> printOn: aStream
+	super printOn: aStream.
+	receiver ifNotNil: [ 
+			aStream nextPutAll: ' rec: '.
+			receiver printOn: aStream.
+			aStream nextPutAll: ' selector: #' , self currentMethod selector ]
+```
 
 
 
@@ -509,7 +516,7 @@ CInterpreterTest >> testReadEnclosingTemporary
 		equals: 2
 ```
 
-The following scenario is also interesting. It shows that each block has a specific defining context that different temporary variables and that the second context is nested into the first one (see Figure *@nonlocalvariable2@*).
+The following scenario is also interesting. It shows that each block has a specific defining context that different temporary variables and that the second context is nested into the first one (see Figures *@nonlocalvariable2@* and *@nonlocalvariableScreen@*).
 
 ![ Temporaries  in `[ tempMethod + tempBlock ]`. %anchor=nonlocalvariable2 ](./figures/ReadNonLocalTemp2.pdf)
 
@@ -522,7 +529,7 @@ CInterpretable >> readDoublyNestedEnclosingTemporary
 		[ tempMethod + tempBlock ] value ] value
 ```
 
-![Browsing frames from `[ tempMethod + tempBlock ].` i.e., blocks should access temporaries defined in the definition context. %anchor=nonlocalvariable ](./figures/ReadDoublyScreenshot.png)
+![Browsing frames from `[ tempMethod + tempBlock ]`. %anchor=nonlocalvariableScreen ](./figures/ReadDoublyScreenshot.png)
 
 ### Temporary Lookup Implementation
 
@@ -566,23 +573,30 @@ CInterpreter >> primitiveBlockValue
 
 Finally we need to redefine temporary reads and writes.
 Temporary reads need to lookup the frame where the variable is defined and read the value from it.
-This is what what the method `visitTemporaryNode:` does.
-
+This is what what the method `visitVariableNode:` does. 
+- First we only look for temporary in a defining context if such defining context exist. This makes sure that in absence of block we can still look for temporary variables. In such case we look in the scope method.
+- Second, when a defining context is available we walk through the chain to find the corresponding context.
 
 ```
-CInterpreter >> visitTemporaryNode: aTemporaryNode
-	| definingFrame |
-	definingFrame := self lookupFrameDefiningTemporary: aTemporaryNode name.
-	^ definingFrame at: aTemporaryNode name
+CInterpreter >> visitVariableNode: aVariableNode
+	| name |
+	name := aVariableNode name.
+	(self topFrame includesVariableName: #__definingContext)
+		 ifTrue: [
+			| tempScope |
+			tempScope := self lookupFrameDefiningTemporary: name.
+			^ tempScope read: name ].	
+	^ (self scopeDefining: name) read: name
 ```
 
-
-Temporary writes are similar to read. We need to lookup the frame where the variable is defined and write the value to it.
+Now that we can read variable from the defining context of a block we should make sure that writes (assignments) to such temporary variables is working too. 
 
 
 ### Write Temporary Support
 
-Now that we can read variable from the defining context of a block we should make sure that writes (assignments) to such temporary variables is working too. 
+Temporary writes are similar to read. We need to lookup the frame where the variable is defined and write the value to it.
+
+
 
 ```
 CInterpretable >> increaseEnclosingTemporary
@@ -614,7 +628,7 @@ CInterpreter >> visitAssignmentNode: anAssignmentNode
 		ifTrue: [ | definingFrame |
 			definingFrame := self
 				lookupFrameDefiningTemporary: anAssignmentNode variable name.
-			definingFrame at: aRBAssignmentNode variable name put: rightSide ]
+			definingFrame at: anAssignmentNode variable name put: rightSide ]
 		ifFalse: [ anAssignmentNode variable variable 
 					write: rightSide 
 					to: self receiver ].
@@ -633,6 +647,7 @@ CInterpreter >> visitAssignmentNode: anAssignmentNode
 
 We have seen so far that blocks implicitly return the value of their last expression. 
 For example the method `lastExpression` will return 43.
+
 ```
 CInterpretable >> lastExpression
 	| tmp | 
