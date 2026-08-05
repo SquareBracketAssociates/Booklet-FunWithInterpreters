@@ -332,19 +332,20 @@ In the previous example the distinction is not done because the definition conte
 However, as soon as we work on more complex scenarios, where blocks are sent as arguments of methods, or stored in temporary variables, this does not hold anymore.
 
 Let us check the following example.
-A variable is looked up in the block definition context. We define two methods `setVariableAndDefineBlock` and `setVariableAndDefineBlock:`. The first one defines a variable `t` and sets it to 42, and a block `[t traceCr]`.
+A variable is looked up in the block definition context. We define two methods `setVariableAndDefineBlock` and `setVariableAndDefineBlock:`. The first one defines a variable `t` and sets it to 42, and a block `[ t ]`.
 The second one defines a new variable with the same name and executes a block defined elsewhere.
 
 ```
 CInterpretable >> setVariableAndDefineBlock
+	
 	| t |
 	t := 42.
-	self evaluateBlock: [ t traceCr ]
+	^ self evaluateBlock: [ t ]
 	
 CInterpretable >> evaluateBlock: aBlock
 	| t |
 	t := nil.
-	aBlock value	
+	^ aBlock value
 
 CInterpretable new setVariableAndDefineBlock 
 >>> 42
@@ -456,50 +457,38 @@ We leave it as an exercise for the reader to verify their correctness.
 
 ### Looking up Temporaries in Lexical Contexts
 
-
 A problem we have not solved yet involves the reads and writes of temporary variables that are not part of the current frame.
-This is the case when a block tries to access a temporary of a parent lexical scope, such as another surrounding scope, or the home method.
-The method `increaseEnclosingTemporary` is an example of such a situation: the block `[ temp := temp + 1 ]`  will access during its execution 
-the temporary variable that was defined outside of the block. 
-Note that the execution of the block could happen in another method and still be block should be able to access the temporary variable `temp`.
+This is the case when a block tries to access a temporary of a parent lexical scope, such as another surrounding scope, or the home method. Our next scenario should check that blocks can correctly read and write temporaries of their enclosing contexts.
 
-Our next scenario checks that blocks can correctly read and write temporaries of their enclosing contexts.
-In our test, the enclosing environment creates a temporary. The block reads that value and increases it by one.
-When the block executes and returns, the value of its temporary should have been updated from 0 to 1.
+The following method `readEnclosingTemporary` shows that the block `[ temp + temp ]` should be able to access the temporary variable `temp` defined in the method `readEnclosingTemporary`. Note that such temporary could have been defined in another method and passed as an argument to another method.
 
 ```
-CInterpretable >> increaseEnclosingTemporary
+CInterpretable >> readEnclosingTemporary
 	| temp |
-	temp := 0.
-	[ temp := temp + 1 ] value.
-	^ temp
+	temp := 1.
+	^ [ temp + temp ] value.
+```
 
-CInterpreterTest >> testIncreaseEnclosingTemporary 
-	self assert: (self executeSelector: #increaseEnclosingTemporary) equals: 1
+To validate this scenario the following test make sures that the correct behavior is implemented. 
+```
+CInterpreterTest >> testReadEnclosingTemporary 
+	self 
+		assert: (self executeSelector: #readEnclosingTemporary) 
+		equals: 2
 ```
 
 
+![Reading `temp` in `[ temp + temp ]` ](./figures/ReadNonLocalTemp.pdf)
 
-!!note should add some diagrams here
+
+
+### Temporary Lookup Implementation
 
 This scenario is resolved by implementing a temporary variable lookup in the block's _defining_ context.
 Of course, a block could be defined inside another's block context, so our lookup needs to be lookup through the complete context chain.
 The lookup should stop when the current lookup context does not have a defining context i.e., it is a method and not a block.
 
 To simplify temporary variable lookup we define first a helper method `lookupFrameDefiningTemporary:` that returns the frame in which a temporary is defined. 
-This method returns a frame. It has to walk from a frame to its defining frame up to a method. 
-However, so far the only object in our design knowing the defining frame is the block \(via its instance variable `definingContext`\), and we do not have any way to access a block from its frame.
-
-One possibility is to store a block reference in its frame when it is activated, and then go from a frame to its block to its defining frame and continue the lookup. Another possibility, which we will implement, is to directly store the defining context in the frame when the block is activated.
-
-```
-CInterpreter >> primitiveBlockValue
-	| theBlock |
-	theBlock := self receiver.
-	self receiver: (theBlock definingContext at: #self).
-	self tempAt: #__definingContext put: theBlock definingContext.
-	^ self visitNode: theBlock code body
-```
 
 
 ```
@@ -511,16 +500,23 @@ CInterpreter >> lookupFrameDefiningTemporary: aName
 	^ currentLookupFrame
 ```
 
+This method returns a frame. It has to walk from a frame to its defining frame up to a method. 
+However, so far the only object in our design knowing the defining frame is the block (via its instance variable `definingContext`), and we do not have any way to access a block from its frame.
+
+One possibility is to store a block reference in its frame when it is activated, and then go from a frame to its block to its defining frame and continue the lookup. Another possibility, which we will implement, is to directly store the defining context in the frame when the block is activated.
+We enhance the definition of `primitiveBlockValue` to store the context in which the block is defined. 
+
+```
+CInterpreter >> primitiveBlockValue
+	| theBlock |
+	theBlock := self receiver.
+	self receiver: theBlock definingContext receiver.
+	self tempAt: #__definingContext put: theBlock definingContext.
+	^ self visitNode: theBlock code body
+```
 
 
-
-
-
-
-
-!!note should add some diagrams here
-
-Now we need to redefine temporary reads and writes.
+Finally we need to redefine temporary reads and writes.
 Temporary reads need to lookup the frame where the variable is defined and read the value from it.
 This is what what the method `visitTemporaryNode:` does.
 
@@ -535,20 +531,45 @@ CInterpreter >> visitTemporaryNode: aTemporaryNode
 
 Temporary writes are similar to read. We need to lookup the frame where the variable is defined and write the value to it.
 
+
+### Write Temporary Support
+
+Now that we can read variable from the defining context of a block we should make sure that writes (assignments) to such temporary variables is working too. 
+
 ```
-CInterpreter >> visitAssignmentNode: aRBAssignmentNode [
+CInterpretable >> increaseEnclosingTemporary
+	| temp |
+	temp := 0.
+	[ temp := temp + 1 ] value.
+	^ temp
+```
+
+The method `increaseEnclosingTemporary` is an example of such a situation: the block `[ temp := temp + 1 ]`  will access during its execution  the temporary variable that was defined outside of the block. 
+
+Note that the execution of the block could happen in another method and still the block should be able to access the temporary variable `temp`.
+
+
+In our test, the enclosing environment creates a temporary. The block reads that value and increases it by one.
+When the block executes and returns, the value of its temporary should have been updated from 0 to 1.
+
+
+```
+CInterpreterTest >> testIncreaseEnclosingTemporary 
+	self assert: (self executeSelector: #increaseEnclosingTemporary) equals: 1
+
+```
+CInterpreter >> visitAssignmentNode: anAssignmentNode
 	| rightSide |
-	rightSide := self visitNode: aRBAssignmentNode value.
-	aRBAssignmentNode variable variable isTempVariable
+	rightSide := self visitNode: anAssignmentNode value.
+	anAssignmentNode variable variable isTempVariable
 		ifTrue: [ | definingFrame |
 			definingFrame := self
-				lookupFrameDefiningTemporary: aRBAssignmentNode variable name.
+				lookupFrameDefiningTemporary: anAssignmentNode variable name.
 			definingFrame at: aRBAssignmentNode variable name put: rightSide ]
-		ifFalse: [ aRBAssignmentNode variable variable 
+		ifFalse: [ anAssignmentNode variable variable 
 					write: rightSide 
 					to: self receiver ].
 	^ rightSide
-]
 ```
 
 
