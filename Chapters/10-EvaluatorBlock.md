@@ -606,13 +606,13 @@ CInterpretable >> increaseEnclosingTemporary
 	^ temp
 ```
 
-The method `increaseEnclosingTemporary` is an example of such a situation: the block `[ temp := temp + 1 ]`  will access during its execution  the temporary variable that was defined outside of the block. 
+The method `increaseEnclosingTemporary` is an example of such a situation: the block `[ temp := temp + 1 ]`  will access during its execution  the temporary variable that was defined outside of the block. The defining context variable should be updated.
 
 Note that the execution of the block could happen in another method and still the block should be able to access the temporary variable `temp`.
 
-
 In our test, the enclosing environment creates a temporary. The block reads that value and increases it by one.
-When the block executes and returns, the value of its temporary should have been updated from 0 to 1.
+When the block executes and modifies the variable it captured and that it allocated in the enclosing environment. 
+The value of its temporary should be 1.
 
 
 ```
@@ -622,24 +622,29 @@ CInterpreterTest >> testIncreaseEnclosingTemporary
 
 ```
 CInterpreter >> visitAssignmentNode: anAssignmentNode
-	| rightSide |
+	| rightSide name|
 	rightSide := self visitNode: anAssignmentNode value.
-	anAssignmentNode variable variable isTempVariable
+	name := anAssignmentNode variable name.
+	(self topFrame includesVariableName: #__definingContext)
 		ifTrue: [ | definingFrame |
 			definingFrame := self
-				lookupFrameDefiningTemporary: anAssignmentNode variable name.
+				lookupFrameDefiningTemporary:  name.
 			definingFrame at: anAssignmentNode variable name put: rightSide ]
-		ifFalse: [ anAssignmentNode variable variable 
-					write: rightSide 
-					to: self receiver ].
+		ifFalse: [ (self scopeDefining: name)
+    write: name
+    withValue: rightSide ].
 	^ rightSide
 ```
 
 
+We can now also verify that the execution `setVariableAndDefineBlock` is correct too.
 
-
-
-
+```
+CInterpreterTest >> testSetVariableAndDefineBlock
+	self 
+		assert: (self executeSelector: #setVariableAndDefineBlock)
+		equals: 42
+```
 
 
 ### Block Non-Local Return
