@@ -646,6 +646,100 @@ CInterpreterTest >> testSetVariableAndDefineBlock
 		equals: 42
 ```
 
+### Curing from Magic Numbers
+
+Non local variables are working and all the tests pass so this is a good moment to refactor the code to avoid to spread magic numbers such as `#__definingContext` all over the places.
+
+First we defining the methods `hasDefiningContext` in each of the scope.
+
+```
+CMethodScope >> hasDefiningContext 
+	^ self includesVariableName: #__definingContext
+```
+
+```
+CInstanceScope >> hasDefiningContext 
+	^ false
+```
+
+```
+CGlobalScope >> hasDefiningContext 
+	^ false
+```
+
+#### Revisit the `visit` Methods.
+Then we use the newly introduced methods to remove exposing this internal logic. 
+We rewrite the method `visitVariableNode:` and `visitAssignmentNode:`.
+
+```
+CInterpreter >> visitVariableNode: aVariableNode
+	| name |
+	name := aVariableNode name.
+	self topFrame hasDefiningContext
+		 ifTrue: [
+			| tempScope |
+			tempScope := self lookupFrameDefiningTemporary: name.
+			^ tempScope read: name ].	
+	^ (self scopeDefining: name) read: name
+```
+
+```
+CInterpreter >> visitAssignmentNode: anAssignmentNode
+	| rightSide name|
+	rightSide := self visitNode: anAssignmentNode value.
+	name := anAssignmentNode variable name.
+	self topFrame hasDefiningContext
+		ifTrue: [ | definingFrame |
+			definingFrame := self
+				lookupFrameDefiningTemporary:  name.
+			definingFrame at: anAssignmentNode variable name put: rightSide ]
+		ifFalse: [ (self scopeDefining: name)
+    write: name
+    withValue: rightSide ].
+	^ rightSide
+```
+
+#### Revisit `value` Primitive.
+We continue to hide encodings. We define the method `definingContext` and `definingContext:`.
+
+```
+CInterpreter >> definingContext
+	^ self tempAt: #__definingContext
+```
+
+```
+CInterpreter >> definingContext: aContext
+	self tempAt: #__definingContext put: aContext
+```
+
+Using such special accessors we redefine `primitiveBlockValue`.
+
+```
+CInterpreter >> primitiveBlockValue
+	| theBlock |
+	theBlock := self receiver.
+	self receiver: theBlock definingContext receiver.
+	self definingContext: theBlock definingContext.
+	^ self visitNode: theBlock code body
+```
+
+#### Revisit Temporary Lookup.
+Finally we encapsulate the encoding of the defining context within the method scope. 
+
+```
+CMethodScope >> definingContext 
+	^ variables at: #__definingContext
+```	
+
+We rewrite the `lookupFrameDefiningTemporary:` method using the new message `definingContext`.
+```
+CIntepreter >> lookupFrameDefiningTemporary: aName
+	"Precondition the variable should be defined within the frame hierarchy."
+	| currentLookupFrame |
+	currentLookupFrame := self topFrame.
+	[ currentLookupFrame includesVariableName: aName ]
+		whileFalse: [ currentLookupFrame := currentLookupFrame definingContext ].
+```
 
 ### Block Non-Local Return
 
@@ -784,9 +878,3 @@ CHInterpreter >> visitReturnNode: aReturnNode [
 
 
 In this chapter we have extended our evaluator with block closures. Our block closure implementation required adding a kind of object to our runtime, `CHBlock`, to represent blocks containing some AST. Then we refined our evaluator to define a block evaluation primitive, and correctly set up the lexical context. Our lexical context implementation gives blocks access to the defining context's receiver and temporaries. We then shown a first implementation of non-local returns, using exceptions to unwind the stack.
-
-
-
-## Todo 
-
-- make sure that methodScope does not have a separate field for receiver but use the frame in previous chapter.
