@@ -744,8 +744,7 @@ CIntepreter >> lookupFrameDefiningTemporary: aName
 
 SD: here for now
 
-### Block Non-Local Return
-
+### Block Non-Local Returns
 
 We have seen so far that blocks implicitly return the value of their last expression. 
 For example, the method `lastExpression` will return 43.
@@ -758,6 +757,16 @@ CInterpretable >> lastExpression
 	^ tmp
 ```
 
+The following test validates this behavior.
+
+```
+CInterpreterTest >> testLastExpression
+
+	self 
+		assert: (self executeSelector: #lastExpression)
+		equals: 43
+```
+
 
 Now this is a completely different story when a block contains an explicit return statement. 
 Return statements, instead, break the execution of the defining method, namely the home method, and return from it.
@@ -766,115 +775,124 @@ For example, let's consider a method using `ifTrue:` to implement a guard which 
 ```
 CInterpretable >> methodWithGuard
 	true ifTrue: [ ^ nil ].
-	^ self doSomethingExpensive
+	^ self lastExpression
 ```
 
+%!!note put a figure here to show the stack, the blocks, their relationships.
 
-!!note put a figure here to show the stack, the blocks, their relationships.
-
-When executing this method, the message `doSomethingExpensive` will never be executed. The execution of the method `methodWithGuard` will be stopped by the return statement in the block `[^ nil]`.
+When executing this method, the message `lastExpression` will never be executed. The execution of the method `methodWithGuard` will be stopped by the return statement in the block `[^ nil]`.
 
 More precisely, the block is not activated by `methodWithGuard`. `methodWithGuard` executes the message `ifTrue:` which in turn activates the `[^ nil]`. Still, this block knows the context of `methodWithGuard` as its defining context.
-When the block executes, the return statement should not return `nil` to the `ifTrue:` context: it should return _from_  `methodWithGuard` with the `nil` value, as if it was the return value of the method. 
-Because of this, we call such return inside blocks "non-local returns", because they return from a non-local context, its home context.
 
-The block may have been passed around, when the block executes a return statement, it will return from the method that created the block. 
-We say that the execution quits the home context of the block \(the context of the method that defined it\).
+When the block executes, the return statement should not return `nil` to the `ifTrue:` context: it should return _from_ `methodWithGuard` with the `nil` value, as if it was the return value of the method.
 
-To implement non-local returns, we will first start by defining a new helper method: `homeFrameOf:` that returns the home frame of a frame. 
+Because of this, we call such return inside blocks "non-local returns", because they return from a non-local context, the block's home context.
+
+The block may have been passed around, when the block executes a return statement, it will return _from_ the method that created the block. 
+We say that the execution quits the home context of the block (the context of the method that defined it).
+
+
+With the current implementation the following test should fail:
+
+```
+CInterpreterTest >> testSimpleNonLocal
+
+	self 
+		assert: (self executeSelector: #methodWithGuard)
+		equals: nil
+```
+
+### Non Local-Return Implementation 
+
+To implement non-local returns, we will first start by defining a new helper method: 
+the method `homeFrame` returns the home frame. 
+
 The home frame is the frame that has a defining context. 
 Note that the home frame of a normal method frame is itself.
 
 ```
-CHInterpreter >> homeFrame [
+CInterpreter >> homeFrame
 	| currentLookupFrame |
 	currentLookupFrame := self topFrame.
-	[ currentLookupFrame includesKey: #__definingContext ]
+	[ currentLookupFrame includesVariableName: #__definingContext ]
 		whileTrue: [ currentLookupFrame := currentLookupFrame at: #__definingContext ].
 	^ currentLookupFrame
-]
 ```
 
+SD: I need a test
 
-!!note add a diagram
 
 A simple way to implement non-local returns in Pharo is by using exceptions: exceptions unwind automatically the call-stack, thus short-circuiting the execution of all methods automatically.
 
-We define a new exception called `CHReturn`. It refers to the home frame and a value.
-```
-Error subclass: #CHReturn
-	instanceVariableNames: 'value homeFrame'
-	classVariableNames: ''
-	package: 'Champollion-Core'
-```
-
+We define a new exception called `CReturn`. It holds two piece of information: the home frame and a value.
 
 ```
-CHReturn >> homeFrame [
-  ^ homeFrame
-]
-```
-
-
-```
-CHReturn >> homeFrame: aFrame [
-  homeFrame := aFrame
-]
+Error subclass: #CReturn
+	slots: {#value . #homeFrame};
+	package: 'Champollion'
 ```
 
 ```
-CHReturn >> value [
-  ^ value
-]
+CReturn >> homeFrame
+	^ homeFrame
 ```
 
 ```
-CHReturn >> value: aValue [
-  value := aValue
-]
+CReturn >> homeFrame: aFrame 
+	homeFrame := aFrame
 ```
+
+```
+CReturn >> value
+	^ value
+```
+
+```
+CReturn >> value: aValue
+	value := aValue
+```
+
+When we visit a return we raise a return exception and we pass the context.
+
+```
+CInterpreter >> visitReturnNode: aReturnNode
+	CReturn new
+		value: (self visitNode: aReturnNode value);
+		homeFrame: self homeFrame;
+		signal
+```
+
+
 
 
 When we activate a method we then need to prepare ourselves to catch the exception indicating a return, and only manage it if the return is targetting the current method's context:
 
 SD: we should explain more the `returnFrom homeFrame = thisFrame`
 ```
-CHInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection [
-	| result thisFrame |	
-	thisFrame := self pushNewFrame.
+CInterpreter >> execute: anAST withReceiver: anObject andArguments: aCollection
 
+	| result thisFrame |	
+	thisFrame := self pushNewMethodFrame.
 	self tempAt: #__method put: anAST.
 	self tempAt: #self put: anObject.
-	anAST arguments with: aCollection
-		do: [ :arg :value | self tempAt: arg name put: value ].
-
+	self manageArguments: aCollection of: anAST.
+	self topFrame parentScope: (CInstanceScope new
+			 receiver: anObject;
+			 parentScope: globalScope;
+			 yourself).
+	self topFrame receiver: anObject.
 	result := [ self visitNode: anAST ]
-		on: CHReturn 				"A return statement was executed"
+		on: CReturn "A return statement was executed"
 		do: [ :return | 
 			return homeFrame = thisFrame
 				ifTrue: [ return value ]
 				ifFalse: [ return pass ] ].
-
 	self popFrame.
 	^ result
-]
 ```
 
 
-
-When we visit a return we raise a return exception and we pass the context.
-SD: need more explanation.
-
-```
-CHInterpreter >> visitReturnNode: aReturnNode [
-  CHReturn new
-		value: (self visitNode: aReturnNode value);
-		homeFrame: self homeFrame;
-		signal
-]
-```
-
-
+Need a test here or more
 
 
 ### Conclusion
