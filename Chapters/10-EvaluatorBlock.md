@@ -494,7 +494,7 @@ We leave it as an exercise for the reader to verify their correctness.
 A problem we have not solved yet involves the reads and writes of temporary variables that are not part of the current frame.
 This is the case when a block tries to access a temporary of a parent lexical scope, such as another surrounding scope, or the home method. Our next scenario should check that blocks can correctly read and write temporaries of their enclosing contexts.
 
-The following method `readEnclosingTemporary` shows that the block `[ temp + temp ]` should be able to access the temporary variable `temp` defined in the method `readEnclosingTemporary` (See Figure *@nonlocalvariable@*). Note that such temporary could have been defined in another method and passed as an argument to another method.
+The following method `readEnclosingTemporary` shows that the block `[ temp + temp ]` should be able to access the temporary variable `temp` defined in the method `readEnclosingTemporary` (See Figure *@nonlocalvariable@*). Note that such a temporary could have been defined in another method and passed as an argument to another method.
 
 ```
 CInterpretable >> readEnclosingTemporary
@@ -503,11 +503,11 @@ CInterpretable >> readEnclosingTemporary
 	^ [ temp + temp ] value.
 ```
 
-Figure *@nonlocalvariable@* illustrates that 
+Figure *@nonlocalvariable@* illustrates that blocks should access temporaries defined in the definition context.
 
 ![Reading `temp` in `[ temp + temp ].` i.e., blocks should access temporaries defined in the definition context. %anchor=nonlocalvariable ](./figures/ReadNonLocalTemp.pdf)
 
-To validate this scenario the following test make sures that the correct behavior is implemented. 
+To validate this scenario, the following test makes sure that the correct behavior is implemented. 
 
 ```
 CInterpreterTest >> testReadEnclosingTemporary 
@@ -516,7 +516,7 @@ CInterpreterTest >> testReadEnclosingTemporary
 		equals: 2
 ```
 
-The following scenario is also interesting. It shows that each block has a specific defining context that different temporary variables and that the second context is nested into the first one (see Figures *@nonlocalvariable2@* and *@nonlocalvariableScreen@*).
+The following scenario is also interesting. It shows that each block has a specific defining context for different temporary variables and that the second context is nested into the first one (see Figures *@nonlocalvariable2@* and *@nonlocalvariableScreen@*).
 
 ![ Temporaries  in `[ tempMethod + tempBlock ]`. %anchor=nonlocalvariable2 ](./figures/ReadNonLocalTemp2.pdf)
 
@@ -589,13 +589,12 @@ CInterpreter >> visitVariableNode: aVariableNode
 	^ (self scopeDefining: name) read: name
 ```
 
-Now that we can read variable from the defining context of a block we should make sure that writes (assignments) to such temporary variables is working too. 
+Now that we can read variables from the defining context of a block, we should make sure that writes (assignments) to such temporary variables is working too. 
 
 
 ### Write Temporary Support
 
-Temporary writes are similar to read. We need to lookup the frame where the variable is defined and write the value to it.
-
+Temporary writes are similar to read. We need to look up the frame where the variable is defined and write the value to it.
 
 
 ```
@@ -606,9 +605,9 @@ CInterpretable >> increaseEnclosingTemporary
 	^ temp
 ```
 
-The method `increaseEnclosingTemporary` is an example of such a situation: the block `[ temp := temp + 1 ]`  will access during its execution  the temporary variable that was defined outside of the block. The defining context variable should be updated.
+The method `increaseEnclosingTemporary` is an example of such a situation: the block `[ temp := temp + 1 ]`  will access during its execution the temporary variable that was defined outside of the block. The defining context variable should be updated.
 
-Note that the execution of the block could happen in another method and still the block should be able to access the temporary variable `temp`.
+Note that the execution of the block could happen in another method, and still the block should be able to access the temporary variable `temp`.
 
 In our test, the enclosing environment creates a temporary. The block reads that value and increases it by one.
 When the block executes and modifies the variable it captured and that it allocated in the enclosing environment. 
@@ -648,9 +647,9 @@ CInterpreterTest >> testSetVariableAndDefineBlock
 
 ### Curing from Magic Numbers
 
-Non local variables are working and all the tests pass so this is a good moment to refactor the code to avoid to spread magic numbers such as `#__definingContext` all over the places.
+Non-local variables are working, and all the tests pass so this is a good moment to refactor the code to avoid spreading magic numbers such as `#__definingContext` all over the place.
 
-First we defining the methods `hasDefiningContext` in each of the scope.
+First, we define the methods `hasDefiningContext` in each of the scope.
 
 ```
 CMethodScope >> hasDefiningContext 
@@ -669,7 +668,7 @@ CGlobalScope >> hasDefiningContext
 
 #### Revisit the `visit` Methods.
 Then we use the newly introduced methods to remove exposing this internal logic. 
-We rewrite the method `visitVariableNode:` and `visitAssignmentNode:`.
+We rewrite the methods `visitVariableNode:` and `visitAssignmentNode:`.
 
 ```
 CInterpreter >> visitVariableNode: aVariableNode
@@ -694,8 +693,8 @@ CInterpreter >> visitAssignmentNode: anAssignmentNode
 				lookupFrameDefiningTemporary:  name.
 			definingFrame at: anAssignmentNode variable name put: rightSide ]
 		ifFalse: [ (self scopeDefining: name)
-    write: name
-    withValue: rightSide ].
+		    write: name
+		    withValue: rightSide ].
 	^ rightSide
 ```
 
@@ -712,7 +711,7 @@ CInterpreter >> definingContext: aContext
 	self tempAt: #__definingContext put: aContext
 ```
 
-Using such special accessors we redefine `primitiveBlockValue`.
+Using such special accessors, we redefine `primitiveBlockValue`.
 
 ```
 CInterpreter >> primitiveBlockValue
@@ -724,7 +723,7 @@ CInterpreter >> primitiveBlockValue
 ```
 
 #### Revisit Temporary Lookup.
-Finally we encapsulate the encoding of the defining context within the method scope. 
+Finally, we encapsulate the encoding of the defining context within the method scope. 
 
 ```
 CMethodScope >> definingContext 
@@ -741,22 +740,26 @@ CIntepreter >> lookupFrameDefiningTemporary: aName
 		whileFalse: [ currentLookupFrame := currentLookupFrame definingContext ].
 ```
 
+
+
+SD: here for now
+
 ### Block Non-Local Return
 
 
 We have seen so far that blocks implicitly return the value of their last expression. 
-For example the method `lastExpression` will return 43.
+For example, the method `lastExpression` will return 43.
 
 ```
 CInterpretable >> lastExpression
 	| tmp | 
 	tmp := 1.  
-	tmp := true ifTrue: [ tmp := 42. tmp := tmp + 1].
+	tmp := true ifTrue: [ tmp := 42. tmp := tmp + 1 ].
 	^ tmp
 ```
 
 
-Now this is a complete different story when a block contains an explicit return statement. 
+Now this is a completely different story when a block contains an explicit return statement. 
 Return statements, instead, break the execution of the defining method, namely the home method, and return from it.
 For example, let's consider a method using `ifTrue:` to implement a guard which should stop the method execution if the guard fails:
 
