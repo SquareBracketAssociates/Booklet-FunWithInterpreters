@@ -326,6 +326,21 @@ body {
   font-weight: 700;
 }
 
+/* A part (a # header when chapters are ##): a heading that groups the chapters after it (site.mustache marks it). */
+.toc li[data-part] {
+  margin: 1.1rem 0 0.4rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.toc li[data-part] > a {
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 /* Numbers of chapters, sections and figures (MicBookHTMLVisitor, site.mustache). */
 .number {
   color: var(--muted);
